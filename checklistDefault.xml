@@ -1,111 +1,642 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ArrayOfCheckListItem xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <CheckListItem>
-    <TrueColor>Green</TrueColor>
-    <FalseColor>Red</FalseColor>
-    <Description>Veryify GPS</Description>
-    <Text>{value} &gt;= 3</Text>
-    <TriggerValue>3</TriggerValue>
-    <Name>gpsstatus</Name>
-    <ConditionType>GTEQ</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>Green</TrueColor>
-    <FalseColor>Red</FalseColor>
-    <Description>Gps Sat Count</Description>
-    <Text>{value} Sats</Text>
-    <TriggerValue>5</TriggerValue>
-    <Name>satcount</Name>
-    <ConditionType>GTEQ</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>Green</TrueColor>
-    <FalseColor>Red</FalseColor>
-    <Description>Telemetry Signal</Description>
-    <Text>{value}%</Text>
-    <TriggerValue>95</TriggerValue>
-    <Name>linkqualitygcs</Name>
-    <ConditionType>GT</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>Green</TrueColor>
-    <FalseColor>Red</FalseColor>
-    <Description>Battery Level</Description>
-    <Text>{value} V</Text>
-    <TriggerValue>22</TriggerValue>
-    <Name>battery_voltage</Name>
-    <ConditionType>GT</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>White</TrueColor>
-    <FalseColor>White</FalseColor>
-    <Description>Mode</Description>
-    <Text>{value}</Text>
-    <TriggerValue>0</TriggerValue>
-    <Name>mode</Name>
-    <ConditionType>NONE</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>White</TrueColor>
-    <FalseColor>White</FalseColor>
-    <Description>Check Altitude</Description>
-    <Text>{value} &lt; 5m</Text>
-    <TriggerValue>5</TriggerValue>
-    <Name>alt</Name>
-    <ConditionType>LT</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>White</TrueColor>
-    <FalseColor>White</FalseColor>
-    <Description>Tail and wings secured?</Description>
-    <Text />
-    <TriggerValue>0</TriggerValue>
-    <Name>roll</Name>
-    <ConditionType>NONE</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>White</TrueColor>
-    <FalseColor>White</FalseColor>
-    <Description>All servos respond to input?</Description>
-    <Text />
-    <TriggerValue>0</TriggerValue>
-    <Name>roll</Name>
-    <ConditionType>NONE</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>White</TrueColor>
-    <FalseColor>White</FalseColor>
-    <Description>All servos respond to pitch and roll?</Description>
-    <Text />
-    <TriggerValue>0</TriggerValue>
-    <Name>roll</Name>
-    <ConditionType>NONE</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>White</TrueColor>
-    <FalseColor>White</FalseColor>
-    <Description>Center of gravity at indicated point?</Description>
-    <Text />
-    <TriggerValue>0</TriggerValue>
-    <Name>roll</Name>
-    <ConditionType>NONE</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>White</TrueColor>
-    <FalseColor>White</FalseColor>
-    <Description>Servo linkages are secure?</Description>
-    <Text />
-    <TriggerValue>0</TriggerValue>
-    <Name>roll</Name>
-    <ConditionType>NONE</ConditionType>
-  </CheckListItem>
-  <CheckListItem>
-    <TrueColor>White</TrueColor>
-    <FalseColor>White</FalseColor>
-    <Description>Camera is on and ready to fly?</Description>
-    <Text />
-    <TriggerValue>0</TriggerValue>
-    <Name>roll</Name>
-    <ConditionType>NONE</ConditionType>
-  </CheckListItem>
+<ArrayOfCheckListItem xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<CheckListItem>
+		<TrueColor>Aqua</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>**USER** Mission plan checked</Description>
+		<Text />
+		<TriggerValue>0</TriggerValue>
+		<Name>parent</Name>
+		<ConditionType>NONE</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Aqua</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>**USER** Pre-flight calibration</Description>
+		<Text />
+		<TriggerValue>0</TriggerValue>
+		<Name>parent</Name>
+		<ConditionType>NONE</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Aqua</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>**USER** Control surface check</Description>
+		<Text />
+		<TriggerValue>0</TriggerValue>
+		<Name>parent</Name>
+		<ConditionType>NONE</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Aqua</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>**USER** Flight mode check</Description>
+		<Text />
+		<TriggerValue>0</TriggerValue>
+		<Name>parent</Name>
+		<ConditionType>NONE</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Aqua</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>**USER** {Q_RTL_ALT}</Description>
+		<Text>QRTL return height is {value} m</Text>
+		<TriggerValue>20</TriggerValue>
+		<Name>PARAM</Name>
+		<ConditionType>NONE</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Aqua</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>**USER** {FENCE_TOTAL}</Description>
+		<Text>Geofence polygon uploaded</Text>
+		<TriggerValue>0</TriggerValue>
+		<Name>PARAM</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Airspeed reading</Description>
+		<Text>{value} m/s &lt; {trigger} m/s</Text>
+		<TriggerValue>1.6</TriggerValue>
+		<Name>airspeed</Name>
+		<ConditionType>LT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>-0.5</TriggerValue>
+			<Name>alt</Name>
+			<ConditionType>GT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Home altitude</Description>
+		<Text>-{trigger} m &lt; {value} m &lt; {trigger} m</Text>
+		<TriggerValue>0.5</TriggerValue>
+		<Name>alt</Name>
+		<ConditionType>LT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Waypoint set</Description>
+		<Text>Wp {value}</Text>
+		<TriggerValue>1</TriggerValue>
+		<Name>wpno</Name>
+		<ConditionType>LTEQ</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>0</TriggerValue>
+			<Name>rangefinder1</Name>
+			<ConditionType>GT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Rangefinder</Description>
+		<Text>0 cm &lt; {value} cm &lt; {trigger} cm</Text>
+		<TriggerValue>30</TriggerValue>
+		<Name>rangefinder1</Name>
+		<ConditionType>LT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Battery 1 voltage</Description>
+		<Text>{value} V &gt; {trigger} V</Text>
+		<TriggerValue>49.5</TriggerValue>
+		<Name>battery_voltage2</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Battery 2 voltage</Description>
+		<Text>{value} V &gt; {trigger} V</Text>
+		<TriggerValue>49.5</TriggerValue>
+		<Name>battery_voltage3</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>0</TriggerValue>
+			<Name>gpshdop</Name>
+			<ConditionType>GT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>GPS 1 accuracy</Description>
+		<Text>{value} m &lt; {trigger} m</Text>
+		<TriggerValue>0.6</TriggerValue>
+		<Name>gpshdop</Name>
+		<ConditionType>LT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>GPS 1 satellite count</Description>
+		<Text>{value} sats &gt; {trigger} sats</Text>
+		<TriggerValue>20</TriggerValue>
+		<Name>satcount</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>0</TriggerValue>
+			<Name>gpshdop2</Name>
+			<ConditionType>GT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>GPS 2 accuracy</Description>
+		<Text>{value} m &lt; {trigger} m</Text>
+		<TriggerValue>0.6</TriggerValue>
+		<Name>gpshdop2</Name>
+		<ConditionType>LT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>GPS 2 satellite count</Description>
+		<Text>{value} sats &gt; {trigger} sats</Text>
+		<TriggerValue>20</TriggerValue>
+		<Name>satcount2</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>0</TriggerValue>
+			<Name>magfield</Name>
+			<ConditionType>GT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Compass magfield</Description>
+		<Text>{value} mGauss &lt; {trigger} mGauss</Text>
+		<TriggerValue>700</TriggerValue>
+		<Name>magfield</Name>
+		<ConditionType>LT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<Child>
+				<Child>
+					<Child>
+						<Child>
+							<TrueColor>0</TrueColor>
+							<FalseColor>0</FalseColor>
+							<Description />
+							<Text />
+							<TriggerValue>-980</TriggerValue>
+							<Name>az</Name>
+							<ConditionType>LT</ConditionType>
+						</Child>
+						<TrueColor>0</TrueColor>
+						<FalseColor>0</FalseColor>
+						<Description />
+						<Text />
+						<TriggerValue>-1020</TriggerValue>
+						<Name>az</Name>
+						<ConditionType>GT</ConditionType>
+					</Child>
+					<TrueColor>0</TrueColor>
+					<FalseColor>0</FalseColor>
+					<Description />
+					<Text />
+					<TriggerValue>25</TriggerValue>
+					<Name>ay</Name>
+					<ConditionType>LT</ConditionType>
+				</Child>
+				<TrueColor>0</TrueColor>
+				<FalseColor>0</FalseColor>
+				<Description />
+				<Text />
+				<TriggerValue>-25</TriggerValue>
+				<Name>ay</Name>
+				<ConditionType>GT</ConditionType>
+			</Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>110</TriggerValue>
+			<Name>ax</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Accelerometer 1</Description>
+		<Text />
+		<TriggerValue>-110</TriggerValue>
+		<Name>ax</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<Child>
+				<Child>
+					<Child>
+						<Child>
+							<TrueColor>0</TrueColor>
+							<FalseColor>0</FalseColor>
+							<Description />
+							<Text />
+							<TriggerValue>-980</TriggerValue>
+							<Name>az2</Name>
+							<ConditionType>LT</ConditionType>
+						</Child>
+						<TrueColor>0</TrueColor>
+						<FalseColor>0</FalseColor>
+						<Description />
+						<Text />
+						<TriggerValue>-1020</TriggerValue>
+						<Name>az2</Name>
+						<ConditionType>GT</ConditionType>
+					</Child>
+					<TrueColor>0</TrueColor>
+					<FalseColor>0</FalseColor>
+					<Description />
+					<Text />
+					<TriggerValue>25</TriggerValue>
+					<Name>ay2</Name>
+					<ConditionType>LT</ConditionType>
+				</Child>
+				<TrueColor>0</TrueColor>
+				<FalseColor>0</FalseColor>
+				<Description />
+				<Text />
+				<TriggerValue>-25</TriggerValue>
+				<Name>ay2</Name>
+				<ConditionType>GT</ConditionType>
+			</Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>110</TriggerValue>
+			<Name>ax2</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Accelerometer 2</Description>
+		<Text />
+		<TriggerValue>-100</TriggerValue>
+		<Name>ax2</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<Child>
+				<Child>
+					<Child>
+						<Child>
+							<TrueColor>0</TrueColor>
+							<FalseColor>0</FalseColor>
+							<Description />
+							<Text />
+							<TriggerValue>-980</TriggerValue>
+							<Name>az3</Name>
+							<ConditionType>LT</ConditionType>
+						</Child>
+						<TrueColor>0</TrueColor>
+						<FalseColor>0</FalseColor>
+						<Description />
+						<Text />
+						<TriggerValue>-1020</TriggerValue>
+						<Name>az3</Name>
+						<ConditionType>GT</ConditionType>
+					</Child>
+					<TrueColor>0</TrueColor>
+					<FalseColor>0</FalseColor>
+					<Description />
+					<Text />
+					<TriggerValue>25</TriggerValue>
+					<Name>ay3</Name>
+					<ConditionType>LT</ConditionType>
+				</Child>
+				<TrueColor>0</TrueColor>
+				<FalseColor>0</FalseColor>
+				<Description />
+				<Text />
+				<TriggerValue>-25</TriggerValue>
+				<Name>ay3</Name>
+				<ConditionType>GT</ConditionType>
+			</Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>110</TriggerValue>
+			<Name>ax3</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Accelerometer 3</Description>
+		<Text />
+		<TriggerValue>-110</TriggerValue>
+		<Name>ax3</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<Child>
+				<Child>
+					<Child>
+						<Child>
+							<TrueColor>0</TrueColor>
+							<FalseColor>0</FalseColor>
+							<Description />
+							<Text />
+							<TriggerValue>8</TriggerValue>
+							<Name>gz</Name>
+							<ConditionType>LT</ConditionType>
+						</Child>
+						<TrueColor>0</TrueColor>
+						<FalseColor>0</FalseColor>
+						<Description />
+						<Text />
+						<TriggerValue>-8</TriggerValue>
+						<Name>gz</Name>
+						<ConditionType>GT</ConditionType>
+					</Child>
+					<TrueColor>0</TrueColor>
+					<FalseColor>0</FalseColor>
+					<Description />
+					<Text />
+					<TriggerValue>8</TriggerValue>
+					<Name>gy</Name>
+					<ConditionType>LT</ConditionType>
+				</Child>
+				<TrueColor>0</TrueColor>
+				<FalseColor>0</FalseColor>
+				<Description />
+				<Text />
+				<TriggerValue>-8</TriggerValue>
+				<Name>gy</Name>
+				<ConditionType>GT</ConditionType>
+			</Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>8</TriggerValue>
+			<Name>gx</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Gyroscope 1</Description>
+		<Text />
+		<TriggerValue>-8</TriggerValue>
+		<Name>gx</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<Child>
+				<Child>
+					<Child>
+						<Child>
+							<TrueColor>0</TrueColor>
+							<FalseColor>0</FalseColor>
+							<Description />
+							<Text />
+							<TriggerValue>8</TriggerValue>
+							<Name>gz2</Name>
+							<ConditionType>LT</ConditionType>
+						</Child>
+						<TrueColor>0</TrueColor>
+						<FalseColor>0</FalseColor>
+						<Description />
+						<Text />
+						<TriggerValue>-8</TriggerValue>
+						<Name>gz2</Name>
+						<ConditionType>GT</ConditionType>
+					</Child>
+					<TrueColor>0</TrueColor>
+					<FalseColor>0</FalseColor>
+					<Description />
+					<Text />
+					<TriggerValue>8</TriggerValue>
+					<Name>gy2</Name>
+					<ConditionType>LT</ConditionType>
+				</Child>
+				<TrueColor>0</TrueColor>
+				<FalseColor>0</FalseColor>
+				<Description />
+				<Text />
+				<TriggerValue>-8</TriggerValue>
+				<Name>gy2</Name>
+				<ConditionType>GT</ConditionType>
+			</Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>8</TriggerValue>
+			<Name>gx2</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Gyroscope 2</Description>
+		<Text />
+		<TriggerValue>-8</TriggerValue>
+		<Name>gx2</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<Child>
+				<Child>
+					<Child>
+						<Child>
+							<TrueColor>0</TrueColor>
+							<FalseColor>0</FalseColor>
+							<Description />
+							<Text />
+							<TriggerValue>8</TriggerValue>
+							<Name>gz3</Name>
+							<ConditionType>LT</ConditionType>
+						</Child>
+						<TrueColor>0</TrueColor>
+						<FalseColor>0</FalseColor>
+						<Description />
+						<Text />
+						<TriggerValue>-8</TriggerValue>
+						<Name>gz3</Name>
+						<ConditionType>GT</ConditionType>
+					</Child>
+					<TrueColor>0</TrueColor>
+					<FalseColor>0</FalseColor>
+					<Description />
+					<Text />
+					<TriggerValue>8</TriggerValue>
+					<Name>gy3</Name>
+					<ConditionType>LT</ConditionType>
+				</Child>
+				<TrueColor>0</TrueColor>
+				<FalseColor>0</FalseColor>
+				<Description />
+				<Text />
+				<TriggerValue>-8</TriggerValue>
+				<Name>gy3</Name>
+				<ConditionType>GT</ConditionType>
+			</Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>8</TriggerValue>
+			<Name>gx3</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>Gyroscope 3</Description>
+		<Text />
+		<TriggerValue>-8</TriggerValue>
+		<Name>gx3</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>65</TriggerValue>
+			<Name>esc1_temp</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>VTOL ESC 1</Description>
+		<Text />
+		<TriggerValue>45</TriggerValue>
+		<Name>esc1_volt</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>65</TriggerValue>
+			<Name>esc2_temp</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>VTOL ESC 2</Description>
+		<Text />
+		<TriggerValue>45</TriggerValue>
+		<Name>esc2_volt</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>65</TriggerValue>
+			<Name>esc3_temp</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>VTOL ESC 3</Description>
+		<Text />
+		<TriggerValue>45</TriggerValue>
+		<Name>esc3_volt</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<Child>
+			<TrueColor>0</TrueColor>
+			<FalseColor>0</FalseColor>
+			<Description />
+			<Text />
+			<TriggerValue>65</TriggerValue>
+			<Name>esc4_temp</Name>
+			<ConditionType>LT</ConditionType>
+		</Child>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>VTOL ESC 4</Description>
+		<Text />
+		<TriggerValue>45</TriggerValue>
+		<Name>esc4_volt</Name>
+		<ConditionType>GT</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>{ARMING_CHECK}</Description>
+		<Text>{value} == {trigger}</Text>
+		<TriggerValue>1</TriggerValue>
+		<Name>PARAM</Name>
+		<ConditionType>EQ</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>{CAN_D1_UC_ESC_BM}</Description>
+		<Text>{value} == {trigger}</Text>
+		<TriggerValue>3</TriggerValue>
+		<Name>PARAM</Name>
+		<ConditionType>EQ</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>{CAN_D2_UC_ESC_BM}</Description>
+		<Text>{value} == {trigger}</Text>
+		<TriggerValue>12</TriggerValue>
+		<Name>PARAM</Name>
+		<ConditionType>EQ</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>{CAN_D1_UC_SRV_BM}</Description>
+		<Text>{value} == {trigger}</Text>
+		<TriggerValue>864</TriggerValue>
+		<Name>PARAM</Name>
+		<ConditionType>EQ</ConditionType>
+	</CheckListItem>
+	<CheckListItem>
+		<TrueColor>Lime</TrueColor>
+		<FalseColor>Red</FalseColor>
+		<Description>{CAN_D2_UC_SRV_BM}</Description>
+		<Text>{value} == {trigger}</Text>
+		<TriggerValue>864</TriggerValue>
+		<Name>PARAM</Name>
+		<ConditionType>EQ</ConditionType>
+	</CheckListItem>
 </ArrayOfCheckListItem>
