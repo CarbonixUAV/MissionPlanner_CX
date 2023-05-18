@@ -5,7 +5,11 @@ using System.Runtime.InteropServices;
 
 public partial class MAVLink
 {
+<<<<<<< Updated upstream
     public const string MAVLINK_BUILD_DATE = "Sun Apr 02 2023";
+=======
+    public const string MAVLINK_BUILD_DATE = "Tue Mar 07 2023";
+>>>>>>> Stashed changes
     public const string MAVLINK_WIRE_PROTOCOL_VERSION = "2.0";
     public const int MAVLINK_MAX_PAYLOAD_LEN = 255;
 
@@ -202,7 +206,7 @@ public partial class MAVLink
         new message_info(217, "GOPRO_GET_RESPONSE", 202, 6, 6, typeof( mavlink_gopro_get_response_t )),
         new message_info(218, "GOPRO_SET_REQUEST", 17, 7, 7, typeof( mavlink_gopro_set_request_t )),
         new message_info(219, "GOPRO_SET_RESPONSE", 162, 2, 2, typeof( mavlink_gopro_set_response_t )),
-        new message_info(225, "EFI_STATUS", 208, 65, 73, typeof( mavlink_efi_status_t )),
+        new message_info(225, "EFI_STATUS", 208, 65, 85, typeof( mavlink_efi_status_t )),
         new message_info(226, "RPM", 207, 8, 8, typeof( mavlink_rpm_t )),
         new message_info(230, "ESTIMATOR_STATUS", 163, 42, 42, typeof( mavlink_estimator_status_t )),
         new message_info(231, "WIND_COV", 105, 40, 40, typeof( mavlink_wind_cov_t )),
@@ -22673,12 +22677,12 @@ public partial class MAVLink
 
     
     /// extensions_start 17
-    [StructLayout(LayoutKind.Sequential,Pack=1,Size=73)]
+    [StructLayout(LayoutKind.Sequential,Pack=1,Size=85)]
     ///<summary> EFI status output </summary>
     public struct mavlink_efi_status_t
     {
         /// packet ordered constructor
-        public mavlink_efi_status_t(float ecu_index,float rpm,float fuel_consumed,float fuel_flow,float engine_load,float throttle_position,float spark_dwell_time,float barometric_pressure,float intake_manifold_pressure,float intake_manifold_temperature,float cylinder_head_temperature,float ignition_timing,float injection_time,float exhaust_gas_temperature,float throttle_out,float pt_compensation,byte health,float ignition_voltage,float fuel_pressure) 
+        public mavlink_efi_status_t(float ecu_index,float rpm,float fuel_consumed,float fuel_flow,float engine_load,float throttle_position,float spark_dwell_time,float barometric_pressure,float intake_manifold_pressure,float intake_manifold_temperature,float cylinder_head_temperature,float ignition_timing,float injection_time,float exhaust_gas_temperature,float throttle_out,float pt_compensation,byte health,float ignition_voltage,float fuel_pressure,float cylinder_head_temperature2,float exhaust_gas_temperature2,uint System_time_in_ms) 
         {
             this.ecu_index = ecu_index;
             this.rpm = rpm;
@@ -22699,11 +22703,14 @@ public partial class MAVLink
             this.health = health;
             this.ignition_voltage = ignition_voltage;
             this.fuel_pressure = fuel_pressure;
+            this.cylinder_head_temperature2 = cylinder_head_temperature2;
+            this.exhaust_gas_temperature2 = exhaust_gas_temperature2;
+            this.System_time_in_ms = System_time_in_ms;
             
         }
         
         /// packet xml order
-        public static mavlink_efi_status_t PopulateXMLOrder(byte health,float ecu_index,float rpm,float fuel_consumed,float fuel_flow,float engine_load,float throttle_position,float spark_dwell_time,float barometric_pressure,float intake_manifold_pressure,float intake_manifold_temperature,float cylinder_head_temperature,float ignition_timing,float injection_time,float exhaust_gas_temperature,float throttle_out,float pt_compensation,float ignition_voltage,float fuel_pressure) 
+        public static mavlink_efi_status_t PopulateXMLOrder(byte health,float ecu_index,float rpm,float fuel_consumed,float fuel_flow,float engine_load,float throttle_position,float spark_dwell_time,float barometric_pressure,float intake_manifold_pressure,float intake_manifold_temperature,float cylinder_head_temperature,float ignition_timing,float injection_time,float exhaust_gas_temperature,float throttle_out,float pt_compensation,float ignition_voltage,float fuel_pressure,float cylinder_head_temperature2,float exhaust_gas_temperature2,uint System_time_in_ms) 
         {
             var msg = new mavlink_efi_status_t();
 
@@ -22726,6 +22733,9 @@ public partial class MAVLink
             msg.pt_compensation = pt_compensation;
             msg.ignition_voltage = ignition_voltage;
             msg.fuel_pressure = fuel_pressure;
+            msg.cylinder_head_temperature2 = cylinder_head_temperature2;
+            msg.exhaust_gas_temperature2 = exhaust_gas_temperature2;
+            msg.System_time_in_ms = System_time_in_ms;
             
             return msg;
         }
@@ -22844,6 +22854,24 @@ public partial class MAVLink
         [Description("Fuel pressure. Zero in this value means 'unknown', so if the fuel pressure really is zero kPa use 0.0001 instead.")]
         //[FieldOffset(69)]
         public  float fuel_pressure;
+
+        /// <summary>Cylinder head temperature2  [degC] </summary>
+        [Units("[degC]")]
+        [Description("Cylinder head temperature2")]
+        //[FieldOffset(73)]
+        public  float cylinder_head_temperature2;
+
+        /// <summary>Exhaust gas temperature2  [degC] </summary>
+        [Units("[degC]")]
+        [Description("Exhaust gas temperature2")]
+        //[FieldOffset(77)]
+        public  float exhaust_gas_temperature2;
+
+        /// <summary>System Time (ms)  [degC] </summary>
+        [Units("[degC]")]
+        [Description("System Time (ms)")]
+        //[FieldOffset(81)]
+        public  uint System_time_in_ms;
     };
 
     

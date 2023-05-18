@@ -7529,6 +7529,9 @@ f.EFI_STATUS_throttle_out = ProtoField.new("throttle_out (float)", "mavlink_prot
 f.EFI_STATUS_pt_compensation = ProtoField.new("pt_compensation (float)", "mavlink_proto.EFI_STATUS_pt_compensation", ftypes.FLOAT, nil)
 f.EFI_STATUS_ignition_voltage = ProtoField.new("ignition_voltage (float)", "mavlink_proto.EFI_STATUS_ignition_voltage", ftypes.FLOAT, nil)
 f.EFI_STATUS_fuel_pressure = ProtoField.new("fuel_pressure (float)", "mavlink_proto.EFI_STATUS_fuel_pressure", ftypes.FLOAT, nil)
+f.EFI_STATUS_cylinder_head_temperature2 = ProtoField.new("cylinder_head_temperature2 (float)", "mavlink_proto.EFI_STATUS_cylinder_head_temperature2", ftypes.FLOAT, nil)
+f.EFI_STATUS_exhaust_gas_temperature2 = ProtoField.new("exhaust_gas_temperature2 (float)", "mavlink_proto.EFI_STATUS_exhaust_gas_temperature2", ftypes.FLOAT, nil)
+f.EFI_STATUS_System_time_in_ms = ProtoField.new("System_time_in_ms (uint32_t)", "mavlink_proto.EFI_STATUS_System_time_in_ms", ftypes.UINT32, nil)
 
 f.ESTIMATOR_STATUS_time_usec = ProtoField.new("time_usec (uint64_t)", "mavlink_proto.ESTIMATOR_STATUS_time_usec", ftypes.UINT64, nil)
 f.ESTIMATOR_STATUS_flags = ProtoField.new("flags (ESTIMATOR_STATUS_FLAGS)", "mavlink_proto.ESTIMATOR_STATUS_flags", ftypes.UINT16, nil)
@@ -34333,9 +34336,9 @@ end
 -- dissect payload of message type EFI_STATUS
 function payload_fns.payload_225(buffer, tree, msgid, offset, limit, pinfo)
     local padded, field_offset, value, subtree
-    if (offset + 73 > limit) then
+    if (offset + 85 > limit) then
         padded = buffer(0, limit):bytes()
-        padded:set_size(offset + 73)
+        padded:set_size(offset + 85)
         padded = padded:tvb("Untruncated payload")
     else
         padded = buffer
@@ -34378,6 +34381,12 @@ function payload_fns.payload_225(buffer, tree, msgid, offset, limit, pinfo)
     subtree, value = tree:add_le(f.EFI_STATUS_ignition_voltage, padded(field_offset, 4))
     field_offset = offset + 69
     subtree, value = tree:add_le(f.EFI_STATUS_fuel_pressure, padded(field_offset, 4))
+    field_offset = offset + 73
+    subtree, value = tree:add_le(f.EFI_STATUS_cylinder_head_temperature2, padded(field_offset, 4))
+    field_offset = offset + 77
+    subtree, value = tree:add_le(f.EFI_STATUS_exhaust_gas_temperature2, padded(field_offset, 4))
+    field_offset = offset + 81
+    subtree, value = tree:add_le(f.EFI_STATUS_System_time_in_ms, padded(field_offset, 4))
 end
 -- dissect payload of message type ESTIMATOR_STATUS
 function payload_fns.payload_230(buffer, tree, msgid, offset, limit, pinfo)
