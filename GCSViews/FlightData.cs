@@ -171,18 +171,18 @@ namespace MissionPlanner.GCSViews
         public enum actions
         {
             Loiter_Unlim,
-            Return_To_Launch,
+            //Return_To_Launch,
             Preflight_Calibration,
             Mission_Start,
             Preflight_Reboot_Shutdown,
-            Trigger_Camera,
+            //Trigger_Camera,
             System_Time,
-            Battery_Reset,
-            ADSB_Out_Ident,
-            Scripting_cmd_stop_and_restart,
-            Scripting_cmd_stop,
-            HighLatency_Enable,
-            HighLatency_Disable
+            //Battery_Reset,
+            //ADSB_Out_Ident,
+            //Scripting_cmd_stop_and_restart,
+            //Scripting_cmd_stop,
+            //HighLatency_Enable,
+            //HighLatency_Disable
         }
 
         private Dictionary<int, string> NIC_table = new Dictionary<int, string>()
@@ -1625,7 +1625,7 @@ namespace MissionPlanner.GCSViews
 
         private void BUTactiondo_Click(object sender, EventArgs e)
         {
-            try
+            /*try
             {
                 if (CMB_action.Text == actions.Trigger_Camera.ToString())
                 {
@@ -1665,7 +1665,7 @@ namespace MissionPlanner.GCSViews
                     CustomMessageBox.Show(Strings.CommandFailed, Strings.ERROR);
                     return;
                 }
-            }
+            }*/
 
             if (CMB_action.Text == actions.System_Time.ToString())
             {
@@ -1712,7 +1712,7 @@ namespace MissionPlanner.GCSViews
                         ((Control) sender).Enabled = true;
                         return;
                     }
-                    if (CMB_action.Text == actions.HighLatency_Enable.ToString())
+                    /*if (CMB_action.Text == actions.HighLatency_Enable.ToString())
                     {
                         MainV2.comPort.doHighLatency(true);
                         ((Control)sender).Enabled = true;
@@ -1730,7 +1730,7 @@ namespace MissionPlanner.GCSViews
                         param1 = 0xff; // batt 1
                         param2 = 100; // 100%
                         param3 = 0;
-                    }
+                    }*/
 
                     MAVLink.MAV_CMD cmd;
                     try
