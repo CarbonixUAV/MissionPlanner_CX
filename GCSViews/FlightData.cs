@@ -5769,6 +5769,14 @@ namespace MissionPlanner.GCSViews
 
         private void tabStatus_Paint(object sender, PaintEventArgs e)
         {
+            string[] statusList = { "" };
+            string stausListConfigfile = Settings.GetUserDataDirectory() + "statusListConfig.txt";
+
+            if (System.IO.File.Exists(stausListConfigfile))
+            {
+                statusList = System.IO.File.ReadAllLines(stausListConfigfile);
+            }
+
             var bmp = new Bitmap(tabStatus.DisplayRectangle.Width, tabStatus.DisplayRectangle.Height);
             var g = Graphics.FromImage(bmp);
             g.Clear(Color.Transparent);
@@ -5780,21 +5788,26 @@ namespace MissionPlanner.GCSViews
             var cs = bindingSourceStatusTab.Current as CurrentState;
             var br = new SolidBrush(tabStatus.ForeColor);
 
+            //System.IO.File.WriteAllLines(Settings.GetUserDataDirectory() + "SavedLists.txt", list);
+
             foreach (var field in list)
             {
-                g.DrawString(field, this.Font, br, new RectangleF(x, y, 120, 15));
-
-                if (cs != null)
-                    g.DrawString(typeof(CurrentState).GetProperty(field).GetValue(cs)?.ToString(), this.Font,
-                        br, new RectangleF(x + 120, y, 50, 15));
-
-                x += 0;
-                y += 15;
-
-                if (y > tabStatus.Height - 30)
+                if (statusList.Contains(field))
                 {
-                    x += 190;
-                    y = 10;
+                    g.DrawString(field, this.Font, br, new RectangleF(x, y, 120, 15));
+
+                    if (cs != null)
+                        g.DrawString(typeof(CurrentState).GetProperty(field).GetValue(cs)?.ToString(), this.Font,
+                            br, new RectangleF(x + 120, y, 50, 15));
+
+                    x += 0;
+                    y += 15;
+
+                    if (y > tabStatus.Height - 30)
+                    {
+                        x += 190;
+                        y = 10;
+                    }
                 }
             }
 
