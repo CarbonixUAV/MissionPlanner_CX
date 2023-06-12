@@ -6194,5 +6194,10 @@ namespace MissionPlanner.GCSViews
             tabControlactions.Multiline = !tabControlactions.Multiline;
             Settings.Instance["tabControlactions_Multiline"] = tabControlactions.Multiline.ToString();
         }
+
+        private void tableMap_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
     }
 }
