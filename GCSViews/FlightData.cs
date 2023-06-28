@@ -6181,5 +6181,54 @@ namespace MissionPlanner.GCSViews
             tabControlactions.Multiline = !tabControlactions.Multiline;
             Settings.Instance["tabControlactions_Multiline"] = tabControlactions.Multiline.ToString();
         }
+
+
+        public void update_snr_data(int index, string name, int rssi1, int rssi2, float snr)
+        {
+            try
+            {
+                if (index == 1)
+                {
+                    silvus1_name.Text = name;
+                    //if (silvus1_rssi1.Text == "") // && Int32.Parse(silvus1_rssi1.Text) != rssi1)
+                    silvus1_rssi1.Text = rssi1.ToString();
+                    //if (silvus1_rssi2.Text == "") // && Int32.Parse(silvus1_rssi2.Text) != rssi2)
+                    silvus1_rssi2.Text = rssi2.ToString();
+                    //if (silvus1_snr.Text == "") // && float.Parse(silvus1_snr.Text) != snr)
+                    {
+                        silvus1_snr.Text = snr.ToString();
+                        if (snr < 5)
+                            silvus1_snr.BackColor = Color.Red;
+                        else if (snr < 15)
+                            silvus1_snr.BackColor = Color.Yellow;
+                        else if (snr < 20)
+                            silvus1_snr.BackColor = Color.LightGreen;
+                        else
+                            silvus1_snr.BackColor = Color.Green;
+                    }
+                }
+                else if (index == 2)
+                {
+                    silvus2_name.Text = name;
+                    //if (silvus2_rssi1.Text == "") // && Int32.Parse(silvus2_rssi1.Text) != rssi1)
+                    silvus2_rssi1.Text = rssi1.ToString();
+                    //if (silvus2_rssi2.Text == "") // && Int32.Parse(silvus2_rssi2.Text) != rssi2)
+                    silvus2_rssi2.Text = rssi2.ToString();
+                    //if (silvus2_snr.Text == "") // && float.Parse(silvus2_snr.Text) != snr)
+                    {
+                        silvus2_snr.Text = snr.ToString();
+                        if (snr < 5)
+                            silvus2_snr.BackColor = Color.Red;
+                        else if (snr < 15)
+                            silvus2_snr.BackColor = Color.Yellow;
+                        else if (snr < 20)
+                            silvus2_snr.BackColor = Color.LightGreen;
+                        else
+                            silvus2_snr.BackColor = Color.Green;
+                    }
+                }
+            }
+            catch { }
+        }
     }
 }

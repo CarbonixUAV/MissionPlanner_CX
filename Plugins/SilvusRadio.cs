@@ -10,43 +10,314 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Xml;
+using GMap.NET.WindowsForms;
+using MissionPlanner.Maps;
+using MissionPlanner.GCSViews;
+using MissionPlanner.Utilities;
+using System.Web.Script.Serialization;
+using OpenTK.Audio.OpenAL;
 
 namespace MissionPlanner.plugins
 {
-    public class SilvusRadio : MissionPlanner.Plugin.Plugin
+    public class rssi_node
     {
-        enum silvus_state
+        private bool _node_enabled;
+        public bool node_enabled
         {
-            silvus_wait_for_connection,
-            silvus_connecting,
-            silvus_check_for_message,
-            silvus_error
+            get { return _node_enabled; }
+            set { _node_enabled = value; }
         }
 
-        silvus_state state = silvus_state.silvus_wait_for_connection;
+        private string _node_name;
+        public string node_name
+        {
+            get { return _node_name; }
+            set { _node_name = value; }
+        }
 
-        int silvus_connection_retries = 0;
+        private string _remote_ip;
+        public string remote_ip
+        {
+            get { return _remote_ip; }
+            set { _remote_ip = value; }
+        }
+
+        private string _local_ip;
+        public string local_ip
+        {
+            get { return _local_ip; }
+            set { _local_ip = value; }
+        }
+
+        private int _node_port;
+        public int node_port
+        {
+            get { return _node_port; }
+            set { _node_port = value; }
+        }
+
+        private UdpClient udp_server;
+
+        public int rssi1 { get; set; }
+        public int rssi2 { get; set; }
+        public float snr { get; set; }
+
+        public enum node_state
+        {
+            node_ping_test,
+            node_connect,
+            node_check_for_message,
+            node_error
+        }
+        public node_state node_current_state;
+
+        int retry_count;
 
 
-        // private HttpClient client;
-        // Socket winSocket;
-        // EndPoint Remote;
+        private void init_node()
+        {
+            retry_count = 0;
+            node_current_state = node_state.node_ping_test;
+        }
 
-        string SilvusIP = "192.168.0.7";
-        string LocalIP  = "192.168.0.22";
-        // string SilvusIP = "172.20.172.84";
-        // string LocalIP = "172.20.172.81";
-        int SilvusPort = 8000;
+        private void close_node()
+        {
+            node_enabled = false;
+            node_current_state = node_state.node_ping_test;
+            udp_server.Close();
+        }
 
-        // Create UDP client to read incoming packets
-        UdpClient client; // = new UdpClient(SilvusPort);
+        public rssi_node(bool enabled, string name, string remote, string local, int port)
+        {
+            node_enabled = enabled;
+            node_name = name;
+            remote_ip = remote;
+            local_ip = local;
+            node_port = port;
 
-        // Create IP endpoint 
-        IPEndPoint RemoteIpEndPoint; // = new IPEndPoint(IPAddress.Parse(SilvusIP), SilvusPort);
+            init_node();
+        }
+
+        public void node_process()
+        {
+            // Start the node process
+            switch (node_current_state)
+            {
+                case node_state.node_ping_test:
+                    if (ping_test())
+                    {
+                        node_current_state = node_state.node_connect;
+                    }
+                    else
+                    {
+                        if (retry_count++ > 100)
+                        {
+                            retry_count = 0;
+                            Console.WriteLine("RSSI comm: unable to ping - " + remote_ip);
+                        }
+                    }
+                    break;
+
+                case node_state.node_connect:
+                    if (connect())
+                    {
+                        node_current_state = node_state.node_check_for_message;
+                    }
+                    else
+                    {
+                        if (retry_count++ > 10)
+                        {
+                            retry_count = 0;
+                            Console.WriteLine("RSSI comm: unable to connect - " + remote_ip);
+                            node_current_state = node_state.node_ping_test;
+                        }
+                    }
+                    break;
+
+                case node_state.node_check_for_message:
+                    if (!fetch_data())
+                    {
+                        if (retry_count++ > 10)
+                        {
+                            retry_count = 0;
+                            Console.WriteLine("RSSI comm: unable to connect - " + remote_ip);
+                            node_current_state = node_state.node_ping_test;
+                        }
+                    }
+                    break;
+            }
+        }
+
+
+        private bool ping_test()
+        {
+            bool status = false;
+            int timeout = 120;
+
+            // Ping the remote IP
+            Ping pingSender = new Ping();
+            PingOptions options = new PingOptions();
+
+            try
+            {
+                PingReply reply = pingSender.Send(remote_ip, timeout);
+                status = (reply.Status == IPStatus.Success) ? true : false;
+            }
+            catch
+            {
+                status = false;
+            }
+
+            return status;
+        }
+
+
+        private bool connect()
+        {
+            bool status = true;
+            try
+            {
+                udp_server = new UdpClient(node_port);
+            }
+            catch
+            {
+                status = false;
+            }
+
+            return status;
+        }
+
+
+        private bool fetch_data()
+        {
+            bool status = true;
+
+            try
+            {
+                IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 8000);
+                byte[] data = udp_server.Receive(ref RemoteIpEndPoint);
+                // string receive_bytes = Encoding.UTF8.GetString(data);
+
+                if (RemoteIpEndPoint.Address.ToString() == remote_ip)
+                {
+                    status = parse_data(data);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+                status = false;
+            }
+
+            return status;
+        }
+
+
+        // private bool parse_data(string receive_bytes)
+        private bool parse_data(byte[] data)
+        {
+            bool status = true;
+
+            short data_length = 0;
+            string xval = "";
+            string yval = "";
+
+            try
+            {
+                for (int i = 0; i < data.Length - 4; i += 1)
+                {
+                    char[] ch = new char[4];
+
+                    short report_type = (short)(data[i] << 0x08 | data[i + 1]);
+                    data_length = (short)(data[i + 2] << 0x08 | data[i + 3]);
+
+                    switch (report_type)
+                    {
+                        case 5000:
+                            ch[0] = (char)data[i + data_length];
+                            ch[1] = (char)data[i + data_length + 1];
+                            ch[2] = (char)data[i + data_length + 2];
+                            ch[3] = (char)data[i + data_length + 3];
+
+                            rssi1 = Int32.Parse(new string(ch));
+                            break;
+                        case 5001:
+                            ch[0] = (char)data[i + data_length];
+                            ch[1] = (char)data[i + data_length + 1];
+                            ch[2] = (char)data[i + data_length + 2];
+                            ch[3] = (char)data[i + data_length + 3];
+                            rssi2 = Int32.Parse(new string(ch));
+                            break;
+                        //case 5004:
+                        //    noise = int.Parse(receive_bytes.Substring(i + 4, data_length));
+                        //    //noise = (int)BitConverter.ToInt32(receive_bytes, i + 4);
+                        //    break;
+                        case 5005:
+                            ch[0] = (char)data[i + data_length];
+                            ch[1] = (char)data[i + data_length + 1];
+                            ch[2] = (char)data[i + data_length + 2];
+                            ch[3] = (char)data[i + data_length + 3];
+                            xval = new string(ch);
+
+                            // xval = int.Parse(receive_bytes.Substring(i + 4, data_length));
+                            // xval = (int)BitConverter.ToInt32(receive_bytes, i + 4);
+                            break;
+                        case 5006:
+                            ch[0] = (char)data[i + data_length];
+                            ch[1] = (char)data[i + data_length + 1];
+                            ch[2] = (char)data[i + data_length + 2];
+                            ch[3] = (char)data[i + data_length + 3];
+                            yval = new string(ch);
+
+                            // yval = int.Parse(receive_bytes.Substring(i + 4, data_length));
+                            // yval = (int)BitConverter.ToInt32(receive_bytes, i + 4);
+                            break;
+                        //case 5007:
+                        //    nodeidmsg = int.Parse(receive_bytes.Substring(i + 4, data_length));
+                        //    //nodeidmsg = (int)BitConverter.ToInt16(receiveBytes, i + 4);
+                        //    break;
+
+                        default:
+                            break;
+                    }
+                }
+
+                if (xval != "" && yval != "")
+                {
+                    int x = int.Parse(xval);
+                    int y = int.Parse(yval);
+
+                    if (x != y && x != 999)
+                    {
+                        float zval = (float)((y - x) / 51.0);
+                        var snrmw = (x - 12 * zval) / (64 * zval);
+
+                        this.snr = (int)(10 * Math.Log10(snrmw) / Math.Log10(10));
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.ToString());
+                status = false;
+            }
+
+            return status;
+        }
+    }
+
+
+    public class SilvusRadio : MissionPlanner.Plugin.Plugin
+    {
+        rssi_node first;
+        rssi_node second;
+
+        string comms_xml_file = "Comms_RSSI.xml";
 
         public override string Name
         {
-            get { return "Silvus Radio"; }
+            get { return "Silvus Radio RSSI"; }
         }
 
         public override string Version
@@ -59,7 +330,6 @@ namespace MissionPlanner.plugins
             get { return "Carbonix"; }
         }
 
-        
 
         public override bool Exit()
         {
@@ -71,261 +341,118 @@ namespace MissionPlanner.plugins
             return true;
         }
 
+
         public override bool Loaded()
         {
+            read_xml(comms_xml_file);
+            loopratehz = 100;
 
-            // Create UDP client to read incoming packets
-            client = new UdpClient(SilvusPort);
-
-            // Create IP endpoint 
-            RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse(SilvusIP), SilvusPort);
-
-            loopratehz = 1f;
             return true;
         }
 
 
         public override bool Loop()
         {
-            silvus_process();
+            if (first != null && first.node_enabled)
+            {
+                first.node_process();
+                if (first.node_enabled && first.node_current_state == rssi_node.node_state.node_check_for_message)
+                {
+                    silvus_display_RSSI(1);
+                }
+            }
 
-            // silvus_testing();
+            if (second != null && second.node_enabled)
+            {
+                second.node_process();
+                if (second.node_enabled && second.node_current_state == rssi_node.node_state.node_check_for_message)
+                {
+                    silvus_display_RSSI(2);
+                }
+            }
 
             return true;
         }
 
-
-        private void silvus_testing()
+        private void silvus_display_RSSI(int v)
         {
-            // Create UDP client to read incoming packets
-            UdpClient client = new UdpClient(SilvusPort);
-
-            // Create IP endpoint 
-            IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse(SilvusIP), SilvusPort);
-
-            try
+            if (v == 1)
             {
-                client.Connect(RemoteIpEndPoint);
-                Byte[] receiveBytes = client.Receive(ref RemoteIpEndPoint);
-
-                string returnData = Encoding.ASCII.GetString(receiveBytes);
-
-                Console.WriteLine("This is the message you received " + returnData.ToString());
-                //Console.WriteLine("This message was sent from " + RemoteIpEndPoint.Address.ToString() + " on their port number " + RemoteIpEndPoint.Port.ToString());
+                FlightData.instance.update_snr_data(v, first.node_name, first.rssi1, first.rssi2, first.snr);
             }
-            catch (Exception e)
+            else
             {
-                Console.WriteLine(e.ToString());
+                FlightData.instance.update_snr_data(v, first.node_name, second.rssi1, second.rssi2, second.snr);
             }
         }
 
-
-        private void silvus_process()
+        private void read_xml(string filename)
         {
-            switch (state)
+            int index = 0;
+
+            try
             {
-                case silvus_state.silvus_wait_for_connection:
-                    if (wait_for_ping()) 
-                        state = silvus_state.silvus_connecting;
-                    break;
-                case silvus_state.silvus_connecting:
-                    if (silvus_connect())
+                using (XmlTextReader xmlreader = new XmlTextReader(Settings.GetUserDataDirectory() + filename))
+                {
+                    while (xmlreader.Read())
                     {
-                        silvus_connection_retries = 0;
-                        state = silvus_state.silvus_check_for_message;
-                    }
-                    else 
-                    {
-                        if (silvus_connection_retries++ > 3)
+                        bool node_enabled = false;
+                        string node_name = "";
+                        string remote_ip = "";
+                        string local_ip = "";
+                        int port = 0;
+
+                        xmlreader.MoveToElement();
+                        try
                         {
-                            silvus_connection_retries = 0;
-                            state = silvus_state.silvus_wait_for_connection;
+                            switch (xmlreader.Name)
+                            {
+                                case "RSSI_node":
+                                    while (xmlreader.Read())
+                                    {
+                                        bool dobreak = false;
+                                        xmlreader.MoveToElement();
+                                        switch (xmlreader.Name)
+                                        {
+                                            case "node_enabled":
+                                                node_enabled = (xmlreader.ReadString() == "true") ? true : false;
+                                                break;
+                                            case "node_name":
+                                                node_name = (string)xmlreader.ReadString();
+                                                break;
+                                            case "remote_ip":
+                                                remote_ip = (string)xmlreader.ReadString();
+                                                break;
+                                            case "local_IP":
+                                                local_ip = (string)xmlreader.ReadString();
+                                                break;
+                                            case "port":
+                                                port = Int32.Parse(xmlreader.ReadString());
+                                                break;
+                                            case "RSSI_node":
+                                                if (index++ == 0)
+                                                {
+                                                    first = new rssi_node(node_enabled, node_name, remote_ip, local_ip, port);
+                                                }
+                                                else
+                                                {
+                                                    second = new rssi_node(node_enabled, node_name, remote_ip, local_ip, port);
+                                                }
+                                                dobreak = true;
+                                                break;
+                                        }
+                                        if (dobreak) break;
+                                    }
+                                    break;
+
+                                default: break;
+                            }
                         }
-                    }
-                    break;
-                case silvus_state.silvus_check_for_message:
-                    if (silvus_fetch_message())
-                    {
-                        silvus_display_RSSI();
-                    }
-                    else
-                    {
-                        if (silvus_connection_retries++ > 10)
-                        {
-                            silvus_connection_retries = 0;
-                            state = silvus_state.silvus_connecting;
-                        }
-                    }
-                    break;
-                case silvus_state.silvus_error: 
-                    // TBD
-                    break;
-            }
-        }
-
-        private void silvus_display_RSSI()
-        {
-            // throw new NotImplementedException();
-        }
-
-        private bool silvus_fetch_message()
-        {
-            short data_length = 0;
-            int rssi_send = 0;
-            int noise_send = 0;
-            float snr_send = 0;
-            int msg5000 = 0;
-            int msg5001 = 0;
-            int noise = 0;
-            int yval = 0;
-            int xval = 0;
-            int nodeidmsg = 0;
-
-            // Create UDP client to read incoming packets
-            // UdpClient client = new UdpClient(SilvusPort);
-
-            // Create IP endpoint 
-            // IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Parse(SilvusIP), SilvusPort);
-
-            try
-            {
-                // client.Connect(RemoteIpEndPoint);
-                Byte[] receiveBytes = client.Receive(ref RemoteIpEndPoint);
-
-                for (int i = 0; i < receiveBytes.Length - 4; i+=2)
-                {
-                    short report_type = (short)(receiveBytes[i] << 0x08 | receiveBytes[i + 1]);
-                    data_length = (short)(receiveBytes[i + 2] << 0x08 | receiveBytes[i + 3]);
-
-
-                    char[] ch = new char[4];
-                    byte one = 0, two = 0, thr = 0, fou = 0;
-                    int val = 0;
-
-                    switch (report_type)
-                    {
-                        case 5000:
-                            one = receiveBytes[i + 4];
-                            ch[0] = (char)one;
-                            two = receiveBytes[i + 5];
-                            ch[1] = (char)two;
-                            thr = receiveBytes[i + 6];
-                            ch[2] = (char)thr;
-                            fou = receiveBytes[i + 7];
-                            ch[3] = (char)fou;
-                            val = int.Parse(new string(ch));
-                            msg5000 = (int)val;
-                            //msg5000 = (int)BitConverter.ToInt32(receiveBytes, i + 4);
-                            break;
-                        case 5001:
-                            one = receiveBytes[i + 4];
-                            ch[0] = (char)one;
-                            two = receiveBytes[i + 5];
-                            ch[1] = (char)two;
-                            thr = receiveBytes[i + 6];
-                            ch[2] = (char)thr;
-                            fou = receiveBytes[i + 7];
-                            ch[3] = (char)fou;
-                            val = int.Parse(new string(ch));
-                            msg5001 = (int)val;
-                            //msg5001 = (int)BitConverter.ToInt32(receiveBytes, i + 4);
-                            break;
-                        case 5004:
-                            noise = (int)BitConverter.ToInt32(receiveBytes, i + 4);
-                            break;
-                        case 5005:
-                            xval = (int)BitConverter.ToInt32(receiveBytes, i + 4);
-                            break;
-                        case 5006:
-                            yval = (int)BitConverter.ToInt32(receiveBytes, i + 4);
-                            break;
-                        case 5007:
-                            nodeidmsg = (int)BitConverter.ToInt16(receiveBytes, i + 4);
-                            break;
+                        catch (Exception ee) { Console.WriteLine("RSSI comm: " + ee.Message); } // silent fail on bad entry
                     }
                 }
-
-                // rssi_send = (Math.Abs(msg5000) + Math.Abs(msg5000)) / 2;
-                
-                rssi_send = (msg5000 + msg5000) / 2;
-                noise_send = (Math.Abs(noise));
-
-                if (xval != yval && xval != 999)
-                {
-                    var zval = (yval - xval) / 51;
-                    var snrmw = (xval - 12 * zval) / (64 * zval);
-
-                    snr_send = (float)(10 * Math.Log10(snrmw) / Math.Log10(10));
-                }
-
-                if (msg5000 < 999 || msg5001 < 999)
-                {
-                    string mytxt = "RSSI1:" + msg5000 + "|RSSI2:" + msg5001 + "|SNR:" + snr_send;
-                    Console.WriteLine(mytxt);
-                }
-                    
             }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.ToString());
-            }
-
-            return true;
-            }
-
-        private bool silvus_connect()
-        {
-            bool status = true;
-
-            /*
-            if ((client = new HttpClient()) != null)
-                status = true;
-
-            IPEndPoint localEndPoint = new IPEndPoint(IPAddress.Parse(LocalIP), Int32.Parse(SilvusPort));
-            winSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            winSocket.Bind(localEndPoint);
-
-            IPEndPoint silvusEndPoint = new IPEndPoint(IPAddress.Parse(SilvusIP), Int32.Parse(SilvusPort));
-            Remote = (EndPoint)(silvusEndPoint);
-            */
-
-            // var header = { };
-            /*
-            var headers = '{ 'Content-Type': 'application/x-www-form-urlencoded',}';
-            var data_portip = '{"jsonrpc": "2.0","method":"rssi_report_address","params":[' + '"' + localIP  + '"' + ', ' + '"' + localPort + '"' + '], "id":"sbkb5u0a"}'
-            var data_period = '{"jsonrpc": "2.0","method":"rssi_report_period","params":["1000"], "id":"sbkb5u0b"}'
-            var values = new Dictionary<string, string>
-            {
-                { "thing1", "hello" },
-                { "thing2", "world" }
-            };
-            var content = new FormUrlEncodedContent(values);
-            var response = await client.PostAsync("http://www.example.com/recepticle.aspx", content);
-            var responseString = await response.Content.ReadAsStringAsync();
-            */
-
-            return status;
-        }
-
-        private bool wait_for_ping()
-        {
-            bool status = false;
-            int timeout = 120;
-
-            Ping pingSender = new Ping();
-            PingOptions options = new PingOptions();
-
-            try
-            {
-                PingReply reply = pingSender.Send(SilvusIP, timeout);
-                status = (reply.Status == IPStatus.Success) ? true : false;
-            }
-            catch (Exception e)
-            {
-                status = false;
-            }
-
-            return status;
+            catch (Exception ex) { Console.WriteLine("RSSI comm: Bad config file: " + ex.ToString()); } // bad config file
         }
     }
 }
