@@ -250,10 +250,9 @@ namespace MissionPlanner.Controls
                                 displayspeed =
                                     displayalt =
                                         displayconninfo =
-                                            displayxtrack =
                                                 displayrollpitch = displaygps = bgon = hudon = batteryon = true;
 
-            displayAOASSA = false;
+            displayxtrack = displayAOASSA = false;
 
             this.Name = "Hud";
 
