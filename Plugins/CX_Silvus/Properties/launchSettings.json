@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "CX_Silvus": {
+      "commandName": "Project"
+    },
+    "Start": {
+      "commandName": "Executable",
+      "executablePath": "..\\MissionPlanner.exe"
+    }
+  }
+}
