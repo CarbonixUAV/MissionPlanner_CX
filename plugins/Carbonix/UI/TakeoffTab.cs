@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -26,11 +27,14 @@ namespace Carbonix
         private readonly Timer messageBoxTimer = new Timer();
         private readonly Timer finalButtonTimer = new Timer();
 
+        decimal temperature_backup;
         HashSet<int> final_wps = new HashSet<int>();
+
+        bool freeze_handlers = false;
 
         private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public TakeoffTab(PluginHost Host, AircraftSettings aircraft_settings)
+        public TakeoffTab(PluginHost Host, GeneralSettings settings, AircraftSettings aircraft_settings)
         {
             this.Host = Host;
 
@@ -39,6 +43,10 @@ namespace Carbonix
             bindingSourceTimer.Tick += bindingSourceTimer_Tick;
             messageBoxTimer.Tick += messageBoxTimer_Tick;
             finalButtonTimer.Tick += finalButtonTimer_Tick;
+
+            // Bind event handler for mav parameter changes
+            Host.comPort.ParamListChanged += ParamListChanged;
+            Host.comPort.CommsClose += CommsClose;
 
             Color nvColor = ThemeManager.TextColor.WithAlpha(255);
             foreach (var color in ThemeManager.thmColor.colors)
@@ -81,6 +89,13 @@ namespace Carbonix
             // Trigger table_numberViews handler
             table_numberViews_Resize(null, null);
 
+            // Temperature units
+            lbl_tempunits.Text = settings.temperature_unit == TemperatureUnits.celsius ? "°C" : "°F";
+
+            // Load temperature limits
+            num_temperature.Minimum = (decimal)Math.Round(toTempDisplayUnit(aircraft_settings.temperature_min));
+            num_temperature.Maximum = (decimal)Math.Round(toTempDisplayUnit(aircraft_settings.temperature_max));
+
         }
 
         private void AddBinding(NumberView nv, string name)
@@ -113,9 +128,67 @@ namespace Carbonix
             return;
         }
 
+        private void ParamListChanged(object sender, EventArgs e)
+        {
+            if (Host.comPort.BaseStream == null || !Host.comPort.BaseStream.IsOpen)
+            {
+                return;
+            }
+
+            freeze_handlers = true;
+
+            // Get param for ground temperature
+            if (Host.comPort.MAV.param["BARO_GND_TEMP"] != null)
+            {
+                decimal gnd_temp = (decimal)toTempDisplayUnit((float)Host.comPort.MAV.param["BARO_GND_TEMP"]);
+
+                // This should not happen, but if this is outside the bounds of the control, we will change the bounds
+                if (gnd_temp > num_temperature.Maximum) num_temperature.Maximum = Math.Ceiling(gnd_temp);
+                if (gnd_temp < num_temperature.Minimum) num_temperature.Minimum = Math.Floor(gnd_temp);
+                num_temperature.Value = gnd_temp;
+                num_temperature.Enabled = true;
+            }
+            else
+            {
+                num_temperature.Enabled = false;
+            }
+            temperature_backup = num_temperature.Value;
+
+            freeze_handlers = false;
+        }
+
+        private void CommsClose(object sender, EventArgs e)
+        {
+            num_temperature.Enabled = false;
+        }
+
+        private double toTempDisplayUnit(double temp)
+        {
+            if (lbl_tempunits.Text == "°C")
+            {
+                return temp;
+            }
+            else
+            {
+                return (temp * 9 / 5) + 32;
+            }
+        }
+
+        private double fromTempDisplayUnit(double temp)
+        {
+            if (lbl_tempunits.Text == "°C")
+            {
+                return temp;
+            }
+            else
+            {
+                return (temp - 32) * 5 / 9;
+            }
+        }
+
         private void bindingSourceTimer_Tick(object sender, EventArgs e)
         {
-            if(!this.Visible)
+            if (!this.Visible)
             {
                 bindingSourceTimer.Stop();
                 return;
@@ -156,12 +229,18 @@ namespace Carbonix
             // Disable preflight cal button when armed
             but_calibrate.Enabled = !Host.cs.armed;
 
+            // Disable Set Temperature button when armed
+            // The EKF would probably respond poorly to a large step change in this while at a high altitude.
+            // We could work around this in the future, but this is better for now, and not really needed.
+            // We don't expect large enough temperature swings in flight for this to be a feature.
+            but_temperature.Enabled = !Host.cs.armed;
+
             // Disable the safety switch button when armed
             but_safety.Enabled = !Host.cs.armed;
 
             // Change the text of the safety button toggle based on safety state
             but_safety.Text = Host.cs.safetyactive ? "Disable Safety" : "Engage Safety";
-    
+
             // Disable the manual mode button if we are likely flying
             but_manual.Enabled = !(Host.cs.armed && (CurrentState.fromSpeedDisplayUnit(Host.cs.groundspeed) > 3 || Host.cs.ch3percent > 12));
 
@@ -169,7 +248,7 @@ namespace Carbonix
             but_landfinal.Enabled = final_wps.Contains((int)Host.cs.wpno);
 
         }
-        
+
         private void finalButtonTimer_Tick(object sender, EventArgs e)
         {
             if (!this.Visible)
@@ -181,11 +260,11 @@ namespace Carbonix
             var wps = Host.comPort.MAV.wps;
 
             var final_wps = new HashSet<int>();
-            
+
             // This flag tracks whether we are searching for a VTOL_LAND or a LOITER_TURNS
             bool looking_for_land = false;
             // Loop backwards through the waypoints
-            for(int i = wps.Count - 1; i > 1; i--)
+            for (int i = wps.Count - 1; i > 1; i--)
             {
                 // Look for VTOL_LAND
                 if (wps[i].command == (ushort)MAVLink.MAV_CMD.VTOL_LAND)
@@ -196,7 +275,7 @@ namespace Carbonix
                 if (!looking_for_land && wps[i].command == (ushort)MAVLink.MAV_CMD.LOITER_TURNS)
                 {
                     // We want to see if we have a zero-turn loiter right after a non-zero-turn loiter
-                    if (wps[i].param1==0 && wps[i-1].command == (ushort)MAVLink.MAV_CMD.LOITER_TURNS && wps[i-1].param1!=0)
+                    if (wps[i].param1 == 0 && wps[i - 1].command == (ushort)MAVLink.MAV_CMD.LOITER_TURNS && wps[i - 1].param1 != 0)
                     {
                         looking_for_land = true;
                         i--;
@@ -285,7 +364,66 @@ namespace Carbonix
             finalButtonTimer.Interval = 5000;
             finalButtonTimer.Start();
         }
-        
+
+
+        private void num_temperature_KeyDown(object sender, KeyEventArgs e)
+        {
+            // Check for escape key and reset value to backup
+            if (e.KeyCode == Keys.Escape)
+            {
+                // Handler will trigger and handle the bg color change
+                num_temperature.Value = temperature_backup;
+            }
+        }
+
+        private void num_temperature_ValueChanged(object sender, EventArgs e)
+        {
+            if (freeze_handlers) return;
+
+            // If the value is different than the backup value, set the background color to green
+            if (Math.Round(num_temperature.Value) != Math.Round(temperature_backup))
+            {
+                // Use a color that contrasts with the text color
+                num_temperature.BackColor = ThemeManager.ControlBGColor.GetBrightness() < 0.5 ? Color.DarkGreen : Color.LightGreen;
+                // Display tooltip explaining how to discard changes
+                toolTip1.SetToolTip(num_temperature, "Hit escape to cancel changes");
+            }
+            else
+            {
+                num_temperature.BackColor = ThemeManager.ControlBGColor;
+                toolTip1.SetToolTip(num_temperature, null);
+            }
+        }
+
+        private void but_temperature_Click(object sender, EventArgs e)
+        {
+            if (!Host.comPort.BaseStream.IsOpen) return;
+
+            double gnd_temp = fromTempDisplayUnit((double)num_temperature.Value);
+
+            // Prevent gnd_temp from being exactly zero as a float
+            if(-0.01 < gnd_temp && gnd_temp < 0.01)
+            {
+                gnd_temp = 0.01;
+            }
+
+            // Update the specified parameter in the aircraft
+            byte sysid = (byte)Host.comPort.sysidcurrent;
+            byte compid = (byte)Host.comPort.compidcurrent;
+            bool result = Host.comPort.setParam(sysid, compid, "BARO_GND_TEMP", gnd_temp);
+            if (result)
+            {
+                // Update the backup value
+                temperature_backup = num_temperature.Value;
+                num_temperature.BackColor = ThemeManager.ControlBGColor;
+                toolTip1.SetToolTip(num_temperature, null);
+            }
+            else
+            {
+                CustomMessageBox.Show("Failed to set temperature");
+            }
+        }
+
         private void but_arm_Click(object sender, EventArgs e)
         {
             if (!Host.comPort.BaseStream.IsOpen) return;
@@ -309,7 +447,7 @@ namespace Carbonix
                     return true;
                 }, (byte)Host.comPort.sysidcurrent, (byte)Host.comPort.compidcurrent);
                 bool ans = Host.comPort.doARM(!isitarmed);
-                if(ans == false)
+                if (ans == false)
                 {
                     // Sleep 0.25 second to allow the error message to come through
                     System.Threading.Thread.Sleep(250);
@@ -320,7 +458,7 @@ namespace Carbonix
                     if (isitarmed)
                     {
                         if (CustomMessageBox.Show(
-                            "Disarm failed.\n" + sb.ToString() + "\nForce Disarm? (not recommended)", Strings.ERROR, 
+                            "Disarm failed.\n" + sb.ToString() + "\nForce Disarm? (not recommended)", Strings.ERROR,
                             CustomMessageBox.MessageBoxButtons.YesNo, CustomMessageBox.MessageBoxIcon.Exclamation,
                             "Force Disarm", "Cancel") == CustomMessageBox.DialogResult.Yes)
                         {
@@ -335,7 +473,7 @@ namespace Carbonix
                     {
                         CustomMessageBox.Show("Arm failed.\n" + sb.ToString(), Strings.ERROR);
                     }
-                    
+
                 }
             }
             catch
@@ -389,7 +527,7 @@ namespace Carbonix
                 }
             }
         }
-        
+
         private void but_landfinal_Click(object sender, EventArgs e)
         {
             if (!Host.comPort.BaseStream.IsOpen) return;
@@ -397,7 +535,7 @@ namespace Carbonix
             // Double check that we are in a correct waypoint for this
             // Just in case there is a really off-chance race condition
             int wpno = (int)Host.cs.wpno;
-            if(final_wps.Contains(wpno))
+            if (final_wps.Contains(wpno))
             {
                 byte sysid = (byte)Host.comPort.sysidcurrent;
                 byte compid = (byte)Host.comPort.compidcurrent;
