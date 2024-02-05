@@ -263,7 +263,7 @@ namespace Carbonix
                 Text = "Takeoff/Land",
                 Name = "tabTakeoff"
             };
-            TakeoffTab tabTakeoff = new TakeoffTab(Host, aircraft_settings) { Dock = DockStyle.Fill };
+            TakeoffTab tabTakeoff = new TakeoffTab(Host, settings, aircraft_settings) { Dock = DockStyle.Fill };
             tabPageTakeoff.Controls.Add(tabTakeoff);
             Host.MainForm.FlightData.TabListOriginal.Insert(1, tabPageTakeoff);
 

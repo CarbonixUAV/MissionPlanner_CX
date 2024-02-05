@@ -10,6 +10,8 @@ namespace Carbonix
     {
         [JsonConverter(typeof(StringEnumConverter))]
         public VelZUnits velz_unit;
+        [JsonConverter(typeof(StringEnumConverter))]
+        public TemperatureUnits temperature_unit;
         public Color hud_groundcolor1;
         public Color hud_groundcolor2;
         public List<string> fdmap_menu_allow;
@@ -21,7 +23,9 @@ namespace Carbonix
         public GeneralSettings()
         {
             velz_unit = VelZUnits.meters_per_second;
-            
+
+            temperature_unit = TemperatureUnits.celsius;
+
             hud_groundcolor1 = Color.FromArgb(179, 119, 44);
             hud_groundcolor2 = Color.FromArgb(128, 85, 31);
 
@@ -73,6 +77,8 @@ namespace Carbonix
         public double max_vtol_altitude;
         public double max_descent_grade;
         public double cruise_speed;
+        public double temperature_min;
+        public double temperature_max;
         public decimal landing_hold_minutes;
 
         public struct Point
@@ -104,6 +110,8 @@ namespace Carbonix
                 max_vtol_altitude = 90;
                 max_descent_grade = 0.08;
                 cruise_speed = 21.0;
+                temperature_min = -10;
+                temperature_max = 45;
                 landing_hold_minutes = 0;
 
                 approach_points = new List<Point>()
@@ -140,6 +148,8 @@ namespace Carbonix
                 max_vtol_altitude = 90;
                 max_descent_grade = 0.08;
                 cruise_speed = 24.0;
+                temperature_min = 5;
+                temperature_max = 45;
                 landing_hold_minutes = 0;
 
                 approach_points = new List<Point>()
@@ -182,6 +192,12 @@ namespace Carbonix
     {
         meters_per_second,
         feet_per_minute
+    }
+
+    public enum TemperatureUnits
+    {
+        celsius,
+        fahrenheit
     }
 
     public enum Aircraft
