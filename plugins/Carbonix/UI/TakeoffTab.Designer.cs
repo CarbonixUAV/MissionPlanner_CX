@@ -1,4 +1,4 @@
-﻿namespace Carbonix
+namespace Carbonix
 {
     partial class TakeoffTab
     {
@@ -41,12 +41,14 @@
             this.tableLayoutActions = new System.Windows.Forms.TableLayoutPanel();
             this.lbl_tempunits = new System.Windows.Forms.Label();
             this.num_temperature = new System.Windows.Forms.NumericUpDown();
+            this.but_reboot = new MissionPlanner.Controls.MyButton();
+            this.but_restartmis = new MissionPlanner.Controls.MyButton();
             this.table_numberViews = new System.Windows.Forms.TableLayoutPanel();
-            this.bindingSource1 = new System.Windows.Forms.BindingSource(this.components);
             this.numberView4 = new Carbonix.NumberView();
             this.numberView3 = new Carbonix.NumberView();
             this.numberView2 = new Carbonix.NumberView();
             this.numberView1 = new Carbonix.NumberView();
+            this.bindingSource1 = new System.Windows.Forms.BindingSource(this.components);
             this.tableLayoutPanelOuter.SuspendLayout();
             this.tableLayoutActions.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.num_temperature)).BeginInit();
@@ -63,7 +65,7 @@
             this.but_temperature.ColorMouseOver = System.Drawing.Color.Empty;
             this.but_temperature.ColorNotEnabled = System.Drawing.Color.Empty;
             this.but_temperature.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.but_temperature.Location = new System.Drawing.Point(92, 2);
+            this.but_temperature.Location = new System.Drawing.Point(91, 2);
             this.but_temperature.Margin = new System.Windows.Forms.Padding(2);
             this.but_temperature.Name = "but_temperature";
             this.but_temperature.Size = new System.Drawing.Size(86, 26);
@@ -83,7 +85,7 @@
             this.but_calibrate.ColorMouseOver = System.Drawing.Color.Empty;
             this.but_calibrate.ColorNotEnabled = System.Drawing.Color.Empty;
             this.but_calibrate.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.but_calibrate.Location = new System.Drawing.Point(92, 32);
+            this.but_calibrate.Location = new System.Drawing.Point(91, 32);
             this.but_calibrate.Margin = new System.Windows.Forms.Padding(2);
             this.but_calibrate.Name = "but_calibrate";
             this.but_calibrate.Size = new System.Drawing.Size(86, 26);
@@ -103,7 +105,7 @@
             this.but_arm.ColorMouseOver = System.Drawing.Color.Empty;
             this.but_arm.ColorNotEnabled = System.Drawing.Color.Empty;
             this.but_arm.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.but_arm.Location = new System.Drawing.Point(92, 62);
+            this.but_arm.Location = new System.Drawing.Point(91, 62);
             this.but_arm.Margin = new System.Windows.Forms.Padding(2);
             this.but_arm.Name = "but_arm";
             this.but_arm.Size = new System.Drawing.Size(86, 26);
@@ -126,7 +128,7 @@
             this.but_safety.Location = new System.Drawing.Point(2, 62);
             this.but_safety.Margin = new System.Windows.Forms.Padding(2);
             this.but_safety.Name = "but_safety";
-            this.but_safety.Size = new System.Drawing.Size(86, 26);
+            this.but_safety.Size = new System.Drawing.Size(85, 26);
             this.but_safety.TabIndex = 95;
             this.but_safety.Text = "Engage Safety";
             this.but_safety.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -146,7 +148,7 @@
             this.but_manual.Location = new System.Drawing.Point(2, 32);
             this.but_manual.Margin = new System.Windows.Forms.Padding(2);
             this.but_manual.Name = "but_manual";
-            this.but_manual.Size = new System.Drawing.Size(86, 26);
+            this.but_manual.Size = new System.Drawing.Size(85, 26);
             this.but_manual.TabIndex = 78;
             this.but_manual.Text = "Manual";
             this.but_manual.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -166,7 +168,7 @@
             this.but_landfinal.Location = new System.Drawing.Point(2, 2);
             this.but_landfinal.Margin = new System.Windows.Forms.Padding(2);
             this.but_landfinal.Name = "but_landfinal";
-            this.but_landfinal.Size = new System.Drawing.Size(86, 26);
+            this.but_landfinal.Size = new System.Drawing.Size(85, 26);
             this.but_landfinal.TabIndex = 94;
             this.but_landfinal.Text = "Cleared to Land";
             this.but_landfinal.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -213,11 +215,13 @@
             this.tableLayoutActions.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50.00001F));
             this.tableLayoutActions.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 19F));
             this.tableLayoutActions.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 60F));
-            this.tableLayoutActions.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 40F));
+            this.tableLayoutActions.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 41F));
             this.tableLayoutActions.Controls.Add(this.but_temperature, 1, 0);
             this.tableLayoutActions.Controls.Add(this.lbl_tempunits, 4, 0);
             this.tableLayoutActions.Controls.Add(this.num_temperature, 3, 0);
             this.tableLayoutActions.Controls.Add(this.but_arm, 1, 2);
+            this.tableLayoutActions.Controls.Add(this.but_restartmis, 2, 2);
+            this.tableLayoutActions.Controls.Add(this.but_reboot, 2, 1);
             this.tableLayoutActions.Controls.Add(this.but_safety, 0, 2);
             this.tableLayoutActions.Controls.Add(this.but_manual, 0, 1);
             this.tableLayoutActions.Controls.Add(this.but_landfinal, 0, 0);
@@ -237,10 +241,10 @@
             // lbl_tempunits
             // 
             this.lbl_tempunits.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.lbl_tempunits.Location = new System.Drawing.Point(261, 8);
+            this.lbl_tempunits.Location = new System.Drawing.Point(260, 8);
             this.lbl_tempunits.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
             this.lbl_tempunits.Name = "lbl_tempunits";
-            this.lbl_tempunits.Size = new System.Drawing.Size(37, 13);
+            this.lbl_tempunits.Size = new System.Drawing.Size(38, 13);
             this.lbl_tempunits.TabIndex = 97;
             this.lbl_tempunits.Text = "°F";
             // 
@@ -248,7 +252,7 @@
             // 
             this.num_temperature.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
             this.num_temperature.Enabled = false;
-            this.num_temperature.Location = new System.Drawing.Point(201, 5);
+            this.num_temperature.Location = new System.Drawing.Point(200, 5);
             this.num_temperature.Margin = new System.Windows.Forms.Padding(2);
             this.num_temperature.Maximum = new decimal(new int[] {
             140,
@@ -260,6 +264,38 @@
             this.num_temperature.TabIndex = 96;
             this.num_temperature.ValueChanged += new System.EventHandler(this.num_temperature_ValueChanged);
             this.num_temperature.KeyDown += new System.Windows.Forms.KeyEventHandler(this.num_temperature_KeyDown);
+            // 
+            // but_reboot
+            // 
+            this.but_reboot.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.tableLayoutActions.SetColumnSpan(this.but_reboot, 3);
+            this.but_reboot.Location = new System.Drawing.Point(183, 34);
+            this.but_reboot.Margin = new System.Windows.Forms.Padding(4);
+            this.but_reboot.Name = "but_reboot";
+            this.but_reboot.Size = new System.Drawing.Size(113, 22);
+            this.but_reboot.TabIndex = 99;
+            this.but_reboot.Text = "Reboot";
+            this.but_reboot.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
+            this.but_reboot.UseVisualStyleBackColor = true;
+            this.but_reboot.Click += new System.EventHandler(this.but_reboot_Click);
+            // 
+            // but_restartmis
+            // 
+            this.but_restartmis.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.tableLayoutActions.SetColumnSpan(this.but_restartmis, 3);
+            this.but_restartmis.Location = new System.Drawing.Point(183, 64);
+            this.but_restartmis.Margin = new System.Windows.Forms.Padding(4);
+            this.but_restartmis.Name = "but_restartmis";
+            this.but_restartmis.Size = new System.Drawing.Size(113, 22);
+            this.but_restartmis.TabIndex = 100;
+            this.but_restartmis.Text = "Restart Mission";
+            this.but_restartmis.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
+            this.but_restartmis.UseVisualStyleBackColor = true;
+            this.but_restartmis.Click += new System.EventHandler(this.but_restartmis_Click);
             // 
             // table_numberViews
             // 
@@ -281,10 +317,6 @@
             this.table_numberViews.Size = new System.Drawing.Size(294, 174);
             this.table_numberViews.TabIndex = 3;
             this.table_numberViews.Resize += new System.EventHandler(this.table_numberViews_Resize);
-            // 
-            // bindingSource1
-            // 
-            this.bindingSource1.DataSource = typeof(MissionPlanner.CurrentState);
             // 
             // numberView4
             // 
@@ -346,6 +378,10 @@
             this.numberView1.TabIndex = 0;
             this.numberView1.Text = "numberView1";
             // 
+            // bindingSource1
+            // 
+            this.bindingSource1.DataSource = typeof(MissionPlanner.CurrentState);
+            // 
             // TakeoffTab
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -383,5 +419,7 @@
         private MissionPlanner.Controls.MyButton but_temperature;
         private System.Windows.Forms.Label lbl_tempunits;
         private System.Windows.Forms.NumericUpDown num_temperature;
+        private MissionPlanner.Controls.MyButton but_reboot;
+        private MissionPlanner.Controls.MyButton but_restartmis;
     }
 }

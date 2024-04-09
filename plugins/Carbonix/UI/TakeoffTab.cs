@@ -572,5 +572,40 @@ namespace Carbonix
             var mode = new MAVLink.mavlink_set_mode_t() { custom_mode = custom_mode, target_system = (byte)Host.comPort.sysidcurrent };
             MainV2.comPort.setMode(mode, MAVLink.MAV_MODE_FLAG.SAFETY_ARMED);
         }
+
+        private void but_reboot_Click(object sender, EventArgs e)
+        {
+            if (CustomMessageBox.Show("Are you sure you want to reboot?", "Action", MessageBoxButtons.YesNo) == (int)DialogResult.Yes)
+            {
+                try
+                {
+                    MainV2.comPort.doReboot();
+                    ((Control)sender).Enabled = true;
+                    return;
+                }
+                catch
+                {
+                    CustomMessageBox.Show(Strings.CommandFailed, Strings.ERROR);
+                }
+
+                ((Control)sender).Enabled = true;
+            }
+        }
+
+        private void but_restartmis_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                ((Control)sender).Enabled = false;
+
+                MainV2.comPort.setWPCurrent(MainV2.comPort.MAV.sysid, MainV2.comPort.MAV.compid, 0); // set nav to
+            }
+            catch
+            {
+                CustomMessageBox.Show(Strings.CommandFailed, Strings.ERROR);
+            }
+
+            ((Control)sender).Enabled = true;
+        }
     }
 }
