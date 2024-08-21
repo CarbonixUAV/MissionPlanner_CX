@@ -1,4 +1,4 @@
-﻿using log4net;
+using log4net;
 using MissionPlanner.Plugin;
 using MissionPlanner.ArduPilot.Mavlink;
 using MissionPlanner.ArduPilot;
@@ -43,6 +43,17 @@ namespace Carbonix
 
         public override bool Loaded()
         {
+
+            // Add button under the HUD that launches a pop-up
+            var button = new MissionPlanner.Controls.MyButton();
+            button.Text = "Run Validator";
+            button.Click += (sender, e) =>
+            {
+                CustomMessageBox.Show("Hello from Mission Test Validator!!");
+            };
+
+            Host.MainForm.FlightData.panel_persistent.Controls.Add(button);
+
             // Load settings json files
             LoadSettings();
 
