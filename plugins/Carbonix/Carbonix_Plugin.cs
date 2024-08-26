@@ -14,7 +14,11 @@ using MissionPlanner.Controls;
 using System.Threading.Tasks;
 using System.Drawing;
 using MissionPlanner.GCSViews.ConfigurationView;
+<<<<<<< HEAD
 using Newtonsoft.Json.Serialization;
+=======
+using System.Linq;
+>>>>>>> 04de07db9 (Validator: plugin mod to add in hardcoded waypoints for dummy analysis)
 
 namespace Carbonix
 {
@@ -39,20 +43,46 @@ namespace Carbonix
         // Time to attempt autoconnect of joystick, 5 seconds after plugin load
         DateTime controller_autoconnect_time = DateTime.MaxValue;
 
+        // Add in 'Run Validator' as a right-click option
+        ToolStripMenuItem val_but;
+        MissionPlanner.Controls.MyDataGridView test_command;
+
         public override bool Init() { return true; }
 
         public override bool Loaded()
         {
+     
+            // Note - Somehow this works in the modified example2-menu.cs plugin but does not work as 
+            // part of the Carbonix Plugin so it is commented out in Carbonix_Plugin.cs for now
 
-            // Add button under the HUD that launches a pop-up
+            /*
+
+            // i) Add in right-click option for validator test to appear as "Test the Mission" item
+            // modified from example2-menu.cs
+            val_but = new ToolStripMenuItem("Test the Mission");
+
+            // If this option is clicked
+            val_but.Click += but_Click;
+
+            // Option should appear in the FPMenuMap (the 2nd tab - Flight Planner page)
+            ToolStripItemCollection col = Host.FPMenuMap.Items;
+            col.Add(val_but);
+            test_command =
+                Host.MainForm.FlightPlanner.Controls.Find("Commands", true).FirstOrDefault() as
+                    MissionPlanner.Controls.MyDataGridView;
+
+            */
+
+            // ii) Generic pop-up box. Add button under the HUD that launches a pop-up
             var button = new MissionPlanner.Controls.MyButton();
             button.Text = "Run Validator";
             button.Click += (sender, e) =>
             {
-                CustomMessageBox.Show("Hello from Mission Test Validator!!");
+                CustomMessageBox.Show("Hello from Mission Test Validator V1.2!!");
             };
 
-            Host.MainForm.FlightData.panel_persistent.Controls.Add(button);
+            Host.MainForm.FlightData.panel_persistent.Controls.Add(button); //adds a green "Run Validator" box to below HUD that
+            // is clickable
 
             // Load settings json files
             LoadSettings();
@@ -700,5 +730,30 @@ namespace Carbonix
                 log.Error(ex);
             }
         }
+
+        // When the "Test the Mission" option is selected inthe Flight Planner page,
+        // the three waypoints (vtol takeoff, do land start, vtol land) should appear as waypoints
+        // to play around with how a plugin option can 'affect' the mission planning page
+        // intention is to then 'verify' the mission is ok as the basic MVP check
+
+        /*
+        void but_Click(object sender, EventArgs e)
+        {
+            CustomMessageBox.Show("Successful Right-click option");
+            
+            string angle = "0";
+            InputBox.Show("Load Mission to be validated: ","", ref angle);
+
+            // Mavlink commands for reference from documentation - https://mavlink.io/en/messages/common.html
+            //MAV_CMD_DO_LAND_START(189)
+            //MAV_CMD_NAV_VTOL_TAKEOFF (84)
+            //MAV_CMD_NAV_VTOL_LAND(85)
+
+            // Some sample mission waypoints
+            Host.InsertWP(0, MAVLink.MAV_CMD.VTOL_TAKEOFF, 0, 90, 0, 0, 150.849055 , -33.667015, 40.000000);
+            Host.InsertWP(1, MAVLink.MAV_CMD.DO_LAND_START,0, 90, 0, 0, 150.845954 , -33.668533 , 40.000000);
+            Host.InsertWP(2, MAVLink.MAV_CMD.VTOL_LAND, 0, 90, 0, 0, 150.845107 , -33.668390, 40.000000);
+        }
+        */
     }
 }
