@@ -42,7 +42,7 @@ namespace Shortcuts
 
         public override bool Loaded()
         {
-            but = new ToolStripMenuItem("Fix mission top/bottom");
+            but = new ToolStripMenuItem("Test the Mission");
             but.Click += but_Click;
             ToolStripItemCollection col = Host.FPMenuMap.Items;
             col.Add(but);
@@ -64,19 +64,17 @@ namespace Shortcuts
 
         void but_Click(object sender, EventArgs e)
         {
-            CustomMessageBox.Show("This is a sample plugin\nSee the source in the plugins folder");
+            CustomMessageBox.Show("Successful Right-click option");
 
-			string angle = "0";
-            InputBox.Show("Enter Angle", "This will be the heading", ref angle);
-		    int angle_in_number = Int32.Parse(angle);
-			
-			Host.InsertWP(0, MAVLink.MAV_CMD.DO_SET_SERVO, 9, angle_in_number, 0, 0, 0, 0, 0);
-            Host.InsertWP(1, MAVLink.MAV_CMD.DO_SET_SERVO, 10, 1000, 0, 0, 0, 0, 0);
- 
-			Host.AddWPtoList(MAVLink.MAV_CMD.DO_SET_SERVO, 9, 1000, 0, 0, 0, 0, 0);
-            Host.AddWPtoList(MAVLink.MAV_CMD.DO_SET_SERVO, 10, 1000, 0, 0, 0, 0, 0);
+            string angle = "0";
+            InputBox.Show("Load Mission to be validated: ", "", ref angle);
 
-            commands.Rows.RemoveAt(1);
+            // Mavlink commands for reference from documentation - https://mavlink.io/en/messages/common.html
+            //MAV_CMD_DO_LAND_START(189)
+            //MAV_CMD_NAV_VTOL_TAKEOFF (84)
+            //MAV_CMD_NAV_VTOL_LAND(85)
+
+            // Some sample mission waypoints
         }
     }
 }
