@@ -51,12 +51,11 @@ namespace Carbonix
 
         public override bool Loaded()
         {
-     
+
             // Note - Somehow this works in the modified example2-menu.cs plugin but does not work as 
             // part of the Carbonix Plugin so it is commented out in Carbonix_Plugin.cs for now
 
             /*
-
             // i) Add in right-click option for validator test to appear as "Test the Mission" item
             // modified from example2-menu.cs
             val_but = new ToolStripMenuItem("Test the Mission");
@@ -70,7 +69,7 @@ namespace Carbonix
             test_command =
                 Host.MainForm.FlightPlanner.Controls.Find("Commands", true).FirstOrDefault() as
                     MissionPlanner.Controls.MyDataGridView;
-
+            
             */
 
             // ii) Generic pop-up box. Add button under the HUD that launches a pop-up
@@ -78,12 +77,12 @@ namespace Carbonix
             button.Text = "Run Validator";
             button.Click += (sender, e) =>
             {
-                CustomMessageBox.Show("Hello from Mission Test Validator V1.2!!");
+                CustomMessageBox.Show("Hello from Mission Test Validator V1.3!!"); //using as a small version control check for build
             };
 
             Host.MainForm.FlightData.panel_persistent.Controls.Add(button); //adds a green "Run Validator" box to below HUD that
             // is clickable
-
+                        
             // Load settings json files
             LoadSettings();
 
@@ -731,16 +730,9 @@ namespace Carbonix
             }
         }
 
-        // When the "Test the Mission" option is selected inthe Flight Planner page,
-        // the three waypoints (vtol takeoff, do land start, vtol land) should appear as waypoints
-        // to play around with how a plugin option can 'affect' the mission planning page
-        // intention is to then 'verify' the mission is ok as the basic MVP check
-
         /*
         void but_Click(object sender, EventArgs e)
-        {
-            CustomMessageBox.Show("Successful Right-click option");
-            
+        {           
             string angle = "0";
             InputBox.Show("Load Mission to be validated: ","", ref angle);
 
