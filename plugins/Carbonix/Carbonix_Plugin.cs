@@ -14,11 +14,8 @@ using MissionPlanner.Controls;
 using System.Threading.Tasks;
 using System.Drawing;
 using MissionPlanner.GCSViews.ConfigurationView;
-<<<<<<< HEAD
 using Newtonsoft.Json.Serialization;
-=======
 using System.Linq;
->>>>>>> 04de07db9 (Validator: plugin mod to add in hardcoded waypoints for dummy analysis)
 
 namespace Carbonix
 {
@@ -50,21 +47,7 @@ namespace Carbonix
         public override bool Init() { return true; }
 
         public override bool Loaded()
-        {
-
-            /*
-            // Generic pop-up box. Add button under the HUD that launches a pop-up
-            var button = new MissionPlanner.Controls.MyButton();
-            button.Text = "Run Validator";
-            button.Click += (sender, e) =>
-            {
-                CustomMessageBox.Show("Hello from Mission Test Validator V1.4!!"); //using as a small version control check for build
-            };
-
-            Host.MainForm.FlightData.panel_persistent.Controls.Add(button); //adds a green "Run Validator" box to below HUD that
-            // is clickable
-            
-            */
+        {                       
 
             // Load settings json files
             LoadSettings();
@@ -711,24 +694,6 @@ namespace Carbonix
             {
                 log.Error(ex);
             }
-        }
-
-        /*
-        void but_Click(object sender, EventArgs e)
-        {           
-            string angle = "0";
-            InputBox.Show("Load Mission to be validated: ","", ref angle);
-
-            // Mavlink commands for reference from documentation - https://mavlink.io/en/messages/common.html
-            //MAV_CMD_DO_LAND_START(189)
-            //MAV_CMD_NAV_VTOL_TAKEOFF (84)
-            //MAV_CMD_NAV_VTOL_LAND(85)
-
-            // Some sample mission waypoints
-            Host.InsertWP(0, MAVLink.MAV_CMD.VTOL_TAKEOFF, 0, 90, 0, 0, 150.849055 , -33.667015, 40.000000);
-            Host.InsertWP(1, MAVLink.MAV_CMD.DO_LAND_START,0, 90, 0, 0, 150.845954 , -33.668533 , 40.000000);
-            Host.InsertWP(2, MAVLink.MAV_CMD.VTOL_LAND, 0, 90, 0, 0, 150.845107 , -33.668390, 40.000000);
-        }
-        */
+        }     
     }
 }
