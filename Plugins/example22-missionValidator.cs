@@ -9,6 +9,9 @@ using System.Windows.Forms;
 using System.Diagnostics;
 using MissionPlanner;
 using System.Drawing;
+using static MAVLink;
+using System.Collections.Concurrent;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace MissionValidator
 {
@@ -20,11 +23,22 @@ namespace MissionValidator
         IEnumerable<KeyValuePair<int, MAVLink.mavlink_mission_item_int_t>> waypoint_list;
 
         // Create a new string variable for the end page to say why it fails
-        string whyItFails;
+        //string whyItFails;
+
+        // Dictionary to hold the missionResult descriptors
+        Dictionary<int, string> missionResult = new Dictionary<int, string>()
+        {
+            {1, "Valid VTOL Takeoff"},
+            {2, "Invalid VTOL Takeoff"},
+            {3, "Missing VTOL Takeoff"},
+            {4, "Valid VTOL Land"},
+            {5, "Invalid VTOL Land"},
+            {6, "Missing VTOL Land"},
+        };
 
         public override string Name
         {
-            get { return "Carbonix Mission Planner Plugin"; }
+            get { return "Carbonix Mission Validator Plugin"; }
         }
 
         public override string Version
@@ -85,11 +99,14 @@ namespace MissionValidator
 
             if (isMissionValid)
             {
-                CustomMessageBox.Show("Mission - PASSES");
+                CustomMessageBox.Show("Mission - PASSES: ");
+                // Add explanation of why mission passed
             }
             else
             {
-                CustomMessageBox.Show("Mission - FAILS: " + whyItFails);
+                CustomMessageBox.Show("Mission - FAILS: ");
+                // Add explanation of why mission failed
+                //CustomMessageBox.Show("Mission - FAILS: " + whyItFails);
             }
 
         }
@@ -116,10 +133,9 @@ namespace MissionValidator
 
             bool takeoffExists = false;
             bool landExists = false;
+            bool validTakeoff = false; // Adding a flag to help check if VTOL_TAKEOFF command is the 'first' waypoint
+            bool validLand = false;
             int waypointCount = commands.Rows.Count;
-
-            // Adding a flag to help check if VTOL_TAKEOFF command exists
-            bool takeoffFound = false;
 
             // The .Where query filters the autopilot's current loaded mission to only collect the VTOL_TAKEOFF, VTOL_LAND and DO_LAND_START points
             // to make this check time-efficient?
@@ -129,42 +145,48 @@ namespace MissionValidator
                           a.Value.command == (ushort)MAVLink.MAV_CMD.VTOL_LAND).ToList();
 
             // Iterating over the filtered waypoint command list. 
-            foreach (var sublist in takeofflanding_wps) //var sublist is an implicit type for the keyvalue pair of "int" and "mavlink mission message item"
+            // var sublist is an implicit type for the keyvalue pair of "int" and "mavlink mission message item"
+            foreach (var sublist in takeofflanding_wps) 
             {
-               
-                //i) Check 'first' WP is VTOL_TAKEOFF
-                if (sublist.Value.command == (ushort)MAVLink.MAV_CMD.VTOL_TAKEOFF && sublist.Key == 1)
+
+                // VTOL Takeoff Conditions
+                if (sublist.Value.command == (ushort)MAVLink.MAV_CMD.VTOL_TAKEOFF)
                 {
-                    takeoffFound = true;
-                    takeoffExists = true;
+                    if (sublist.Key == 1)
+                    {
+                        CustomMessageBox.Show("Valid vtol takeoff"); // TAKEOFF is 'first' WP
+                        validTakeoff = true;
+                    }
+                    else
+                    {
+                        takeoffExists = true;
+                        CustomMessageBox.Show("VTOL takeoff is not 1st waypoint"); // takeoff is present but is not the first waypoint
+                    }                    
                 }
 
-                // check if VTOL_TAKEOFF is not there - when flag is still false
-                else if (takeoffFound == false)
+                // VTOL Land Conditions
+                if (sublist.Value.command == (ushort)MAVLink.MAV_CMD.VTOL_LAND)
                 {
-                    takeoffExists = false;
-                    whyItFails = "VTOL_TAKEOFF command does not exist in mission plan";
+                    if (sublist.Key == waypointCount && sublist.Value.z == 0)
+                    {
+                        validLand = true;
+                        CustomMessageBox.Show("Valid vtol land"); // LAND is 'last' WP and at 0m altitude
+                    }
+                    else
+                    {
+                        landExists = true;
+                        CustomMessageBox.Show("VTOL land is not last waypoint or altitude > 0m"); // either not the last waypoint or altitude incorrect                        
+                    }                     
                 }
 
-                //check if VTOL_TAKEOFF is there but not at the first waypoint
-                else if (sublist.Value.command == (ushort)MAVLink.MAV_CMD.VTOL_TAKEOFF && sublist.Key != 1)
-                {
-                    takeoffFound = true;
-                    takeoffExists = false;
-                    whyItFails = "VTOL_TAKEOFF command is not the first command";
-                }
-
-                //ii) Check 'last' WP is VTOL_LAND & at 0m altitude
-                if (sublist.Value.command == (ushort)MAVLink.MAV_CMD.VTOL_LAND && (sublist.Key == waypointCount && sublist.Value.z == 0))
-                {
-                    landExists = true;
-                }
-
-                //iii) Check a DO_LAND_START is present
+                // DO_LAND_START Conditions
                 // TO DO
             }
 
-            return (takeoffExists && landExists);
+            // if takeoffExists still false at end of all waypoints - missing takeoff waypoint
+            // if landExists still false at end of all waypoints - missing vtol_land waypoint
+
+            return (validLand && validTakeoff);
         }
     }
 }
