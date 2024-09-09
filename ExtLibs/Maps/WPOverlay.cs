@@ -1,4 +1,4 @@
-﻿using GMap.NET;
+using GMap.NET;
 using GMap.NET.WindowsForms;
 using GMap.NET.WindowsForms.Markers;
 using MissionPlanner.Controls.Waypoints;
@@ -24,6 +24,10 @@ namespace MissionPlanner.ArduPilot
         /// list of point as per mission including jump repeats
         /// </summary>
         List<PointLatLngAlt> route = new List<PointLatLngAlt>();
+        /// <summary>
+        /// Create a dictionary to map waypoint numbers to route array indices
+        /// </summary>
+        Dictionary<int, int> waypointToRouteIndex = new Dictionary<int, int>();
 
         public void CreateOverlay(PointLatLngAlt home, List<Locationwp> missionitems, double wpradius, double loiterradius, double altunitmultiplier)
         {
@@ -88,17 +92,11 @@ namespace MissionPlanner.ArduPilot
                         pointlist.Add(new PointLatLngAlt(item.lat, item.lng,
                             item.alt + gethomealt((MAVLink.MAV_FRAME) item.frame, item.lat, item.lng),
                             "DLS" + (a + 1).ToString()));
-                        route.Add(pointlist[pointlist.Count - 1]);
+                        AddPointToRoute(a + 1, pointlist[pointlist.Count - 1]);
 
                         dolandstart = a;
-                        // draw everything before
-                        if (route.Count > 0)
-                        {
-                            RegenerateWPRoute(route, home, false);
-                            route.Clear();
-                        }
                         
-                        route.Add(pointlist[pointlist.Count - 1]);
+                        AddPointToRoute(a + 1, pointlist[pointlist.Count - 1]);
                         addpolygonmarker((a + 1).ToString(), item.lng, item.lat,
                             item.alt * altunitmultiplier, null, wpradius);
                     } 
@@ -106,13 +104,11 @@ namespace MissionPlanner.ArduPilot
                     {
                         pointlist.Add(new PointLatLngAlt(item.lat, item.lng,
                             item.alt + gethomealt((MAVLink.MAV_FRAME) item.frame, item.lat, item.lng),
-                            (a + 1).ToString()));
-                        route.Add(pointlist[pointlist.Count - 1]);
+                            (a + 1).ToString())
+                            {Tag = "break"});
+                        AddPointToRoute(a + 1, pointlist[pointlist.Count - 1]);
                         addpolygonmarker((a + 1).ToString(), item.lng, item.lat,
                             item.alt * altunitmultiplier, null, wpradius);
-
-                        RegenerateWPRoute(route, home,  false);
-                        route.Clear();
                     } 
                     else if (command == (ushort) MAVLink.MAV_CMD.DO_SET_ROI)
                     {
@@ -198,18 +194,18 @@ namespace MissionPlanner.ArduPilot
 
                                 if (dist > this_loiterradius)
                                 {
-                                    route.Add(pointlist[pointlist.Count - 1]);
+                                    AddPointToRoute(a + 1, pointlist[pointlist.Count - 1]);
                                     var theta = Math.Acos(this_loiterradius / dist) * MathHelper.rad2deg;
                                     var offset = from.newpos(bearing - loiterdirection*theta, this_loiterradius);
                                     route.Add(offset);
                                 }
                                 else
                                 {
-                                    route.Add(pointlist[pointlist.Count - 1]);
+                                    AddPointToRoute(a + 1, pointlist[pointlist.Count - 1]);
                                 }
                             }
                             else
-                                route.Add(pointlist[pointlist.Count - 1]);
+                                AddPointToRoute(a + 1, pointlist[pointlist.Count - 1]);
 
                             addpolygonmarker((a + 1).ToString(), item.lng, item.lat,
                                 item.alt * altunitmultiplier, Color.LightBlue, this_loiterradius);
@@ -221,14 +217,14 @@ namespace MissionPlanner.ArduPilot
                                 item.alt + gethomealt((MAVLink.MAV_FRAME) item.frame, item.lat, item.lng),
                                 (a + 1).ToString())
                             {Tag2 = "spline"});
-                        route.Add(pointlist[pointlist.Count - 1]);
+                        AddPointToRoute(a + 1, pointlist[pointlist.Count - 1]);
                         addpolygonmarker((a + 1).ToString(), item.lng, item.lat,
                             item.alt * altunitmultiplier, Color.Green, wpradius);
                     }
                     else if (command == (ushort) MAVLink.MAV_CMD.WAYPOINT && item.lat == 0 && item.lng == 0)
                     {
                         if(pointlist.Count > 0)
-                            route.Add(pointlist[pointlist.Count - 1]);
+                            AddPointToRoute(a + 1, pointlist[pointlist.Count - 1]);
                         pointlist.Add(null);
                     }
                     else
@@ -238,7 +234,7 @@ namespace MissionPlanner.ArduPilot
                             pointlist.Add(new PointLatLngAlt(item.lat, item.lng,
                                 item.alt + gethomealt((MAVLink.MAV_FRAME) item.frame, item.lat, item.lng),
                                 (a + 1).ToString()));
-                            route.Add(pointlist[pointlist.Count - 1]);
+                            AddPointToRoute(a + 1, pointlist[pointlist.Count - 1]);
                             addpolygonmarker((a + 1).ToString(), item.lng, item.lat,
                                 item.alt * altunitmultiplier, null, wpradius);
                         }
@@ -253,25 +249,40 @@ namespace MissionPlanner.ArduPilot
                     minlong = Math.Min(item.lng, minlong);
                     minlat = Math.Min(item.lat, minlat);
                 }
-                else if (command == (ushort)MAVLink.MAV_CMD.DO_JUMP) // fix do jumps into the future
+                else if (command == (ushort)MAVLink.MAV_CMD.DO_JUMP) 
                 {
                     pointlist.Add(null);
 
                     int wpno = (int) Math.Max(item.p1, 0);
                     int repeat = (int)item.p2;
+                    // Do jumps into the future are not able to be handled correctly with this new implementation of
+                    // the route array and how the route is now only one continous list of points to draw.
+                    // Therefore unfortunately we have to ignore them.
+                    // Need to come up with a solution to make this work.
+                    if (wpno > a)
+                    {
+                        continue;
+                    }
 
                     List<PointLatLngAlt> list = new List<PointLatLngAlt>();
 
-                    // cycle through reps
-                    for (int repno = repeat; repno > 0; repno--)
+                    if (waypointToRouteIndex.ContainsKey(wpno))
                     {
-                        // cycle through wps
-                        for (int no = wpno; no <= a; no++)
+                        int routeIndex = waypointToRouteIndex[wpno];
+
+                        // cycle through reps
+                        for (int repno = repeat; repno > 0; repno--)
                         {
-                            if (pointlist[no] != null)
-                                list.Add(pointlist[no]);
+                            // cycle through route starting from mapped route index
+                            //continure until end of route array
+                            for (int no = routeIndex; no < route.Count; no++)
+                            {
+                                if (route[no] != null)
+                                    list.Add(route[no]);
+                            }
                         }
                     }
+
                     /*
                     if (repeat == -1)
                     {
@@ -574,8 +585,19 @@ namespace MissionPlanner.ArduPilot
                         }
                         return;
                     }
+                    if (x.Tag == "break")
+                    {
+                        route.Points.Add(x);
+                        route.Stroke = new Pen(Color.Yellow, 4);
+                        route.Stroke.DashStyle = DashStyle.Custom;
+                        overlay.Routes.Add(route);
 
-                    route.Points.Add(x);
+                        route = new GMapRoute("wp route");
+                    }
+                    else
+                    {
+                        route.Points.Add(x);
+                    }
                 });
 
                 homeroute.Stroke = new Pen(Color.Yellow, 2);
@@ -594,5 +616,17 @@ namespace MissionPlanner.ArduPilot
                 overlay.Routes.Add(route);
             }
         }
+        private void AddPointToRoute(int waypointIndex, PointLatLngAlt point)
+        {
+            // Add the point to the route array
+            route.Add(point);
+
+            // If the waypoint index is valid (i.e., corresponds to a real waypoint), update the mapping
+            if (waypointIndex >= 0)
+            {
+                waypointToRouteIndex[waypointIndex] = route.Count - 1;
+            }
+        }
+
     }
 }
