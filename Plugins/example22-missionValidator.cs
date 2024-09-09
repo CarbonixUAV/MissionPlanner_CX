@@ -149,6 +149,7 @@ namespace MissionValidator
                     }                    
 
                     //any other condition being true is invalid waypoint or missing waypoint condition
+                    // to enumerate more efficiently later!
                     if (resultCheck.Key == "VTOL Takeoff is not 1st waypoint")
                     {
                         missionFail = true;
@@ -156,6 +157,18 @@ namespace MissionValidator
                     }
 
                     if (resultCheck.Key == "VTOL Land is not last waypoint or altitude > 0m")
+                    {
+                        missionFail = true;
+                        missionDescriptionListFail.Add(resultCheck.Key);
+                    }
+
+                    if (resultCheck.Key == "Missing VTOL Takeoff")
+                    {
+                        missionFail = true;
+                        missionDescriptionListFail.Add(resultCheck.Key);
+                    }
+
+                    if (resultCheck.Key == "Missing VTOL Land")
                     {
                         missionFail = true;
                         missionDescriptionListFail.Add(resultCheck.Key);
