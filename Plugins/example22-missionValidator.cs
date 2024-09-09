@@ -119,6 +119,7 @@ namespace MissionValidator
             // initially set the mission validation status flags 
             bool takeoffPass = false;
             bool landPass = false;
+            bool missionFail = false;
 
             var missionDescriptionListPass = new List<string>();
             var missionDescriptionListFail = new List<string>();
@@ -148,14 +149,16 @@ namespace MissionValidator
                     }                    
 
                     //any other condition being true is invalid waypoint or missing waypoint condition
-                    if (resultCheck.Key == "VTOL Takeoff is not 1st waypoin")
+                    if (resultCheck.Key == "VTOL Takeoff is not 1st waypoint")
                     {
-                        // TODO
+                        missionFail = true;
+                        missionDescriptionListFail.Add(resultCheck.Key);
                     }
 
                     if (resultCheck.Key == "VTOL Land is not last waypoint or altitude > 0m")
                     {
-                        // TODO
+                        missionFail = true;
+                        missionDescriptionListFail.Add(resultCheck.Key);
                     }
                 }                               
             }
@@ -166,9 +169,9 @@ namespace MissionValidator
                     + System.Environment.NewLine + missionDescriptionListPass[1].ToString();
                 CustomMessageBox.Show(messagePass);
             }
-            else
+            else if (missionFail)
             {
-                string messageFail = "Mission - FAILS: ";
+                string messageFail = "Mission - FAILS: " + System.Environment.NewLine + missionDescriptionListFail[0].ToString();
                 CustomMessageBox.Show(messageFail);
             }              
         }
