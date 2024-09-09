@@ -56,6 +56,12 @@ namespace MissionValidator
             return true;
         }
 
+        // Helper function to change the state of the mission condition dictionary elements
+        void updateMissionResult(string missionResultDescription, bool wp_outcome)
+        {
+            missionResult[missionResultDescription] = wp_outcome;
+        }
+
         public override bool Loaded()
         {
             //Unused for now
@@ -77,8 +83,6 @@ namespace MissionValidator
             // If this "Run Validator" button option is clicked
             button.Click += but_Click;
 
-            //reset flags in Dictionary - TO DO
-
             return true;
         }
 
@@ -94,10 +98,17 @@ namespace MissionValidator
 
         // When the "Run Validator" button is clicked in the Flight Planner page        
         void but_Click(object sender, EventArgs e)
-        {           
+        {
+
+            //reset flags in Dictionary
+            foreach (var resultFlag in missionResult.ToList())
+            {
+                missionResult[resultFlag.Key] = false;
+            }
+
             // note - requires serial connection to autopilot to check
             // the current waypoint file stored in flight controller
-           checkMission(MainV2.comPort.MAV);           
+            checkMission(MainV2.comPort.MAV);           
 
         }
 
@@ -109,7 +120,8 @@ namespace MissionValidator
             bool takeoffPass = false;
             bool landPass = false;
 
-            var missionDescriptionList = new List<string>();
+            var missionDescriptionListPass = new List<string>();
+            var missionDescriptionListFail = new List<string>();
 
             waypoint_list = MAV.wps; //waypoint list to be queried
 
@@ -127,33 +139,38 @@ namespace MissionValidator
                     if (resultCheck.Key == "Valid VTOL Takeoff")
                     {
                         takeoffPass = true;
-                        missionDescriptionList.Add(resultCheck.Key);
+                        missionDescriptionListPass.Add(resultCheck.Key);
                     }
                     if (resultCheck.Key == "Valid VTOL Land")
                     {
                         landPass = true;
-                        missionDescriptionList.Add(resultCheck.Key);
+                        missionDescriptionListPass.Add(resultCheck.Key);
                     }                    
+
                     //any other condition being true is invalid waypoint or missing waypoint condition
+                    if (resultCheck.Key == "VTOL Takeoff is not 1st waypoin")
+                    {
+                        // TODO
+                    }
+
+                    if (resultCheck.Key == "VTOL Land is not last waypoint or altitude > 0m")
+                    {
+                        // TODO
+                    }
                 }                               
             }
 
             if (takeoffPass && landPass)
             {
-                string message = "Mission - PASSES: " + System.Environment.NewLine + missionDescriptionList[0].ToString()
-                    + System.Environment.NewLine + missionDescriptionList[1].ToString();
-                CustomMessageBox.Show(message);
+                string messagePass = "Mission - PASSES: " + System.Environment.NewLine + missionDescriptionListPass[0].ToString()
+                    + System.Environment.NewLine + missionDescriptionListPass[1].ToString();
+                CustomMessageBox.Show(messagePass);
             }
             else
             {
-                CustomMessageBox.Show("Mission - FAILS: ");
+                string messageFail = "Mission - FAILS: ";
+                CustomMessageBox.Show(messageFail);
             }              
-        }
-        
-        // Helper function to change the state of the mission condition dictionary elements
-        void updateMissionResult(string missionResultDescription, bool wp_outcome)
-        {
-            missionResult[missionResultDescription] = wp_outcome;
         }
 
         // Check Takeoff and Landing waypoint validity
