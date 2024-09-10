@@ -34,6 +34,9 @@ namespace MissionValidator
             {"Valid VTOL Land",false},
             {"VTOL Land is not last waypoint or altitude > 0m",false}, //note - probably a bit too wordy
             {"Missing VTOL Land",false},
+            {"Valid DO_LAND_START", false},
+            {"DO_LAND_START is in the incorrect place", false},
+            {"Missing DO_LAND_START", false},
         };
 
         public override string Name
@@ -120,6 +123,7 @@ namespace MissionValidator
             bool takeoffPass = false;
             bool landPass = false;
             bool missionFail = false;
+            bool doLandStart = false;
 
             var missionDescriptionListPass = new List<string>();
             var missionDescriptionListFail = new List<string>();
@@ -146,7 +150,12 @@ namespace MissionValidator
                     {
                         landPass = true;
                         missionDescriptionListPass.Add(resultCheck.Key);
-                    }                    
+                    }
+                    if (resultCheck.Key == "Valid DO_LAND_START")
+                    {
+                        doLandStart = true;
+                        missionDescriptionListPass.Add(resultCheck.Key);
+                    }
 
                     //any other condition being true is invalid waypoint or missing waypoint condition
                     // to enumerate more efficiently later!
@@ -157,6 +166,11 @@ namespace MissionValidator
                     }
 
                     if (resultCheck.Key == "VTOL Land is not last waypoint or altitude > 0m")
+                    {
+                        missionFail = true;
+                        missionDescriptionListFail.Add(resultCheck.Key);
+                    }
+                    if(resultCheck.Key == "DO_LAND_START is in the incorrect place")
                     {
                         missionFail = true;
                         missionDescriptionListFail.Add(resultCheck.Key);
@@ -173,18 +187,23 @@ namespace MissionValidator
                         missionFail = true;
                         missionDescriptionListFail.Add(resultCheck.Key);
                     }
+                    if (resultCheck.Key == "Missing DO_LAND_START")
+                    {
+                        missionFail = true;
+                        missionDescriptionListFail.Add(resultCheck.Key);
+                    }
                 }                               
             }
 
-            if (takeoffPass && landPass)
+            if (takeoffPass && landPass && doLandStart)
             {
                 string messagePass = "Mission - PASSES: " + System.Environment.NewLine + missionDescriptionListPass[0].ToString()
-                    + System.Environment.NewLine + missionDescriptionListPass[1].ToString();
+                    + System.Environment.NewLine + missionDescriptionListPass[1].ToString() + System.Environment.NewLine + missionDescriptionListPass[2].ToString();
                 CustomMessageBox.Show(messagePass);
             }
-            else if (missionFail)
+            else if (missionFail) //edit to loop through all fail reasons 
             {
-                string messageFail = "Mission - FAILS: " + System.Environment.NewLine + missionDescriptionListFail[0].ToString();
+                string messageFail = "Mission - FAILS: " + System.Environment.NewLine + missionDescriptionListFail[0].ToString() + System.Environment.NewLine + missionDescriptionListFail[1].ToString();
                 CustomMessageBox.Show(messageFail);
             }              
         }
@@ -195,6 +214,7 @@ namespace MissionValidator
 
             bool takeoffExists = false;
             bool landExists = false;
+            bool doLandStartExists = false;
             int waypointCount = commands.Rows.Count;
 
             // The .Where query filters the autopilot's current loaded mission to only collect the VTOL_TAKEOFF, VTOL_LAND and DO_LAND_START points
@@ -238,7 +258,18 @@ namespace MissionValidator
                 }
 
                 // DO_LAND_START Conditions
-                // TO DO
+                if (sublist.Value.command == (ushort)MAVLink.MAV_CMD.DO_LAND_START)
+                {
+                    doLandStartExists = true;
+                    if (sublist.Key > 1 && sublist.Key < waypointCount) // DO_LAND_START is between the first and last cmds
+                    {
+                        updateMissionResult("Valid DO_LAND_START", true);
+                    }
+                    else
+                    {
+                        updateMissionResult("DO_LAND_START is in the incorrect place", true); // either not the last waypoint or altitude incorrect             
+                    }
+                }
             }
 
             // if takeoffExists still false at end of all waypoints - missing takeoff waypoint
@@ -251,6 +282,10 @@ namespace MissionValidator
             if (landExists == false)
             {
                 updateMissionResult("Missing VTOL Land", true);
+            }
+            if (doLandStartExists == false)
+            {
+                updateMissionResult("Missing DO_LAND_START", true);
             }
         }
     }
