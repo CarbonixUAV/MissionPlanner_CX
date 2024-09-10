@@ -959,6 +959,7 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Include="plugins\example20-multiplepositions.cs" />
+    <Compile Include="plugins\example22-missionValidator.cs" />
     <Compile Include="Utilities\AirMarket.cs">
       <SubType>UserControl</SubType>
     </Compile>
