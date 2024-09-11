@@ -12,6 +12,8 @@ using System.Drawing;
 using static MAVLink;
 using System.Collections.Concurrent;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using static Community.CsharpSqlite.Sqlite3;
+using DeviceProgramming;
 
 namespace MissionValidator
 {
@@ -124,6 +126,8 @@ namespace MissionValidator
             bool landPass = false;
             bool missionFail = false;
             bool doLandStart = false;
+            bool loiterToAlt = false;
+            bool wpRadiusPass = false;
 
             var missionDescriptionListPass = new List<string>();
             var missionDescriptionListFail = new List<string>();
@@ -133,6 +137,9 @@ namespace MissionValidator
             // Add to series of mission checks here, these modify the descriptors based on logic checks, as these
             // functions are passed in the full waypoint set currently stored in autopilot
             checkTakeoffLanding(waypoint_list);
+
+            // check loiter and radis values based on aircraft (currently bool)
+            checkLoiterandWpRadius(waypoint_list);
 
             // Iterate through dictionary key-value pairs and check the descriptors to display
             // to determine the pass/fail score for the mission                       
@@ -154,6 +161,16 @@ namespace MissionValidator
                     if (resultCheck.Key == "Valid DO_LAND_START")
                     {
                         doLandStart = true;
+                        missionDescriptionListPass.Add(resultCheck.Key);
+                    }
+                    if (resultCheck.Key == "Valid LOITER_TO_ALT")
+                    {
+                        loiterToAlt = true;
+                        missionDescriptionListPass.Add(resultCheck.Key);
+                    }
+                    if (resultCheck.Key == "Valid Waypoint Radius")
+                    {
+                        wpRadiusPass = true;
                         missionDescriptionListPass.Add(resultCheck.Key);
                     }
 
@@ -192,18 +209,42 @@ namespace MissionValidator
                         missionFail = true;
                         missionDescriptionListFail.Add(resultCheck.Key);
                     }
+                    if (resultCheck.Key == "LOITER_TO_ALT radius must be > 100m" || resultCheck.Key == "LOITER_TO_ALT radius must be > 150m") // can be in same if statement since only either ottano or volanti can be tested at once
+                    {
+                        missionFail = true;
+                        missionDescriptionListFail.Add(resultCheck.Key);
+                    }
+                   
+                    if (resultCheck.Key == "Waypoint Radius must be 75" || resultCheck.Key == "Waypoint Radius must be 150")
+                    {
+                        missionFail = true;
+                        missionDescriptionListFail.Add(resultCheck.Key);
+                    }
+
+                    
                 }                               
             }
 
-            if (takeoffPass && landPass && doLandStart)
+            if (takeoffPass && landPass && doLandStart && loiterToAlt)
             {
-                string messagePass = "Mission - PASSES: " + System.Environment.NewLine + missionDescriptionListPass[0].ToString()
-                    + System.Environment.NewLine + missionDescriptionListPass[1].ToString() + System.Environment.NewLine + missionDescriptionListPass[2].ToString();
+                int PassCount = missionDescriptionListPass.Count;
+                string messagePass = "Mission - PASSES: ";
+
+                for (int i = 0; i < PassCount; i++)
+                {
+                    messagePass = messagePass + System.Environment.NewLine + missionDescriptionListPass[i].ToString();
+                }
                 CustomMessageBox.Show(messagePass);
             }
-            else if (missionFail) //edit to loop through all fail reasons 
+            else if (missionFail)
             {
-                string messageFail = "Mission - FAILS: " + System.Environment.NewLine + missionDescriptionListFail[0].ToString() + System.Environment.NewLine + missionDescriptionListFail[1].ToString();
+                int FailCount = missionDescriptionListFail.Count;
+                string messageFail = "Mission - FAILS: ";
+
+                for (int i = 0; i < FailCount; i++)
+                {
+                    messageFail = messageFail + System.Environment.NewLine + missionDescriptionListFail[i].ToString();
+                }
                 CustomMessageBox.Show(messageFail);
             }              
         }
@@ -267,7 +308,7 @@ namespace MissionValidator
                     }
                     else
                     {
-                        updateMissionResult("DO_LAND_START is in the incorrect place", true); // either not the last waypoint or altitude incorrect             
+                        updateMissionResult("DO_LAND_START is in the incorrect place", true);              
                     }
                 }
             }
@@ -287,6 +328,60 @@ namespace MissionValidator
             {
                 updateMissionResult("Missing DO_LAND_START", true);
             }
+        }
+
+        void checkLoiterandWpRadius(IEnumerable<KeyValuePair<int, MAVLink.mavlink_mission_item_int_t>> wp_list)
+        {
+            bool aircraftType = false; // false = volanti, true = ottano, will be changed to taken from settings.cs later
+       
+            var loiterToAlt_wps = wp_list
+                   .Where(a => a.Value.command == (ushort)MAVLink.MAV_CMD.LOITER_TO_ALT).ToList();
+            
+            // loop through loiter to alt wps (if any)  //Console.WriteLine(loiterToAlt_wps.Count); 
+            if (loiterToAlt_wps.Count > 0)
+            {
+                foreach(var sublist in loiterToAlt_wps)
+                {
+                    if (aircraftType == false && sublist.Value.param2 < 100) //voltanti 
+                    {
+                        updateMissionResult("LOITER_TO_ALT radius must be > 100m", true); // should add info of which cmd number as there can be multiple loiter to alt in one mission
+                    }
+                    else if (aircraftType == true && sublist.Value.param2 < 150) //ottano
+                    {
+                        updateMissionResult("LOITER_TO_ALT radius must be > 150m", true); // should add info of which cmd number as there can be multiple loiter to alt in one mission
+                    }
+                    else
+                    {
+                        updateMissionResult("Valid LOITER_TO_ALT", true);
+                    }
+                }
+            }
+
+            // Waypoint radius checks 
+            var requestWpRadiusParam = new MAVLink.mavlink_param_value_t() // error - this isnt the right way to read params
+            {
+                param_id = "WP_RADIUS".ToBytes(),
+            };
+
+            int wpRadiusParam = (int)requestWpRadiusParam.param_value;
+
+            // volanti conditions
+            if (aircraftType == false && wpRadiusParam != 75)
+            {
+                updateMissionResult("Waypoint Radius must be 75", false);
+            }
+
+            // ottano conditions 
+            else if (aircraftType == true && wpRadiusParam != 150)
+            {
+                updateMissionResult("Waypoint Radius must be 150", false);
+            }
+            else
+            {
+                updateMissionResult("Valid Waypoint Radius", true);
+            }
+
+            // Loiter Radius Checks - awaiting info from flight team
         }
     }
 }
