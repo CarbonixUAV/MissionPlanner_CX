@@ -244,6 +244,7 @@ namespace MissionValidator
                 }
 
                 // VTOL Land Conditions
+                // Need to separate these two conditions!! TO DO for Friday
                 if (sublist.Value.command == (ushort)MAVLink.MAV_CMD.VTOL_LAND)
                 {
                     landExists = true;
