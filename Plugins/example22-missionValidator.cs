@@ -26,18 +26,7 @@ namespace MissionValidator
         //string whyItFails;
 
         // Dictionary to hold the missionResult descriptors
-        Dictionary<string, bool> missionResult = new Dictionary<string, bool>()
-        {
-            {"Valid VTOL Takeoff", false},
-            {"VTOL Takeoff is not 1st waypoint",false}, //note - probably a bit too wordy
-            {"Missing VTOL Takeoff",false},
-            {"Valid VTOL Land",false},
-            {"VTOL Land is not last waypoint or altitude > 0m",false}, //note - probably a bit too wordy
-            {"Missing VTOL Land",false},
-            {"Valid DO_LAND_START", false},
-            {"DO_LAND_START is in the incorrect place", false},
-            {"Missing DO_LAND_START", false},
-        };
+        Dictionary<string, bool> missionResult = new Dictionary<string, bool>();
 
         public override string Name
         {
@@ -102,108 +91,39 @@ namespace MissionValidator
         // When the "Run Validator" button is clicked in the Flight Planner page        
         void but_Click(object sender, EventArgs e)
         {
-
-            //reset flags in Dictionary
-            foreach (var resultFlag in missionResult.ToList())
-            {
-                missionResult[resultFlag.Key] = false;
-            }
-
-            // note - requires serial connection to autopilot to check
-            // the current waypoint file stored in flight controller
             checkMission(MainV2.comPort.MAV);           
-
         }
 
         // Analyse the proposed mission
         void checkMission(MAVState MAV)
         {
-
-            // initially set the mission validation status flags 
-            bool takeoffPass = false;
-            bool landPass = false;
-            bool missionFail = false;
-            bool doLandStart = false;
-
-            var missionDescriptionListPass = new List<string>();
-            var missionDescriptionListFail = new List<string>();
-
-            waypoint_list = MAV.wps; //waypoint list to be queried
+            missionResult.Clear();
 
             // Add to series of mission checks here, these modify the descriptors based on logic checks, as these
             // functions are passed in the full waypoint set currently stored in autopilot
-            checkTakeoffLanding(waypoint_list);
+            checkTakeoffLanding(MAV.wps);
 
             // Iterate through dictionary key-value pairs and check the descriptors to display
             // to determine the pass/fail score for the mission                       
-            foreach (var resultCheck in missionResult)
+            var missionDescriptionListPass = missionResult.Where(x => x.Value == true).Select(x => x.Key).ToList();
+            var missionDescriptionListFail = missionResult.Where(x => x.Value == false).Select(x => x.Key).ToList();
+
+            if (missionDescriptionListFail.Count == 0)
             {
-                //CustomMessageBox.Show($"{resultCheck.Key} = {resultCheck.Value}");
-                if (resultCheck.Value == true)
+                string messagePass = "Mission - PASSES:" + System.Environment.NewLine;
+                foreach (var pass in missionDescriptionListPass)
                 {
-                    if (resultCheck.Key == "Valid VTOL Takeoff")
-                    {
-                        takeoffPass = true;
-                        missionDescriptionListPass.Add(resultCheck.Key);
-                    }
-                    if (resultCheck.Key == "Valid VTOL Land")
-                    {
-                        landPass = true;
-                        missionDescriptionListPass.Add(resultCheck.Key);
-                    }
-                    if (resultCheck.Key == "Valid DO_LAND_START")
-                    {
-                        doLandStart = true;
-                        missionDescriptionListPass.Add(resultCheck.Key);
-                    }
-
-                    //any other condition being true is invalid waypoint or missing waypoint condition
-                    // to enumerate more efficiently later!
-                    if (resultCheck.Key == "VTOL Takeoff is not 1st waypoint")
-                    {
-                        missionFail = true;
-                        missionDescriptionListFail.Add(resultCheck.Key);
-                    }
-
-                    if (resultCheck.Key == "VTOL Land is not last waypoint or altitude > 0m")
-                    {
-                        missionFail = true;
-                        missionDescriptionListFail.Add(resultCheck.Key);
-                    }
-                    if(resultCheck.Key == "DO_LAND_START is in the incorrect place")
-                    {
-                        missionFail = true;
-                        missionDescriptionListFail.Add(resultCheck.Key);
-                    }
-
-                    if (resultCheck.Key == "Missing VTOL Takeoff")
-                    {
-                        missionFail = true;
-                        missionDescriptionListFail.Add(resultCheck.Key);
-                    }
-
-                    if (resultCheck.Key == "Missing VTOL Land")
-                    {
-                        missionFail = true;
-                        missionDescriptionListFail.Add(resultCheck.Key);
-                    }
-                    if (resultCheck.Key == "Missing DO_LAND_START")
-                    {
-                        missionFail = true;
-                        missionDescriptionListFail.Add(resultCheck.Key);
-                    }
-                }                               
-            }
-
-            if (takeoffPass && landPass && doLandStart)
-            {
-                string messagePass = "Mission - PASSES: " + System.Environment.NewLine + missionDescriptionListPass[0].ToString()
-                    + System.Environment.NewLine + missionDescriptionListPass[1].ToString() + System.Environment.NewLine + missionDescriptionListPass[2].ToString();
+                    messagePass += pass + System.Environment.NewLine;
+                }
                 CustomMessageBox.Show(messagePass);
             }
-            else if (missionFail) //edit to loop through all fail reasons 
+            else
             {
-                string messageFail = "Mission - FAILS: " + System.Environment.NewLine + missionDescriptionListFail[0].ToString() + System.Environment.NewLine + missionDescriptionListFail[1].ToString();
+                string messageFail = "Mission - FAILS:" + System.Environment.NewLine;
+                foreach (var fail in missionDescriptionListFail)
+                {
+                    messageFail += fail + System.Environment.NewLine;
+                }
                 CustomMessageBox.Show(messageFail);
             }              
         }
@@ -239,7 +159,7 @@ namespace MissionValidator
                     }
                     else
                     {
-                        updateMissionResult("VTOL Takeoff is not 1st waypoint", true); // takeoff is present but is not the first waypoint
+                        updateMissionResult("VTOL Takeoff is not 1st waypoint", false); // takeoff is present but is not the first waypoint
                     }                    
                 }
 
@@ -253,7 +173,7 @@ namespace MissionValidator
                     }
                     else
                     {   
-                        updateMissionResult("VTOL Land is not last waypoint or altitude > 0m", true); // either not the last waypoint or altitude incorrect             
+                        updateMissionResult("VTOL Land is not last waypoint or altitude > 0m", false); // either not the last waypoint or altitude incorrect             
                     }                     
                 }
 
@@ -267,7 +187,7 @@ namespace MissionValidator
                     }
                     else
                     {
-                        updateMissionResult("DO_LAND_START is in the incorrect place", true); // either not the last waypoint or altitude incorrect             
+                        updateMissionResult("DO_LAND_START is in the incorrect place", false); // either not the last waypoint or altitude incorrect             
                     }
                 }
             }
@@ -276,16 +196,16 @@ namespace MissionValidator
             // if landExists still false at end of all waypoints - missing vtol_land waypoint
             if (takeoffExists == false)
             {
-                updateMissionResult("Missing VTOL Takeoff", true);
+                updateMissionResult("Missing VTOL Takeoff", false);
             }
 
             if (landExists == false)
             {
-                updateMissionResult("Missing VTOL Land", true);
+                updateMissionResult("Missing VTOL Land", false);
             }
             if (doLandStartExists == false)
             {
-                updateMissionResult("Missing DO_LAND_START", true);
+                updateMissionResult("Missing DO_LAND_START", false);
             }
         }
     }
