@@ -769,9 +769,32 @@ namespace MissionPlanner.GCSViews.ConfigurationView
                 }
             }
 
+            if (chk_none_readonly.Checked)
+            {
+                foreach (DataGridViewRow row in Params.Rows)
+                {
+                    if (check_readonly(row)) {
+                        row.Visible = false;
+                    }
+                }
+            }
+            
+
             Params.Visible = true;
 
             log.InfoFormat("Filter: {0}ms", (DateTime.Now - start).TotalMilliseconds);
+        }
+
+        private bool check_readonly(DataGridViewRow row)
+        {
+            var readonly1 = ParameterMetaDataRepository.GetParameterMetaData(row.Cells[Command.Index].Value.ToString(),
+                            ParameterMetaDataConstants.ReadOnly, MainV2.comPort.MAV.cs.firmware.ToString());
+            if (!String.IsNullOrEmpty(readonly1))
+            {
+                var readonly2 = bool.Parse(readonly1);
+                return readonly2;
+            }
+            else { return false; }
         }
 
         private void BUT_paramfileload_Click(object sender, EventArgs e)
