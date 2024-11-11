@@ -63,7 +63,7 @@ namespace Carbonix
                 "Field",
                 "ROC1"
             };
-            controller = "vJoy Device";
+            controller = "Serial/Keyboard/Mouse/Joystick";
             /*
             It is shockingly difficult to handle this API key the "right way" in
             C#. Getting an environment variable at compile-time is not
