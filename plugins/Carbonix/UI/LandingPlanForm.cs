@@ -609,9 +609,9 @@ namespace Carbonix
                 // it's pointing the right way.
                 plugin.Host.AddWPtoList(MAVLink.MAV_CMD.LOITER_TURNS, 0, 0, sign * loiter_radius, 1, loiter_point.Lng, loiter_point.Lat, Math.Round(CurrentState.toAltDisplayUnit(approach_points.Last().alt + alt_offset)));
             }
-            else // Otherwise throw in a single loiter turn
+            else // Otherwise throw in a zero turns loiter turn
             {
-                plugin.Host.AddWPtoList(MAVLink.MAV_CMD.LOITER_TURNS, 1, 0, sign * loiter_radius, 1, loiter_point.Lng, loiter_point.Lat, Math.Round(CurrentState.toAltDisplayUnit(approach_points.Last().alt + alt_offset)));
+                plugin.Host.AddWPtoList(MAVLink.MAV_CMD.LOITER_TURNS, 0, 0, sign * loiter_radius, 1, loiter_point.Lng, loiter_point.Lat, Math.Round(CurrentState.toAltDisplayUnit(approach_points.Last().alt + alt_offset)));
             }
 
             // Loop backward through approach_points starting with second-to-last and add waypoints
