@@ -4877,6 +4877,9 @@
     <None Include="BurntKermit.mpsystheme">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="CX-Dark.mpsystheme">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="Drivers\chibioscomp.cat">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
