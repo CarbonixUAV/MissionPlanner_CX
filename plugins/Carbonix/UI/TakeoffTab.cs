@@ -165,9 +165,12 @@ namespace Carbonix
             // Disable the manual mode button if we are likely flying
             but_manual.Enabled = !(Host.cs.armed && (CurrentState.fromSpeedDisplayUnit(Host.cs.groundspeed) > 3 || Host.cs.ch3percent > 12));
 
-            // Disable final button when not at the correct waypoint
-            but_landfinal.Enabled = final_wps.Contains((int)Host.cs.wpno + 1);
 
+            //Disable the Reboot Button When armed
+            but_reboot.Enabled = !Host.cs.armed;
+
+            //Disable Engine Start stop Control with safety on and also when flying, allow in VTOL climb and descents
+            but_engControl.Enabled = !(Host.cs.safetyactive || CurrentState.fromSpeedDisplayUnit(Host.cs.groundspeed) > 4 || Host.cs.sonarrange > 30);
         }
         
         private void finalButtonTimer_Tick(object sender, EventArgs e)
@@ -407,30 +410,6 @@ namespace Carbonix
                 }
             }
         }
-        
-        private void but_landfinal_Click(object sender, EventArgs e)
-        {
-            if (!Host.comPort.BaseStream.IsOpen) return;
-
-            // Double check that we are in a correct waypoint for this
-            // Just in case there is a really off-chance race condition
-            int wpno = (int)Host.cs.wpno;
-            if (final_wps.Contains(wpno + 1))
-            {
-                byte sysid = (byte)Host.comPort.sysidcurrent;
-                byte compid = (byte)Host.comPort.compidcurrent;
-                // Send the command to the autopilot
-                try
-                {
-                    // Go to next waypoint to initiate final
-                    Host.comPort.setWPCurrent(sysid, compid, (ushort)(wpno + 1));
-                }
-                catch
-                {
-                    CustomMessageBox.Show(Strings.CommandFailed, Strings.ERROR);
-                }
-            }
-        }
 
         private void but_safety_Click(object sender, EventArgs e)
         {
@@ -442,6 +421,10 @@ namespace Carbonix
             // Disable the button while we send the message
             ((Control)sender).Enabled = false;
 
+            if (!Host.cs.safetyactive)
+            {
+                SendEngineCommand(false);
+            }
             set_safety_switch(!Host.cs.safetyactive);
         }
 
@@ -451,6 +434,48 @@ namespace Carbonix
             var custom_mode = enable ? 1u : 0u;
             var mode = new MAVLink.mavlink_set_mode_t() { custom_mode = custom_mode, target_system = (byte)Host.comPort.sysidcurrent };
             MainV2.comPort.setMode(mode, MAVLink.MAV_MODE_FLAG.SAFETY_ARMED);
+        }
+
+        //reboot the flight conroller
+        private void but_reboot_Click(object sender, EventArgs e)
+        {
+            if (CustomMessageBox.Show("Are you sure you want to Reboot?", "Reboot",
+        MessageBoxButtons.YesNo) == (int)DialogResult.Yes)
+            {
+                try
+                {
+                    // Disable the button while we send the message
+                    ((Control)sender).Enabled = false;
+                    MainV2.comPort.doReboot();
+                }
+                catch
+                {
+                    CustomMessageBox.Show(Strings.CommandFailed, Strings.ERROR);
+                }
+                //renable the button
+                ((Control)sender).Enabled = true;
+            }
+        }
+
+        //One button to start and stop the engine. 
+        private void but_engControl_Click(object sender, EventArgs e)
+        {
+            var result = CustomMessageBox.Show("", "Engine Control", CustomMessageBox.MessageBoxButtons.YesNo, 0, "Start Engine", "Kill Engine");
+            if ((int)result == (int)DialogResult.Yes)
+            {
+                SendEngineCommand(true);
+            }
+            else if ((int)result == (int)DialogResult.No) 
+            {
+                SendEngineCommand(false);
+            }
+
+
+        }
+
+        private void SendEngineCommand(bool startEngine)
+        {
+            Host.comPort.doCommand(MAVLink.MAV_CMD.DO_ENGINE_CONTROL, startEngine ? 1 : 0, 0, 0, 0, 0, 0, 0);
         }
     }
 }
