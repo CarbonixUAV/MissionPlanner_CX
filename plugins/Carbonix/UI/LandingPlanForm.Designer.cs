@@ -118,6 +118,7 @@
             this.label9.Size = new System.Drawing.Size(23, 13);
             this.label9.TabIndex = 28;
             this.label9.Text = "min";
+            this.label9.Visible = false;
             // 
             // num_loitertimemin
             // 
@@ -133,6 +134,7 @@
             this.num_loitertimemin.Size = new System.Drawing.Size(52, 20);
             this.num_loitertimemin.TabIndex = 27;
             this.num_loitertimemin.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
+            this.num_loitertimemin.Visible = false;
             // 
             // label7
             // 
@@ -144,6 +146,7 @@
             this.label7.Size = new System.Drawing.Size(55, 13);
             this.label7.TabIndex = 26;
             this.label7.Text = "Hold Time";
+            this.label7.Visible = false;
             // 
             // lbl_alt_unit2
             // 
@@ -583,7 +586,6 @@
         private MissionPlanner.Controls.myGMAP map;
         private System.Windows.Forms.RadioButton rad_loitccw;
         private System.Windows.Forms.Label label9;
-        private System.Windows.Forms.NumericUpDown num_loitertimemin;
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.Label lbl_alt_unit2;
         private System.Windows.Forms.NumericUpDown num_exitalt;
@@ -609,5 +611,6 @@
         private System.Windows.Forms.CheckBox chk_land_home;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.CheckBox chk_showalt;
+        private System.Windows.Forms.NumericUpDown num_loitertimemin;
     }
 }
