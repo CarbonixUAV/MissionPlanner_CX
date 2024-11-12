@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ArrayOfCustomWarning xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <CustomWarning>
+    <Child>
+      <Name>satcount</Name>
+      <Warning>20</Warning>
+      <type>SpeakAndText</type>
+      <RepeatTime>10</RepeatTime>
+      <ConditionType>LT</ConditionType>
+      <Text>WARNING: {name} is {value}</Text>
+    </Child>
+    <Name>armed</Name>
+    <Warning>0</Warning>
+    <type>SpeakAndText</type>
+    <RepeatTime>60</RepeatTime>
+    <ConditionType>GT</ConditionType>
+    <Text>GPS 1 low satellites</Text>
+  </CustomWarning>
+  <CustomWarning>
+    <Child>
+      <Name>gpsh_acc</Name>
+      <Warning>1.5</Warning>
+      <type>SpeakAndText</type>
+      <RepeatTime>10</RepeatTime>
+      <ConditionType>GT</ConditionType>
+      <Text>WARNING: {name} is {value}</Text>
+    </Child>
+    <Name>armed</Name>
+    <Warning>0</Warning>
+    <type>SpeakAndText</type>
+    <RepeatTime>60</RepeatTime>
+    <ConditionType>GT</ConditionType>
+    <Text>GPS 1 low accuracy</Text>
+  </CustomWarning>
+  <CustomWarning>
+    <Child>
+      <Name>satcount2</Name>
+      <Warning>20</Warning>
+      <type>SpeakAndText</type>
+      <RepeatTime>10</RepeatTime>
+      <ConditionType>LT</ConditionType>
+      <Text>WARNING: {name} is {value}</Text>
+    </Child>
+    <Name>armed</Name>
+    <Warning>0</Warning>
+    <type>SpeakAndText</type>
+    <RepeatTime>60</RepeatTime>
+    <ConditionType>GT</ConditionType>
+    <Text>GPS 2 low satellites</Text>
+  </CustomWarning>
+  <CustomWarning>
+    <Child>
+      <Name>gpsh_acc2</Name>
+      <Warning>1.5</Warning>
+      <type>SpeakAndText</type>
+      <RepeatTime>10</RepeatTime>
+      <ConditionType>GT</ConditionType>
+      <Text>WARNING: {name} is {value}</Text>
+    </Child>
+    <Name>armed</Name>
+    <Warning>0</Warning>
+    <type>SpeakAndText</type>
+    <RepeatTime>60</RepeatTime>
+    <ConditionType>GT</ConditionType>
+    <Text>GPS 2 low accuracy</Text>
+  </CustomWarning>
+  <CustomWarning>
+    <Child>
+      <Child>
+        <Name>efi_rpm</Name>
+        <Warning>500</Warning>
+        <type>SpeakAndText</type>
+        <RepeatTime>10</RepeatTime>
+        <ConditionType>LT</ConditionType>
+        <Text>WARNING: {name} is {value}</Text>
+      </Child>
+      <Name>armed</Name>
+      <Warning>0</Warning>
+      <type>SpeakAndText</type>
+      <RepeatTime>10</RepeatTime>
+      <ConditionType>GT</ConditionType>
+      <Text>WARNING: {name} is {value}</Text>
+    </Child>
+    <Name>efi_headtemp</Name>
+    <Warning>0</Warning>
+    <type>SpeakAndText</type>
+    <RepeatTime>10</RepeatTime>
+    <ConditionType>NEQ</ConditionType>
+    <Text>Engine failure</Text>
+  </CustomWarning>
+  <CustomWarning>
+    <Child>
+      <Child>
+        <Name>efi_headtemp</Name>
+        <Warning>100</Warning>
+        <type>SpeakAndText</type>
+        <RepeatTime>10</RepeatTime>
+        <ConditionType>LT</ConditionType>
+        <Text>WARNING: {name} is {value}</Text>
+      </Child>
+      <Name>armed</Name>
+      <Warning>0</Warning>
+      <type>SpeakAndText</type>
+      <RepeatTime>10</RepeatTime>
+      <ConditionType>GT</ConditionType>
+      <Text>WARNING: {name} is {value}</Text>
+    </Child>
+    <Name>efi_headtemp</Name>
+    <Warning>0</Warning>
+    <type>SpeakAndText</type>
+    <RepeatTime>30</RepeatTime>
+    <ConditionType>NEQ</ConditionType>
+    <Text>Low engine temp</Text>
+  </CustomWarning>
+  <CustomWarning>
+    <Child>
+      <Child>
+        <Name>efi_headtemp</Name>
+        <Warning>260</Warning>
+        <type>SpeakAndText</type>
+        <RepeatTime>10</RepeatTime>
+        <ConditionType>GT</ConditionType>
+        <Text>WARNING: {name} is {value}</Text>
+      </Child>
+      <Name>armed</Name>
+      <Warning>0</Warning>
+      <type>SpeakAndText</type>
+      <RepeatTime>10</RepeatTime>
+      <ConditionType>GT</ConditionType>
+      <Text>WARNING: {name} is {value}</Text>
+    </Child>
+    <Name>efi_headtemp</Name>
+    <Warning>0</Warning>
+    <type>SpeakAndText</type>
+    <RepeatTime>30</RepeatTime>
+    <ConditionType>NEQ</ConditionType>
+    <Text>High engine temp</Text>
+  </CustomWarning>
+  <CustomWarning>
+    <Child>
+      <Child>
+        <Name>esc5_temp</Name>
+        <Warning>100</Warning>
+        <type>SpeakAndText</type>
+        <RepeatTime>10</RepeatTime>
+        <ConditionType>GT</ConditionType>
+        <Text>WARNING: {name} is {value}</Text>
+      </Child>
+      <Name>armed</Name>
+      <Warning>0</Warning>
+      <type>SpeakAndText</type>
+      <RepeatTime>10</RepeatTime>
+      <ConditionType>GT</ConditionType>
+      <Text>WARNING: {name} is {value}</Text>
+    </Child>
+    <Name>efi_headtemp</Name>
+    <Warning>0</Warning>
+    <type>SpeakAndText</type>
+    <RepeatTime>30</RepeatTime>
+    <ConditionType>EQ</ConditionType>
+    <Text>Pusher ESC temp high</Text>
+  </CustomWarning>
+</ArrayOfCustomWarning>

@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using System.Drawing;
 using MissionPlanner.GCSViews.ConfigurationView;
 using Newtonsoft.Json.Serialization;
+using System.Linq;
 
 namespace Carbonix
 {
@@ -47,6 +48,9 @@ namespace Carbonix
         {
             // Load settings json files
             LoadSettings();
+
+            // Copy over default config files
+            CopyDefaultConfigFiles();
 
             // Add custom actions/data tabs and panel
             LoadTabs();
@@ -217,6 +221,55 @@ namespace Carbonix
                     file.Write(JsonConvert.SerializeObject(aircraft_settings, Formatting.Indented));
                 }
             }
+        }
+
+        /// <summary>
+        /// Copy embedded default config files into the user data directory if they are missing, or if the plugin
+        /// has been updated. This allows operators to temporarily reconfigure things in the field if needed,
+        /// but they need to report any changes so they can get baked into the next version.
+        /// </summary>
+        private void CopyDefaultConfigFiles()
+        {
+            bool force_write = !Host.config.ContainsKey("CxPluginVersion") || Host.config["CxPluginVersion"] != Version;
+
+            // Loop over all embedded config files
+            var assembly = Assembly.GetExecutingAssembly();
+            var prefix = $"{assembly.GetName().Name}.ConfigFiles.";
+            var resourceNames = assembly.GetManifestResourceNames()
+                    .Where(name => name.StartsWith(prefix))
+                    .Select(name => name.Substring(prefix.Length));
+            var configDirectory = Settings.GetUserDataDirectory();
+            foreach (var resourceName in resourceNames)
+            {
+                // Define the destination file path
+                var destinationPath = Path.Combine(configDirectory, resourceName);
+
+                // Check if we need to write the file
+                if (force_write || !File.Exists(destinationPath))
+                {
+                    // Read the embedded resource stream
+                    using (var resourceStream = assembly.GetManifestResourceStream($"{prefix}{resourceName}"))
+                    {
+                        if (resourceStream == null)
+                        {
+                            Console.WriteLine($"Resource {resourceName} not found in assembly.");
+                            continue;
+                        }
+
+                        // Create directories if needed
+                        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ?? string.Empty);
+
+                        // Write to the destination file
+                        using (var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write))
+                        {
+                            resourceStream.CopyTo(fileStream);
+                        }
+                    }
+                    Console.WriteLine($"Copied {resourceName} to {destinationPath}");
+                }
+            }
+
+            Host.config["CxPluginVersion"] = Version;
         }
 
         /// <summary>
