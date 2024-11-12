@@ -589,6 +589,9 @@ namespace Carbonix
             var sign = rad_loitcw.Checked ? 1 : -1;
             plugin.Host.AddWPtoList(MAVLink.MAV_CMD.DO_LAND_START, 0, 0, 0, 0, loiter_point.Lng, loiter_point.Lat, (double)num_transit_alt.Value);
 
+            //Turn off camera triggers
+            plugin.Host.AddWPtoList(MAVLink.MAV_CMD.DO_SET_CAM_TRIGG_DIST, 0, 0, 0, 0, 0, 0, 0);
+
             // If exit altitude and transit altitude are within 5m, don't bother with a loiter to altitude
             if (Math.Abs(num_exitalt.Value - num_transit_alt.Value) > (decimal)CurrentState.toDistDisplayUnit(5))
             {
