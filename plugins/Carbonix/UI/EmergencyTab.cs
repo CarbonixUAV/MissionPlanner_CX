@@ -171,5 +171,18 @@ namespace Carbonix
                 CustomMessageBox.Show(Strings.ErrorNoResponce, Strings.ERROR);
             }
         }
+        private void but_killEng_Click(object sender, EventArgs e)
+        {
+            SendEngineCommand(false);
+        }
+
+        private void but_startEng_Click(object sender, EventArgs e)
+        {
+            SendEngineCommand(true);
+        }
+        private void SendEngineCommand(bool startEngine)
+        {
+            Host.comPort.doCommand(MAVLink.MAV_CMD.DO_ENGINE_CONTROL, startEngine ? 1 : 0, 0, 0, 0, 0, 0, 0);
+        }
     }
 }
