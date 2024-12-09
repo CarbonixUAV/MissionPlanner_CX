@@ -30,8 +30,10 @@ namespace Carbonix
         AircraftSettings aircraft_settings;
         Aircraft selected_aircraft;
 
-        // Reference to Records tab, so its data can be accessed by Loop()
+        // Reference to Records tab, and Takeoff tab so its data can be accessed by Loop()
         public RecordsTab tabRecords;
+
+        public TakeoffTab tabTakeoff;
 
         // Reference to controller menu button so text can be changed to indicate connection status
         ToolStripButton controllerMenu;
@@ -170,7 +172,19 @@ namespace Carbonix
                     Host.comPort.send_text((byte)MAVLink.MAV_SEVERITY.INFO, record);
                 }
             }
+            
+            // Update the Can Records tab completion checkbox on disarm
+            if (!is_armed && last_arm_state)
+            {
+                tabRecords.chk_records_done.Checked=false;
+            }
             last_arm_state = is_armed;
+
+            //Checkbox Controls CanArm state
+            if(!is_armed)
+            {
+                tabTakeoff.CanArm = tabRecords.chk_records_done.Checked;
+            }
 
             return true;
         }
@@ -272,7 +286,7 @@ namespace Carbonix
                 Text = "Takeoff/Land",
                 Name = "tabTakeoff"
             };
-            TakeoffTab tabTakeoff = new TakeoffTab(Host, aircraft_settings) { Dock = DockStyle.Fill };
+            tabTakeoff = new TakeoffTab(Host, aircraft_settings) { Dock = DockStyle.Fill };
             tabPageTakeoff.Controls.Add(tabTakeoff);
             Host.MainForm.FlightData.TabListOriginal.Insert(1, tabPageTakeoff);
 
