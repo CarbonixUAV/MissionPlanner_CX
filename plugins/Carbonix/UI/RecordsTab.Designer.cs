@@ -50,11 +50,12 @@ namespace Carbonix
             this.cmb_operation = new System.Windows.Forms.ComboBox();
             this.chk_auto_metar = new System.Windows.Forms.CheckBox();
             this.label9 = new System.Windows.Forms.Label();
+            this.cmb_vlos = new System.Windows.Forms.ComboBox();
             this.tableLayoutPanelOuter = new System.Windows.Forms.TableLayoutPanel();
             this.lineSeparator1 = new MissionPlanner.Controls.LineSeparator();
             this.lineSeparator2 = new MissionPlanner.Controls.LineSeparator();
             this.lineSeparator3 = new MissionPlanner.Controls.LineSeparator();
-            this.cmb_vlos = new System.Windows.Forms.ComboBox();
+            this.chk_records_done = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.num_avbatid)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.num_vtolbatid)).BeginInit();
             this.tableLayoutPanelOuter.SuspendLayout();
@@ -306,6 +307,20 @@ namespace Carbonix
             this.label9.Text = "Payload S/N:";
             this.toolTip1.SetToolTip(this.label9, "Installed Payload");
             // 
+            // cmb_vlos
+            // 
+            this.cmb_vlos.FormattingEnabled = true;
+            this.cmb_vlos.Items.AddRange(new object[] {
+            "VLOS",
+            "EVLOS",
+            "BVLOS"});
+            this.cmb_vlos.Location = new System.Drawing.Point(218, 84);
+            this.cmb_vlos.Name = "cmb_vlos";
+            this.cmb_vlos.Size = new System.Drawing.Size(59, 21);
+            this.cmb_vlos.TabIndex = 24;
+            this.cmb_vlos.Text = "VLOS";
+            this.toolTip1.SetToolTip(this.cmb_vlos, "Visual line of sight");
+            // 
             // tableLayoutPanelOuter
             // 
             this.tableLayoutPanelOuter.AutoSize = true;
@@ -337,12 +352,13 @@ namespace Carbonix
             this.tableLayoutPanelOuter.Controls.Add(this.label8, 0, 3);
             this.tableLayoutPanelOuter.Controls.Add(this.txt_payload_serial, 1, 8);
             this.tableLayoutPanelOuter.Controls.Add(this.label9, 0, 8);
+            this.tableLayoutPanelOuter.Controls.Add(this.chk_records_done, 2, 13);
             this.tableLayoutPanelOuter.Dock = System.Windows.Forms.DockStyle.Top;
             this.tableLayoutPanelOuter.Location = new System.Drawing.Point(0, 0);
             this.tableLayoutPanelOuter.Margin = new System.Windows.Forms.Padding(2);
             this.tableLayoutPanelOuter.MinimumSize = new System.Drawing.Size(250, 0);
             this.tableLayoutPanelOuter.Name = "tableLayoutPanelOuter";
-            this.tableLayoutPanelOuter.RowCount = 13;
+            this.tableLayoutPanelOuter.RowCount = 14;
             this.tableLayoutPanelOuter.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanelOuter.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanelOuter.RowStyles.Add(new System.Windows.Forms.RowStyle());
@@ -356,7 +372,8 @@ namespace Carbonix
             this.tableLayoutPanelOuter.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanelOuter.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanelOuter.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.tableLayoutPanelOuter.Size = new System.Drawing.Size(280, 284);
+            this.tableLayoutPanelOuter.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanelOuter.Size = new System.Drawing.Size(280, 307);
             this.tableLayoutPanelOuter.TabIndex = 79;
             // 
             // lineSeparator1
@@ -395,19 +412,15 @@ namespace Carbonix
             this.lineSeparator3.Size = new System.Drawing.Size(274, 2);
             this.lineSeparator3.TabIndex = 16;
             // 
-            // cmb_vlos
+            // chk_records_done
             // 
-            this.cmb_vlos.FormattingEnabled = true;
-            this.cmb_vlos.Items.AddRange(new object[] {
-            "VLOS",
-            "EVLOS",
-            "BVLOS"});
-            this.cmb_vlos.Location = new System.Drawing.Point(218, 84);
-            this.cmb_vlos.Name = "cmb_vlos";
-            this.cmb_vlos.Size = new System.Drawing.Size(59, 21);
-            this.cmb_vlos.TabIndex = 24;
-            this.cmb_vlos.Text = "VLOS";
-            this.toolTip1.SetToolTip(this.cmb_vlos, "Visual line of sight");
+            this.chk_records_done.AutoSize = true;
+            this.chk_records_done.Location = new System.Drawing.Point(218, 287);
+            this.chk_records_done.Name = "chk_records_done";
+            this.chk_records_done.Size = new System.Drawing.Size(52, 17);
+            this.chk_records_done.TabIndex = 25;
+            this.chk_records_done.Text = "Done";
+            this.chk_records_done.UseVisualStyleBackColor = true;
             // 
             // RecordsTab
             // 
@@ -454,5 +467,6 @@ namespace Carbonix
         public System.Windows.Forms.ComboBox cmb_location;
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.ComboBox cmb_vlos;
+        public System.Windows.Forms.CheckBox chk_records_done;
     }
 }

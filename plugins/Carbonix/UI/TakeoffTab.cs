@@ -18,6 +18,9 @@ namespace Carbonix
     {
         private readonly PluginHost Host;
 
+        //Records tab can arm check
+        public bool CanArm = false;
+
         volatile int updateBindingSourcecount;
         DateTime lastscreenupdate = DateTime.Now;
         readonly object updateBindingSourcelock = new object();
@@ -311,10 +314,17 @@ namespace Carbonix
         {
             if (!Host.comPort.BaseStream.IsOpen) return;
 
+            var isitarmed = Host.comPort.MAV.cs.armed;
+            //Check if user has completed the Records Tab only check when disarmed to avoid disabling disarm on edge case
+            if (!CanArm && !isitarmed)
+            {
+                CustomMessageBox.Show("Please complete the Records Tab");
+                return;
+            }
+
             // arm the MAV
             try
             {
-                var isitarmed = Host.comPort.MAV.cs.armed;
                 var action = Host.comPort.MAV.cs.armed ? "Disarm" : "Arm";
 
                 if (isitarmed)
