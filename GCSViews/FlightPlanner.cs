@@ -4208,11 +4208,13 @@ namespace MissionPlanner.GCSViews
                             {
                                 foreach (var temp in kmlpolygonsoverlay.Polygons)
                                 {
+                                    temp.Stroke = new Pen(Color.Blue,3);
                                     FlightData.kmlpolygons.Polygons.Add(temp);
                                 }
 
                                 foreach (var temp in kmlpolygonsoverlay.Routes)
                                 {
+                                    temp.Stroke = new Pen(Color.Blue,3);
                                     FlightData.kmlpolygons.Routes.Add(temp);
                                 }
                             }
