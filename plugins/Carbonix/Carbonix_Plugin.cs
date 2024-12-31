@@ -1,4 +1,4 @@
-﻿using log4net;
+using log4net;
 using MissionPlanner.Plugin;
 using MissionPlanner.ArduPilot.Mavlink;
 using MissionPlanner.ArduPilot;
@@ -42,10 +42,15 @@ namespace Carbonix
         // Time to attempt autoconnect of joystick, 5 seconds after plugin load
         DateTime controller_autoconnect_time = DateTime.MaxValue;
 
+        // Add in 'Run Validator' as a right-click option
+        ToolStripMenuItem val_but;
+        MissionPlanner.Controls.MyDataGridView test_command;
+
         public override bool Init() { return true; }
 
         public override bool Loaded()
-        {
+        {                       
+
             // Load settings json files
             LoadSettings();
 
@@ -755,6 +760,6 @@ namespace Carbonix
             {
                 log.Error(ex);
             }
-        }
+        }     
     }
 }

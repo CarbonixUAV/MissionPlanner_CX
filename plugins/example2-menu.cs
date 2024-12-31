@@ -18,7 +18,7 @@ namespace Shortcuts
     public class Plugin : MissionPlanner.Plugin.Plugin
     {
         ToolStripMenuItem but;
-		MissionPlanner.Controls.MyDataGridView commands;
+        MissionPlanner.Controls.MyDataGridView commands;
 
         public override string Name
         {
@@ -66,14 +66,14 @@ namespace Shortcuts
         {
             CustomMessageBox.Show("This is a sample plugin\nSee the source in the plugins folder");
 
-			string angle = "0";
+            string angle = "0";
             InputBox.Show("Enter Angle", "This will be the heading", ref angle);
-		    int angle_in_number = Int32.Parse(angle);
-			
-			Host.InsertWP(0, MAVLink.MAV_CMD.DO_SET_SERVO, 9, angle_in_number, 0, 0, 0, 0, 0);
+            int angle_in_number = Int32.Parse(angle);
+
+            Host.InsertWP(0, MAVLink.MAV_CMD.DO_SET_SERVO, 9, angle_in_number, 0, 0, 0, 0, 0);
             Host.InsertWP(1, MAVLink.MAV_CMD.DO_SET_SERVO, 10, 1000, 0, 0, 0, 0, 0);
- 
-			Host.AddWPtoList(MAVLink.MAV_CMD.DO_SET_SERVO, 9, 1000, 0, 0, 0, 0, 0);
+
+            Host.AddWPtoList(MAVLink.MAV_CMD.DO_SET_SERVO, 9, 1000, 0, 0, 0, 0, 0);
             Host.AddWPtoList(MAVLink.MAV_CMD.DO_SET_SERVO, 10, 1000, 0, 0, 0, 0, 0);
 
             commands.Rows.RemoveAt(1);
