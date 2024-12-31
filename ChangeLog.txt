@@ -1,4 +1,18 @@
-﻿*Mission Planner CX 1.3.81.3 - 29-08-2024
+﻿*Mission Planner CX 1.3.81.4 - 31-12-2024
+  - Added check to prevent arming if the the records tab is not completed
+  - Added engine control to takeoff/landing tab
+  - Added preflight reboot button to the takeoff/landing tab
+  - Removed the "hold time" option from the landing planner, and the associated "Cleared to Land"
+    button on the takeoff/landing tab
+  - Added command to the beginning of the landing sequence to stop taking pictures
+  - Removed single-turn loiter after loiter-to-alt in the landing sequence
+  - Added Carbonix theme
+  - Added green icon for ADSB planes with lowest risk level (previously yellow/yellow/red)
+  - Changed KML overlay line to blue, instead of matching the aircraft track line color
+  - Improved the way that jumps in missions are rendered on the map
+  - Default settings updated to work "out of the box" on DesertRotor GCS
+
+*Mission Planner CX 1.3.81.3 - 29-08-2024
 Settings load bugfix [SW-327](https://carbonix.atlassian.net/browse/SW-327)
 
 *Mission Planner CX 1.3.81.2 - 26-08-2024
