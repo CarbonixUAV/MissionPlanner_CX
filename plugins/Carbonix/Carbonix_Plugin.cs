@@ -364,7 +364,7 @@ namespace Carbonix
             Host.MainForm.FlightData.TabListOriginal.Insert(3, tabPageEmergency);
 
             // refilter the display list based on user selection
-            Host.MainForm.FlightData.loadTabControlActions();
+            Host.MainForm.FlightData.updateDisplayView();
         }
 
         private void SetupController()
