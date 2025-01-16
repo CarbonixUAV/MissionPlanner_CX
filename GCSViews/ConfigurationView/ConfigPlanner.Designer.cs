@@ -108,8 +108,24 @@
             this.chk_slowMachine = new System.Windows.Forms.CheckBox();
             this.CHK_speechArmedOnly = new System.Windows.Forms.CheckBox();
             this.label8 = new System.Windows.Forms.Label();
+            this.label9 = new System.Windows.Forms.Label();
+            this.cmb_secondarydisplaystyle = new System.Windows.Forms.ComboBox();
+            this.chk_displaycog = new System.Windows.Forms.CheckBox();
+            this.label10 = new System.Windows.Forms.Label();
+            this.chk_displayheading = new System.Windows.Forms.CheckBox();
+            this.chk_displaynavbearing = new System.Windows.Forms.CheckBox();
+            this.chk_displayradius = new System.Windows.Forms.CheckBox();
+            this.chk_displaytarget = new System.Windows.Forms.CheckBox();
+            this.num_linelength = new System.Windows.Forms.NumericUpDown();
+            this.label11 = new System.Windows.Forms.Label();
+            this.chk_displaytooltip = new System.Windows.Forms.CheckBox();
+            this.CMB_mapCache = new System.Windows.Forms.ComboBox();
+            this.label13 = new System.Windows.Forms.Label();
+            this.BUT_mapCacheDir = new MissionPlanner.Controls.MyButton();
+            this.CHK_rtsresetesp32 = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_tracklength)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.num_gcsid)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.num_linelength)).BeginInit();
             this.SuspendLayout();
             // 
             // label33
@@ -519,6 +535,7 @@
             // 
             resources.ApplyResources(this.BUT_Joystick, "BUT_Joystick");
             this.BUT_Joystick.Name = "BUT_Joystick";
+            this.BUT_Joystick.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
             this.BUT_Joystick.UseVisualStyleBackColor = true;
             this.BUT_Joystick.Click += new System.EventHandler(this.BUT_Joystick_Click);
             // 
@@ -526,6 +543,7 @@
             // 
             resources.ApplyResources(this.BUT_videostop, "BUT_videostop");
             this.BUT_videostop.Name = "BUT_videostop";
+            this.BUT_videostop.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
             this.BUT_videostop.UseVisualStyleBackColor = true;
             this.BUT_videostop.Click += new System.EventHandler(this.BUT_videostop_Click);
             // 
@@ -533,6 +551,7 @@
             // 
             resources.ApplyResources(this.BUT_videostart, "BUT_videostart");
             this.BUT_videostart.Name = "BUT_videostart";
+            this.BUT_videostart.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
             this.BUT_videostart.UseVisualStyleBackColor = true;
             this.BUT_videostart.Click += new System.EventHandler(this.BUT_videostart_Click);
             // 
@@ -550,6 +569,7 @@
             // 
             resources.ApplyResources(this.BUT_logdirbrowse, "BUT_logdirbrowse");
             this.BUT_logdirbrowse.Name = "BUT_logdirbrowse";
+            this.BUT_logdirbrowse.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
             this.BUT_logdirbrowse.UseVisualStyleBackColor = true;
             this.BUT_logdirbrowse.Click += new System.EventHandler(this.BUT_logdirbrowse_Click);
             // 
@@ -570,6 +590,7 @@
             // 
             resources.ApplyResources(this.BUT_themecustom, "BUT_themecustom");
             this.BUT_themecustom.Name = "BUT_themecustom";
+            this.BUT_themecustom.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
             this.BUT_themecustom.UseVisualStyleBackColor = true;
             this.BUT_themecustom.Click += new System.EventHandler(this.BUT_themecustom_Click);
             // 
@@ -584,6 +605,7 @@
             // 
             resources.ApplyResources(this.BUT_Vario, "BUT_Vario");
             this.BUT_Vario.Name = "BUT_Vario";
+            this.BUT_Vario.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
             this.BUT_Vario.UseVisualStyleBackColor = true;
             this.BUT_Vario.Click += new System.EventHandler(this.BUT_Vario_Click);
             // 
@@ -750,9 +772,132 @@
             resources.ApplyResources(this.label8, "label8");
             this.label8.Name = "label8";
             // 
+            // label9
+            // 
+            resources.ApplyResources(this.label9, "label9");
+            this.label9.Name = "label9";
+            // 
+            // cmb_secondarydisplaystyle
+            // 
+            this.cmb_secondarydisplaystyle.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmb_secondarydisplaystyle.FormattingEnabled = true;
+            resources.ApplyResources(this.cmb_secondarydisplaystyle, "cmb_secondarydisplaystyle");
+            this.cmb_secondarydisplaystyle.Name = "cmb_secondarydisplaystyle";
+            this.cmb_secondarydisplaystyle.SelectedIndexChanged += new System.EventHandler(this.cmb_secondarydisplaystyle_SelectedIndexChanged);
+            // 
+            // chk_displaycog
+            // 
+            resources.ApplyResources(this.chk_displaycog, "chk_displaycog");
+            this.chk_displaycog.Name = "chk_displaycog";
+            this.chk_displaycog.UseVisualStyleBackColor = true;
+            this.chk_displaycog.CheckedChanged += new System.EventHandler(this.chk_displaycog_CheckedChanged);
+            // 
+            // label10
+            // 
+            resources.ApplyResources(this.label10, "label10");
+            this.label10.Name = "label10";
+            // 
+            // chk_displayheading
+            // 
+            resources.ApplyResources(this.chk_displayheading, "chk_displayheading");
+            this.chk_displayheading.Name = "chk_displayheading";
+            this.chk_displayheading.UseVisualStyleBackColor = true;
+            this.chk_displayheading.CheckedChanged += new System.EventHandler(this.chk_displayheading_CheckedChanged);
+            // 
+            // chk_displaynavbearing
+            // 
+            resources.ApplyResources(this.chk_displaynavbearing, "chk_displaynavbearing");
+            this.chk_displaynavbearing.Name = "chk_displaynavbearing";
+            this.chk_displaynavbearing.UseVisualStyleBackColor = true;
+            this.chk_displaynavbearing.CheckedChanged += new System.EventHandler(this.chk_displaynavbearing_CheckedChanged);
+            // 
+            // chk_displayradius
+            // 
+            resources.ApplyResources(this.chk_displayradius, "chk_displayradius");
+            this.chk_displayradius.Name = "chk_displayradius";
+            this.chk_displayradius.UseVisualStyleBackColor = true;
+            this.chk_displayradius.CheckedChanged += new System.EventHandler(this.chk_displayradius_CheckedChanged);
+            // 
+            // chk_displaytarget
+            // 
+            resources.ApplyResources(this.chk_displaytarget, "chk_displaytarget");
+            this.chk_displaytarget.Name = "chk_displaytarget";
+            this.chk_displaytarget.UseVisualStyleBackColor = true;
+            this.chk_displaytarget.CheckedChanged += new System.EventHandler(this.chk_displaytarget_CheckedChanged);
+            // 
+            // num_linelength
+            // 
+            this.num_linelength.Increment = new decimal(new int[] {
+            10,
+            0,
+            0,
+            0});
+            resources.ApplyResources(this.num_linelength, "num_linelength");
+            this.num_linelength.Maximum = new decimal(new int[] {
+            2000,
+            0,
+            0,
+            0});
+            this.num_linelength.Minimum = new decimal(new int[] {
+            10,
+            0,
+            0,
+            0});
+            this.num_linelength.Name = "num_linelength";
+            this.num_linelength.Value = new decimal(new int[] {
+            200,
+            0,
+            0,
+            0});
+            this.num_linelength.ValueChanged += new System.EventHandler(this.num_linelength_ValueChanged);
+            // 
+            // label11
+            // 
+            resources.ApplyResources(this.label11, "label11");
+            this.label11.Name = "label11";
+            // 
+            // chk_displaytooltip
+            // 
+            resources.ApplyResources(this.chk_displaytooltip, "chk_displaytooltip");
+            this.chk_displaytooltip.Name = "chk_displaytooltip";
+            this.chk_displaytooltip.UseVisualStyleBackColor = true;
+            this.chk_displaytooltip.CheckedChanged += new System.EventHandler(this.chk_displaytooltip_CheckedChanged);
+            // 
+            // CMB_mapCache
+            // 
+            this.CMB_mapCache.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.CMB_mapCache.FormattingEnabled = true;
+            resources.ApplyResources(this.CMB_mapCache, "CMB_mapCache");
+            this.CMB_mapCache.Name = "CMB_mapCache";
+            this.CMB_mapCache.SelectedIndexChanged += new System.EventHandler(this.CMB_mapCache_SelectedIndexChanged);
+            // 
+            // label13
+            // 
+            resources.ApplyResources(this.label13, "label13");
+            this.label13.Name = "label13";
+            // 
+            // BUT_mapCacheDir
+            // 
+            resources.ApplyResources(this.BUT_mapCacheDir, "BUT_mapCacheDir");
+            this.BUT_mapCacheDir.Name = "BUT_mapCacheDir";
+            this.BUT_mapCacheDir.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
+            this.BUT_mapCacheDir.UseVisualStyleBackColor = true;
+            this.BUT_mapCacheDir.Click += new System.EventHandler(this.BUT_mapCacheDir_Click);
+            // 
+            // CHK_rtsresetesp32
+            // 
+            resources.ApplyResources(this.CHK_rtsresetesp32, "CHK_rtsresetesp32");
+            this.CHK_rtsresetesp32.Name = "CHK_rtsresetesp32";
+            this.CHK_rtsresetesp32.UseVisualStyleBackColor = true;
+            this.CHK_rtsresetesp32.CheckedChanged += new System.EventHandler(this.CHK_rtsresetesp32_CheckedChanged);
+            // 
             // ConfigPlanner
             // 
             resources.ApplyResources(this, "$this");
+            this.Controls.Add(this.CHK_rtsresetesp32);
+            this.Controls.Add(this.label10);
+            this.Controls.Add(this.cmb_secondarydisplaystyle);
+            this.Controls.Add(this.label9);
             this.Controls.Add(this.label8);
             this.Controls.Add(this.CHK_speechArmedOnly);
             this.Controls.Add(this.chk_slowMachine);
@@ -771,6 +916,12 @@
             this.Controls.Add(this.chk_ADSB);
             this.Controls.Add(this.CHK_showairports);
             this.Controls.Add(this.CHK_speechlowspeed);
+            this.Controls.Add(this.chk_displaytarget);
+            this.Controls.Add(this.chk_displayradius);
+            this.Controls.Add(this.chk_displaynavbearing);
+            this.Controls.Add(this.chk_displayheading);
+            this.Controls.Add(this.chk_displaytooltip);
+            this.Controls.Add(this.chk_displaycog);
             this.Controls.Add(this.CHK_Password);
             this.Controls.Add(this.CHK_beta);
             this.Controls.Add(this.chk_analytics);
@@ -790,11 +941,13 @@
             this.Controls.Add(this.CMB_ratesensors);
             this.Controls.Add(this.label26);
             this.Controls.Add(this.CMB_videoresolutions);
+            this.Controls.Add(this.label11);
             this.Controls.Add(this.label12);
             this.Controls.Add(this.CHK_GDIPlus);
             this.Controls.Add(this.label24);
             this.Controls.Add(this.CHK_loadwponconnect);
             this.Controls.Add(this.label23);
+            this.Controls.Add(this.num_linelength);
             this.Controls.Add(this.NUM_tracklength);
             this.Controls.Add(this.CHK_speechaltwarning);
             this.Controls.Add(this.label108);
@@ -832,10 +985,14 @@
             this.Controls.Add(this.BUT_Joystick);
             this.Controls.Add(this.BUT_videostop);
             this.Controls.Add(this.BUT_videostart);
+            this.Controls.Add(this.label13);
+            this.Controls.Add(this.CMB_mapCache);
+            this.Controls.Add(this.BUT_mapCacheDir);
             this.Name = "ConfigPlanner";
             this.Load += new System.EventHandler(this.ConfigPlanner_Load);
             ((System.ComponentModel.ISupportInitialize)(this.NUM_tracklength)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.num_gcsid)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.num_linelength)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -922,5 +1079,20 @@
         private System.Windows.Forms.CheckBox chk_slowMachine;
         private System.Windows.Forms.CheckBox CHK_speechArmedOnly;
         private System.Windows.Forms.Label label8;
+        private System.Windows.Forms.Label label9;
+        public System.Windows.Forms.ComboBox cmb_secondarydisplaystyle;
+        private System.Windows.Forms.CheckBox chk_displaycog;
+        private System.Windows.Forms.Label label10;
+        private System.Windows.Forms.CheckBox chk_displayheading;
+        private System.Windows.Forms.CheckBox chk_displaynavbearing;
+        private System.Windows.Forms.CheckBox chk_displayradius;
+        private System.Windows.Forms.CheckBox chk_displaytarget;
+        private System.Windows.Forms.NumericUpDown num_linelength;
+        private System.Windows.Forms.Label label11;
+        private System.Windows.Forms.CheckBox chk_displaytooltip;
+        private System.Windows.Forms.Label label13;
+        public System.Windows.Forms.ComboBox CMB_mapCache;
+        private Controls.MyButton BUT_mapCacheDir;
+        private System.Windows.Forms.CheckBox CHK_rtsresetesp32;
     }
 }

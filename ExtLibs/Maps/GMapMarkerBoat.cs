@@ -30,6 +30,11 @@ namespace MissionPlanner.Maps
 
         public override void OnRender(IGraphics g)
         {
+            if(IsHidden)
+            {
+                return;
+            }
+            
             var temp = g.Transform;
             g.TranslateTransform(LocalPosition.X, LocalPosition.Y);
 
@@ -69,21 +74,16 @@ namespace MissionPlanner.Maps
             {
             }
 
-            // Draw the boat with transparency (if possible)
 #if NET472_OR_GREATER
-            var colorMatrix = new System.Drawing.Imaging.ColorMatrix();
-            if(!IsActive)
+            var img = Resources.boat;
+            var ia = new System.Drawing.Imaging.ImageAttributes();
+            if(IsTransparent)
             {
-                colorMatrix.Matrix33 = 0.39f;
+                // Draw image with transparency using a color matrix
+                var cm = new System.Drawing.Imaging.ColorMatrix { Matrix33 = 0.39f };
+                ia.SetColorMatrix(cm, System.Drawing.Imaging.ColorMatrixFlag.Default, System.Drawing.Imaging.ColorAdjustType.Bitmap);
             }
-            
-            var imageAttributes = new System.Drawing.Imaging.ImageAttributes();
-            imageAttributes.SetColorMatrix(colorMatrix, System.Drawing.Imaging.ColorMatrixFlag.Default,
-                                           System.Drawing.Imaging.ColorAdjustType.Bitmap);
-            
-            g.DrawImage(Resources.boat, new Rectangle(-Resources.boat.Width / 2, -Resources.boat.Height / 2, Size.Width, Size.Height), 0, 0,
-                        Resources.boat.Width, Resources.boat.Height,
-                        GraphicsUnit.Pixel, imageAttributes);
+            g.DrawImage(img, new Rectangle(-img.Width / 2, -img.Width / 2, img.Width, img.Height), 0, 0, img.Width, img.Height, GraphicsUnit.Pixel, ia);
 #else
             g.DrawImageUnscaled(global::MissionPlanner.Maps.Resources.boat,
                 Size.Width / -2,
