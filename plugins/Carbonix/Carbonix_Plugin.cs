@@ -144,23 +144,26 @@ namespace Carbonix
             }
 
             // Update the controller menu button text to indicate whether the controller is connected
-            if (!last_controller_state && controller_state)
+            if(controllerMenu != null)
             {
-                Host.MainForm.MainMenu.Invoke((MethodInvoker)delegate
+                if (!last_controller_state && controller_state)
                 {
-                    controllerMenu.Text = "Controller\nConnected";
-                    controllerMenu.Invalidate();
-                });
-                last_controller_state = true;
-            }
-            else if (last_controller_state && !controller_state)
-            {
-                Host.MainForm.MainMenu.Invoke((MethodInvoker)delegate
+                    Host.MainForm.MainMenu.Invoke((MethodInvoker)delegate
+                    {
+                        controllerMenu.Text = "Controller\nConnected";
+                        controllerMenu.Invalidate();
+                    });
+                    last_controller_state = true;
+                }
+                else if (last_controller_state && !controller_state)
                 {
-                    controllerMenu.Text = "Controller\nDisconnected";
-                    controllerMenu.Invalidate();
-                });
-                last_controller_state = false;
+                    Host.MainForm.MainMenu.Invoke((MethodInvoker)delegate
+                    {
+                        controllerMenu.Text = "Controller\nDisconnected";
+                        controllerMenu.Invalidate();
+                    });
+                    last_controller_state = false;
+                }
             }
 
             // Update the weather data on the Records tab if necessary
