@@ -1,4 +1,4 @@
-﻿using log4net;
+using log4net;
 using MissionPlanner.Plugin;
 using MissionPlanner.ArduPilot.Mavlink;
 using MissionPlanner.ArduPilot;
@@ -68,8 +68,8 @@ namespace Carbonix
             // Remove unnecessary UI Elements
             CleanUI();
 
-            // Add option to FlightData right-click menu to launch a parameter editor
-            AddParamEditor();
+            // Add options to FlightData right-click menu, like the param editor and map clearing
+            AddFlightDataMenuItems();
 
             // Repurpose the ArduPilot button for aircraft platform indication and selection
             SetupArduPilotButton();
@@ -508,14 +508,22 @@ namespace Carbonix
 
         }
 
-        private void AddParamEditor()
+        private void AddFlightDataMenuItems()
         {
-            // Create button on FD context menu to launch a new ConfigRawParams window
+            Host.FDMenuMap.Items.Add(new ToolStripSeparator());
+            // Create button to launch a new ConfigRawParams window
             ToolStripMenuItem item = new ToolStripMenuItem("Edit Parameters");
             Host.FDMenuMap.Items.Add(item);
             item.Click += (s, e) =>
             {
-                var configRawParams = new ConfigRawParams().ShowUserControl();
+            // Create button to clear aircraft track, camera icons, etc.
+            item = new ToolStripMenuItem("Clear Map");
+            Host.FDMenuMap.Items.Add(item);
+            // Dirty hack: fire the private click hander for the clear map button
+            item.Click += (s, e) =>
+            {
+                var method = Host.MainForm.FlightData.GetType().GetMethod("BUT_clear_track_Click", BindingFlags.NonPublic | BindingFlags.Instance);
+                method.Invoke(Host.MainForm.FlightData, new object[] { null, null });
             };
         }
 
