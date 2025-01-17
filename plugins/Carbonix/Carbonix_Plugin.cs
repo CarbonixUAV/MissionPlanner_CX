@@ -16,6 +16,7 @@ using System.Drawing;
 using MissionPlanner.GCSViews.ConfigurationView;
 using Newtonsoft.Json.Serialization;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Carbonix
 {
@@ -97,7 +98,8 @@ namespace Carbonix
         bool last_controller_state = false; // Used to detect change in controller connection
         DateTime last_rchealthy = DateTime.MinValue; // Used to detect long periods of bad RC Receiver health
         DateTime last_rcwarning = DateTime.MinValue;
-
+        string last_firmware_version = ""; // Used to prevent unecessary repeated regex parsing (probably unnecessary optimization, but whatever)
+        bool has_warned_firmware = false; // We only need to pop up a firmware warning once per session
         public override bool Loop()
         {
             // See if it's time to autoconnect the joystick
@@ -168,7 +170,8 @@ namespace Carbonix
 
             // If the aircraft has just been armed, send a message to the autopilot to
             // capture the pilots and other record information
-            var is_armed = (Host.comPort?.BaseStream?.IsOpen ?? false) && Host.cs.armed;
+            var is_connected = Host.comPort?.BaseStream?.IsOpen ?? false;
+            var is_armed = is_connected && Host.cs.armed;
             if (is_armed && !last_arm_state)
             {
                 foreach (var record in tabRecords.GetRecords())
@@ -188,6 +191,29 @@ namespace Carbonix
             if(!is_armed)
             {
                 tabTakeoff.CanArm = tabRecords.chk_records_done.Checked;
+            }
+
+            // Find firmware version
+            if (is_connected && !is_armed && Host.comPort?.MAV?.VersionString == "")
+            {
+                foreach (var line in Host.comPort.MAV.cs.messages)
+                {
+                    if (Regex.IsMatch(line.message, @"^CxPilot-\d+\.\d+\.\d+", RegexOptions.IgnoreCase))
+                    {
+                        Host.comPort.MAV.VersionString = line.message;
+                    }
+                }
+            }
+
+            // Warn user about unofficial firmware
+            if (is_connected && !is_armed && !has_warned_firmware && last_firmware_version != Host.comPort?.MAV?.VersionString)
+            {
+                last_firmware_version = Host.comPort?.MAV?.VersionString;
+                if (!Regex.IsMatch(last_firmware_version, @"^CxPilot-\d+\.\d+\.\d+(\s+\([a-z0-9]+\))?$", RegexOptions.IgnoreCase))
+                {
+                    CustomMessageBox.Show("This aircraft is not running an official Carbonix firmware release.", "Warning");
+                    has_warned_firmware = true;
+                }
             }
 
             return true;
