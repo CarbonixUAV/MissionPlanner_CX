@@ -33,7 +33,7 @@ namespace Carbonix
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.but_fenceenable = new MissionPlanner.Controls.MyButton();
             this.but_fencedisable = new MissionPlanner.Controls.MyButton();
-            this.but_manual = new MissionPlanner.Controls.MyButton();
+            this.but_qland = new MissionPlanner.Controls.MyButton();
             this.but_fbwa = new MissionPlanner.Controls.MyButton();
             this.but_qaforce = new MissionPlanner.Controls.MyButton();
             this.but_qaenable = new MissionPlanner.Controls.MyButton();
@@ -93,25 +93,25 @@ namespace Carbonix
             this.but_fencedisable.UseVisualStyleBackColor = true;
             this.but_fencedisable.Click += new System.EventHandler(this.but_fencedisable_Click);
             // 
-            // but_manual
+            // but_qland
             // 
-            this.but_manual.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            this.but_qland.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_manual.Location = new System.Drawing.Point(219, 3);
-            this.but_manual.Name = "but_manual";
-            this.but_manual.Size = new System.Drawing.Size(66, 23);
-            this.but_manual.TabIndex = 1;
-            this.but_manual.Text = "Manual";
-            this.but_manual.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
-            this.toolTip1.SetToolTip(this.but_manual, "Set mode to Manual");
-            this.but_manual.UseVisualStyleBackColor = true;
-            this.but_manual.Click += new System.EventHandler(this.but_mode_Click);
+            this.but_qland.Location = new System.Drawing.Point(3, 3);
+            this.but_qland.Name = "but_qland";
+            this.but_qland.Size = new System.Drawing.Size(66, 23);
+            this.but_qland.TabIndex = 1;
+            this.but_qland.Text = "QLand";
+            this.but_qland.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
+            this.toolTip1.SetToolTip(this.but_qland, "Set mode to QLand");
+            this.but_qland.UseVisualStyleBackColor = true;
+            this.but_qland.Click += new System.EventHandler(this.but_mode_Click);
             // 
             // but_fbwa
             // 
             this.but_fbwa.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_fbwa.Location = new System.Drawing.Point(147, 3);
+            this.but_fbwa.Location = new System.Drawing.Point(219, 3);
             this.but_fbwa.Name = "but_fbwa";
             this.but_fbwa.Size = new System.Drawing.Size(66, 23);
             this.but_fbwa.TabIndex = 0;
@@ -189,7 +189,7 @@ namespace Carbonix
             // 
             this.but_qstab.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_qstab.Location = new System.Drawing.Point(75, 3);
+            this.but_qstab.Location = new System.Drawing.Point(147, 3);
             this.but_qstab.Name = "but_qstab";
             this.but_qstab.Size = new System.Drawing.Size(66, 23);
             this.but_qstab.TabIndex = 2;
@@ -203,7 +203,7 @@ namespace Carbonix
             // 
             this.but_qhover.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.but_qhover.Location = new System.Drawing.Point(3, 3);
+            this.but_qhover.Location = new System.Drawing.Point(75, 3);
             this.but_qhover.Name = "but_qhover";
             this.but_qhover.Size = new System.Drawing.Size(66, 23);
             this.but_qhover.TabIndex = 3;
@@ -331,10 +331,10 @@ namespace Carbonix
             this.table_modes.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
             this.table_modes.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
             this.table_modes.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            this.table_modes.Controls.Add(this.but_manual, 3, 0);
-            this.table_modes.Controls.Add(this.but_qhover, 0, 0);
-            this.table_modes.Controls.Add(this.but_qstab, 1, 0);
-            this.table_modes.Controls.Add(this.but_fbwa, 2, 0);
+            this.table_modes.Controls.Add(this.but_qland, 0, 0);
+            this.table_modes.Controls.Add(this.but_qhover, 1, 0);
+            this.table_modes.Controls.Add(this.but_qstab, 2, 0);
+            this.table_modes.Controls.Add(this.but_fbwa, 3, 0);
             this.table_modes.Dock = System.Windows.Forms.DockStyle.Fill;
             this.table_modes.Location = new System.Drawing.Point(3, 16);
             this.table_modes.Margin = new System.Windows.Forms.Padding(0);
@@ -480,7 +480,7 @@ namespace Carbonix
         private MissionPlanner.Controls.MyButton but_fenceenable;
         private MissionPlanner.Controls.MyButton but_fencedisable;
         private System.Windows.Forms.GroupBox grp_modes;
-        private MissionPlanner.Controls.MyButton but_manual;
+        private MissionPlanner.Controls.MyButton but_qland;
         private MissionPlanner.Controls.MyButton but_fbwa;
         private System.Windows.Forms.GroupBox grp_qassist;
         private MissionPlanner.Controls.MyButton but_qaforce;
