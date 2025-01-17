@@ -1,4 +1,4 @@
-using log4net;
+﻿using log4net;
 using MissionPlanner.Plugin;
 using MissionPlanner.ArduPilot.Mavlink;
 using MissionPlanner.ArduPilot;
@@ -508,6 +508,8 @@ namespace Carbonix
 
         }
 
+        // Form to store the ConfigRawParams window so it can be restored if minimized
+        Form _configRawParams;
         private void AddFlightDataMenuItems()
         {
             Host.FDMenuMap.Items.Add(new ToolStripSeparator());
@@ -516,6 +518,19 @@ namespace Carbonix
             Host.FDMenuMap.Items.Add(item);
             item.Click += (s, e) =>
             {
+                if (_configRawParams?.IsDisposed ?? true)
+                {
+                    _configRawParams = new ConfigRawParams().ShowUserControl(showit: false);
+                    // Passing an owner prevents this from getting hidden behind the main window
+                    _configRawParams.Show(Host.MainForm.FlightData);
+                }
+                else
+                {
+                    // If the user clicked this again, the window must be minimized, so restore it
+                    _configRawParams.WindowState = FormWindowState.Normal;
+                }
+
+            };
             // Create button to clear aircraft track, camera icons, etc.
             item = new ToolStripMenuItem("Clear Map");
             Host.FDMenuMap.Items.Add(item);
