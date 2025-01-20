@@ -3634,16 +3634,6 @@ namespace MissionPlanner
                 }
             };
 
-            try
-            {
-                // prescan
-                MissionPlanner.Comms.CommsBLE.SerialPort_GetCustomPorts();
-            }
-            catch { }
-
-            // add the custom port creator
-            CustomPortList.Add(new Regex("BLE_.*"), (s1, s2) => { return new CommsBLE() { PortName = s1, BaudRate = int.Parse(s2) }; });
-
             this.ResumeLayout();
 
             Program.Splash?.Close();

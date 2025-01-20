@@ -54,14 +54,4 @@
     <Compile Update="CommsSerialPort.cs" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Update="simpleble-c.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="simpleble.dll">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
-
-
 </Project>
