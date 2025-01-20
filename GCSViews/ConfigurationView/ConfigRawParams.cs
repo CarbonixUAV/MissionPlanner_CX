@@ -253,9 +253,6 @@ namespace MissionPlanner.GCSViews.ConfigurationView
 
         private void BUT_writePIDS_Click(object sender, EventArgs e)
         {
-            if (Common.MessageShowAgain("Write Raw Params", "Are you Sure?") != DialogResult.OK)
-                return;
-
             // sort with enable at the bottom - this ensures params are set before the function is disabled
             var temp = _changes.Keys.Cast<string>().ToList();
 
@@ -263,14 +260,52 @@ namespace MissionPlanner.GCSViews.ConfigurationView
 
             bool enable = temp.Any(a => a.EndsWith("_ENABLE"));
 
-            if (enable)
+            int error = 0;
+            bool reboot = false;
+            int maxdisplay = 20;
+
+            if (temp.Count > 0 && temp.Count <= maxdisplay)
             {
-                CustomMessageBox.Show(
-                    "You have changed an Enable parameter. You may need to do a full param refresh to show all params",
-                    "Params");
+                // List to track successfully saved parameters
+                List<string> savedParams = new List<string>();
+
+                foreach (string value in temp)
+                {
+                    if (MainV2.comPort.BaseStream == null || !MainV2.comPort.BaseStream.IsOpen)
+                    {
+                        CustomMessageBox.Show("You are not connected", Strings.ERROR);
+                        return;
+                    }
+
+                    // Get the previous value of the param to display in 'param change info'
+                    // (a better way would be to get the value somewhere from inside the code, insted of recieving it over mavlink)
+                    string previousValue = MainV2.comPort.MAV.param[value].ToString();
+                    // new value of param
+                    double newValue = (double)_changes[value];
+
+                    // Add the parameter, previous and new values to the list for 'param change info'
+                    // remember, the 'value' here is key of param, while prev and new are actual values of param
+                    savedParams.Add($"{value}: {previousValue} -> {newValue}");
+                }
+                
+                // Join the saved parameters list to a string
+                string savedParamsMessage = string.Join(Environment.NewLine, savedParams);
+
+                // Ask the user for confirmation showing detailed changes
+                if (CustomMessageBox.Show($"You are about to change {savedParams.Count} parameters. Please review the changes below:\n\n{savedParamsMessage}\n\nDo you want to proceed?", "Confirm Parameter Changes",
+        CustomMessageBox.MessageBoxButtons.YesNo, CustomMessageBox.MessageBoxIcon.Information) !=
+    CustomMessageBox.DialogResult.Yes)
+                    return;
+            }
+            else if (temp.Count > maxdisplay)
+            {
+                // Ask the user for confirmation without listing individual changes
+                if (CustomMessageBox.Show($"You are about to change {temp.Count} parameters. Are you sure you want to proceed?", "Confirm Parameter Changes",
+            CustomMessageBox.MessageBoxButtons.YesNo, CustomMessageBox.MessageBoxIcon.Information) !=
+        CustomMessageBox.DialogResult.Yes)
+                    return;
             }
 
-            int error = 0;
 
             foreach (string value in temp)
             {
@@ -283,7 +318,11 @@ namespace MissionPlanner.GCSViews.ConfigurationView
                     }
 
                     MainV2.comPort.setParam(value, (double)_changes[value]);
-
+                    //check if reboot required
+                    if (ParameterMetaDataRepository.GetParameterRebootRequired(value, MainV2.comPort.MAV.cs.firmware.ToString()))
+                    {
+                        reboot = true;
+                    }
                     try
                     {
                         // set control as well
@@ -323,9 +362,32 @@ namespace MissionPlanner.GCSViews.ConfigurationView
 
             if (error > 0)
                 CustomMessageBox.Show("Not all parameters successfully saved.", "Saved");
+            else if (temp.Count>0)
+                CustomMessageBox.Show($"{temp.Count} parameters successfully saved.", "Saved");
             else
-                CustomMessageBox.Show("Parameters successfully saved.", "Saved");
+                CustomMessageBox.Show("No parameters were changed.", "No changes");
 
+            //Check if reboot is required
+            if (reboot)
+            {
+               CustomMessageBox.Show("Reboot is required for some parameters to take effect.", "Reboot Required");
+            }
+
+            if (MainV2.comPort.MAV.param.TotalReceived != MainV2.comPort.MAV.param.TotalReported )
+            {
+                if (MainV2.comPort.MAV.cs.armed)
+                {
+                    CustomMessageBox.Show("The number of available parameters changed, until full param refresh is done, some parameters will not be available.", "Params");
+                    //Hack the number of reported params to keep params list available
+                    MainV2.comPort.MAV.param.TotalReported = MainV2.comPort.MAV.param.TotalReceived;
+                }
+                else
+                {
+                    CustomMessageBox.Show("The number of available parameters changed. A full param refresh will be done to show all params.", "Params");
+                    //Click on refresh button
+                    BUT_rerequestparams_Click(BUT_rerequestparams, null);
+                }
+            }
         }
 
         private void BUT_compare_Click(object sender, EventArgs e)
@@ -625,10 +687,24 @@ namespace MissionPlanner.GCSViews.ConfigurationView
             treeView1.Nodes.Clear();
             var currentNode = treeView1.Nodes.Add("All");
             string currentPrefix = "";
-            DataGridViewRowCollection rows = Params.Rows;
-            for (int i = 0; i < rows.Count; i++)
+
+            // Get command names from the gridview
+            List<string> commands = new List<string>();
+            foreach (DataGridViewRow row in Params.Rows)
             {
-                string param = rows[i].Cells[Command.Index].Value.ToString();
+                string command = row.Cells[Command.Index].Value.ToString();
+                if (!commands.Contains(command))
+                {
+                    commands.Add(command);
+                }
+            }
+
+            // Sort them again (because of the favorites, they may be out of order)
+            commands.Sort();
+
+            for (int i = 0; i < commands.Count; i++)
+            {
+                string param = commands[i];
 
                 // While param does not start with currentPrefix, step up a layer in the tree
                 while (!param.StartsWith(currentPrefix))
@@ -638,13 +714,13 @@ namespace MissionPlanner.GCSViews.ConfigurationView
                 }
 
                 // If this is the last parameter, add it
-                if (i == rows.Count - 1)
+                if (i == commands.Count - 1)
                 {
                     currentNode.Nodes.Add(param);
                     break;
                 }
 
-                string next_param = rows[i + 1].Cells[Command.Index].Value.ToString();
+                string next_param = commands[i + 1];
                 // While the next parameter has a common prefix with this, add branch nodes
                 string nodeToAdd = param.Substring(currentPrefix.Length).Split('_')[0] + "_";
                 while (nodeToAdd.Length > 1 // While the currentPrefix is smaller than param
@@ -1006,7 +1082,7 @@ namespace MissionPlanner.GCSViews.ConfigurationView
         // Create and place the relevant control in the options column when a row is entered
         private void Params_RowEnter(object sender, DataGridViewCellEventArgs e)
         {
-            if (e.RowIndex < 1)
+            if (e.RowIndex < 0)
                 return;
             
             if (optionsControl != null)

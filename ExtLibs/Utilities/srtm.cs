@@ -9,6 +9,7 @@ using System.Collections;
 using System.Net.Http;
 using System.Threading.Tasks;
 using log4net;
+using GMap.NET;
 
 namespace MissionPlanner.Utilities
 {
@@ -160,15 +161,6 @@ namespace MissionPlanner.Utilities
 
             try
             {
-                // prevent looking for files that dont exist and are common
-                if (filename.Contains("00W000") || filename.Contains("00W001") ||
-                    filename.Contains("01W000") || filename.Contains("01W001") ||
-                    filename.Contains("00E000") || filename.Contains("00E001") ||
-                    filename.Contains("01E000") || filename.Contains("01E001"))
-                {
-                    return altresponce.Ocean;
-                }
-
                 // marked as a oceantile
                 if (oceantile.Contains(filename))
                     return altresponce.Ocean;
@@ -383,24 +375,23 @@ namespace MissionPlanner.Utilities
                 }
                 else // get something
                 {
-                    if(lat >= 61) // srtm data only goes to 60N
-                        return altresponce.Invalid;
-
                     if (zoom >= 7)
                     {
                         if (!Directory.Exists(datadirectory))
                             Directory.CreateDirectory(datadirectory);
 
-                        lock (objlock)
+                        if (GMaps.Instance.Mode != AccessMode.CacheOnly)
                         {
-                            if (!queue.Contains(filename))
+                            lock (objlock)
                             {
-                                log.Info("Getting " + filename);
-                                queue.Add(filename);
-                                requestSemaphore.Release();
+                                if (!queue.Contains(filename))
+                                {
+                                    log.Info("Getting " + filename);
+                                    queue.Add(filename);
+                                    requestSemaphore.Release();
+                                }
                             }
                         }
-
                     }
                 }
             }

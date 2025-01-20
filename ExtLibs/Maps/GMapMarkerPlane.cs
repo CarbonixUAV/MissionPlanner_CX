@@ -74,6 +74,11 @@ namespace MissionPlanner.Maps
 
         public override void OnRender(IGraphics g)
         {
+            if(IsHidden)
+            {
+                return;
+            }
+
             var temp = g.Transform;
             g.TranslateTransform(LocalPosition.X, LocalPosition.Y);
 
@@ -165,30 +170,28 @@ namespace MissionPlanner.Maps
             // the plane
             g.TranslateTransform(-2, -2);
 
-            var fill_color = Color.White;
+            var color = Color.White;
             if (which % 7 == 0)
-                fill_color = Color.Red;
+                color = Color.Red;
             if (which % 7 == 1)
-                fill_color = Color.Black;
+                color = Color.Black;
             if (which % 7 == 2)
-                fill_color = Color.Blue;
+                color = Color.Blue;
             if (which % 7 == 3)
-                fill_color = Color.LimeGreen;
+                color = Color.LimeGreen;
             if (which % 7 == 4)
-                fill_color = Color.Yellow;
+                color = Color.Yellow;
             if (which % 7 == 5)
-                fill_color = Color.Orange;
+                color = Color.Orange;
             if (which % 7 == 6)
-                fill_color = Color.Pink;
-            
-            if (!IsActive)
+                color = Color.Pink;
+
+            if(IsTransparent)
             {
-                fill_color = Color.FromArgb(100, fill_color);
+                color = Color.FromArgb(100, color);
             }
 
-            var brush = new SolidBrush(fill_color);
-
-            g.FillPolygon(brush, plane);
+            g.FillPolygon(new SolidBrush(color), plane);
 
             g.Transform = temp;
         }
