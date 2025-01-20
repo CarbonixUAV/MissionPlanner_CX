@@ -53,17 +53,34 @@ namespace MissionPlanner.Utilities
             {
                 get
                 {
-                    if (Environment.OSVersion.Platform == PlatformID.Win32NT) 
+                    if (Environment.OSVersion.Platform == PlatformID.Win32NT)
                         return BackendEnum.Windows;
-                    if (Environment.OSVersion.Platform == PlatformID.Unix) 
+                    if (Environment.OSVersion.Platform == PlatformID.Unix)
                     {
                         var doc = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                         if (doc.StartsWith("/data/user/"))
                             return BackendEnum.Android;
-                        return BackendEnum.Linux; 
+                        return BackendEnum.Linux;
                     }
 
                     return BackendEnum.Windows;
+                }
+            }
+
+            public static void gst_init(IntPtr argc, IntPtr argv)
+            {
+                switch (Backend)
+                {
+                    default:
+                    case BackendEnum.Windows:
+                        WinNativeMethods.gst_init(argc, argv);
+                        break;
+                    case BackendEnum.Linux:
+                        LinuxNativeMethods.gst_init(argc, argv);
+                        break;
+                    case BackendEnum.Android:
+                        AndroidNativeMethods.gst_init(argc, argv);
+                        break;
                 }
             }
 
@@ -918,7 +935,7 @@ namespace MissionPlanner.Utilities
             [DllImport(lib, CallingConvention = CallingConvention.Cdecl)]
             public static extern void gst_init(IntPtr argc, IntPtr argv);
 
-            [DllImport(lib, CallingConvention = CallingConvention.Cdecl)]
+            [DllImport(lib, CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
             public static extern void gst_init(ref int argc, string[] argv);
 
             [DllImport(lib, CallingConvention = CallingConvention.Cdecl)]
@@ -1244,17 +1261,15 @@ namespace MissionPlanner.Utilities
         static void ThreadStart(object datao)
         {
             string stringpipeline = (string)datao;
-            int argc = 1;
-            string[] argv = new string[] { "-vvv" };
 
             Environment.SetEnvironmentVariable("GST_DEBUG", "*:4");
 
             try
             {
-                
+
 
                 //https://github.com/GStreamer/gstreamer/blob/master/tools/gst-launch.c#L1125
-                NativeMethods.gst_init(ref argc, argv);
+                NativeMethods.gst_init(IntPtr.Zero, IntPtr.Zero);
             }
             catch (DllNotFoundException ex)
             {
@@ -1490,7 +1505,7 @@ namespace MissionPlanner.Utilities
                 WinNativeMethods.SetDefaultDllDirectories(WinNativeMethods.LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
                 WinNativeMethods.AddDllDirectory(Path.Combine(gstdir, "bin"));
                 WinNativeMethods.LoadLibrary(orig);
-            }catch { }
+            }catch { }            
         }
 
         //C:\ProgramData\Mission Planner\gstreamer\1.0\x86_64\bin
@@ -1573,6 +1588,19 @@ namespace MissionPlanner.Utilities
                     {
                         log.Info("Found gstreamer " + ans.First());
                         SetGSTPath(ans.First());
+                        try
+                        {
+                            uint v1 = 0, v2 = 0, v3 = 0, v4 = 0;
+                            NativeMethods.gst_version(out v1, out v2, out v3, out v4);
+
+                            log.InfoFormat("GStreamer {0}.{1}.{2}.{3}", v1, v2, v3, v4);
+                        }
+                        catch (Exception ex)
+                        {
+                            log.Error(ex); 
+                            return "";
+                        }
+
                         return ans.First();
                     }
                 }
@@ -2163,26 +2191,36 @@ namespace MissionPlanner.Utilities
 
 
             status?.Invoke(0, "Downloading..");
+            int retry = 3;
 
-            try
+            while (retry > 0)
             {
-                Download.getFilefromNet(url, output, status: status);
-
-                status?.Invoke(50, "Extracting..");
-                ZipFile.ExtractToDirectory(output, Settings.GetDataDirectory());
-                status?.Invoke(100, "Done.");
-            }
-            catch (WebException ex)
-            {
-                status?.Invoke(-1, "Error downloading file " + ex.ToString());
                 try
                 {
-                    if (File.Exists(output))
-                        File.Delete(output);
+                    if (Download.getFilefromNet(url, output, status: status))
+                    {
+
+                        status?.Invoke(50, "Extracting..");
+                        ZipFile.ExtractToDirectory(output, Settings.GetDataDirectory());
+                        status?.Invoke(100, "Done.");
+
+                        break;
+                    }
                 }
-                catch
+                catch (Exception ex)
                 {
-                }
+                    status?.Invoke(-1, "Error downloading file " + ex.ToString());
+                    try
+                    {
+                        if (File.Exists(output))
+                            File.Delete(output);
+                    }
+                    catch
+                    {
+                    }
+                    status?.Invoke(-1, "Retry");
+                } 
+                retry--;
             }
         }
     }

@@ -203,9 +203,9 @@ namespace RedundantLinkManager
                 if (!timeMetFirst.HasValue)
                 {
                     // Condition met for the first time, start the timer
-                    timeMetFirst = DateTime.Now;
+                    timeMetFirst = DateTime.UtcNow;
                 }
-                else if ((DateTime.Now - timeMetFirst.Value).TotalSeconds >= DelaySeconds)
+                else if ((DateTime.UtcNow - timeMetFirst.Value).TotalSeconds >= DelaySeconds)
                 {
                     // Condition has been continuously met for the specified delay
                     return true;
@@ -219,7 +219,7 @@ namespace RedundantLinkManager
 
             if (reasons != null && Reason != null)
             {
-                reasons.Add(Reason + (timeMetFirst.HasValue ? $" {(DateTime.Now - timeMetFirst.Value).TotalSeconds:0}s ago" : ""));
+                reasons.Add(Reason + (timeMetFirst.HasValue ? $" {(DateTime.UtcNow - timeMetFirst.Value).TotalSeconds:0}s ago" : ""));
             }
 
             return false;
@@ -243,7 +243,7 @@ namespace RedundantLinkManager
                 return false;
             }
 
-            var lastPacketAge = (DateTime.Now - link.comPort.MAV.lastvalidpacket).TotalSeconds;
+            var lastPacketAge = (DateTime.UtcNow - link.comPort.MAV.lastvalidpacket).TotalSeconds;
             if(lastPacketAge > ThresholdSeconds)
             {
                 Reason = $"{lastPacketAge:0}s dropout";

@@ -321,6 +321,23 @@ namespace MissionPlanner.Utilities
             return await Task.Run(() => (content));
         }
 
+        public struct HTTPResult
+        {
+            public string content;
+            public HttpStatusCode status;
+        }
+
+        /// <summary>
+        /// Perform a GET request and return the content and status code
+        /// </summary>
+        public static async Task<HTTPResult> GetAsyncWithStatus(string uri)
+        {
+            var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync(uri);
+            var content = await response.Content.ReadAsStringAsync();
+            return await Task.Run(() => (new HTTPResult() { content = content, status = response.StatusCode }));
+        }
+
         public static event EventHandler<HttpRequestMessage> RequestModification;
 
         public static async Task<bool> getFilefromNetAsync(string url, string saveto, Action<int, string> status = null)
@@ -333,7 +350,7 @@ namespace MissionPlanner.Utilities
 
                 RequestModification?.Invoke(url, request);
 
-                using (var response = await client.SendAsync(request).ConfigureAwait(false))
+                using (var response = await client.SendAsync(request, completionOption: HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false))
                 {
                     lock (log)
                         log.Info(url + " " +(response).StatusCode.ToString());
@@ -441,7 +458,7 @@ namespace MissionPlanner.Utilities
                 client.Timeout = TimeSpan.FromSeconds(30);
 
                 // Get the response.
-                var response = client.GetAsync(url).Result;
+                var response = client.GetAsync(url, completionOption: HttpCompletionOption.ResponseHeadersRead).Result;
                 // Display the status.
                 lock (log)
                     log.Info(response.ReasonPhrase);
@@ -505,9 +522,20 @@ namespace MissionPlanner.Utilities
                     }
                 }
 
-                fs.Close();
-                dataStream.Close();
-
+                if (fs.Length != contlen)
+                {
+                    lock (log)
+                        log.Info("getFilefromNet(): " + "File size mismatch " + fs.Length + " vs " + contlen);
+                    fs.Close();
+                    dataStream.Close();
+                    return false;
+                }
+                else
+                {
+                    fs.Close();
+                    dataStream.Close();
+                }
+                
                 if (File.Exists(saveto))
                 {
                     File.Delete(saveto);
