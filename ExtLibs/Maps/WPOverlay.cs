@@ -254,7 +254,11 @@ namespace MissionPlanner.ArduPilot
                     pointlist.Add(null);
 
                     int wpno = (int) Math.Max(item.p1, 0);
-                    int repeat = (int)item.p2;
+                    //Setting this to Max of 1 jump breaks the progress tracker
+                    //If you wanted to keep the progress tracker but maintain performance another list needs to be created
+                    //One list will contain the total route including all jumps and the second route would contain single jumps
+                    //Then use the single jump list when using the RegenerateWPRoute function
+                    int repeat = Math.Max((int)item.p2,1);
                     // Do jumps into the future are not able to be handled correctly with this new implementation of
                     // the route array and how the route is now only one continous list of points to draw.
                     // Therefore unfortunately we have to ignore them.
