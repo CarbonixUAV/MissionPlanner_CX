@@ -86,7 +86,7 @@
     <type>SpeakAndText</type>
     <RepeatTime>10</RepeatTime>
     <ConditionType>NEQ</ConditionType>
-    <Text>Engine failure</Text>
+    <Text>Engine Stopped</Text>
   </CustomWarning>
   <CustomWarning>
     <Child>
