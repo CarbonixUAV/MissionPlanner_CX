@@ -1,4 +1,19 @@
-﻿﻿*Mission Planner CX 1.3.81.4 - 31-12-2024
+﻿﻿*Mission Planner CX 1.3.83.1 - 12-02-2025
+  - Updated Mission Planner to latest as of Jan 16
+    - This has been *internally* designated as 1.3.83, but 1.3.83 has not been released. It has
+      been long enough though that it is closer to call it 1.3.83 than 1.3.82.
+    - Mostly bug fixes
+  - Removed support for comms over BLE. SimpleBLE was causing random crashes, and we do not need or
+    want this feature.
+  - Added richer customization for Quickviews. This enables us to set a view up for fuel remaining
+    based on what was added vs consumed.
+  - Popup warns pilots about flying development firmware (beta/dev etc)
+  - Camera icons and plane path (spaghetti) can be cleared by right clicking the map.
+  - QLand available on the Emergency tab (removed Manual)
+  - Renamed "Engine Failure" warning to "Engine Stopped"
+  - Added fuel pressure to Takeoff tab (removed fuel consumed)
+
+*Mission Planner CX 1.3.81.4 - 31-12-2024
   - Added check to prevent arming if the the records tab is not completed
   - Added engine control to takeoff/landing tab
   - Added preflight reboot button to the takeoff/landing tab

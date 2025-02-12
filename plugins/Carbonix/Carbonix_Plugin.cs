@@ -23,7 +23,7 @@ namespace Carbonix
     public class CarbonixPlugin : Plugin
     {
         public override string Name { get; } = "Carbonix Addons";
-        public override string Version { get; } = "1.2";
+        public override string Version { get; } = "2.0";
         public override string Author { get; } = "Carbonix";
 
         private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
