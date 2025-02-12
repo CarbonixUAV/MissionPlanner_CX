@@ -182,7 +182,7 @@ namespace Carbonix
                 takeofftab_displays = new List<NumberViewSettings>()
                 {
                     new NumberViewSettings() { variable = "efi_rpm", description = "RPM", numberformat = "0", charwidth = 5 },
-                    new NumberViewSettings() { variable = "efi_fuelconsumed", description = "Fuel Consumed(g)", numberformat = "0", charwidth = 5 },
+                    new NumberViewSettings() { variable = "battery_voltage8", description = "Fuel Pressure (kPa)", numberformat = "0", charwidth = 5 },
                     new NumberViewSettings() { variable = "efi_headtemp", description = "CHT1", numberformat = "0", charwidth = 5 },
                     new NumberViewSettings() { variable = "MAV_CHT2", description = "CHT2", numberformat = "0", charwidth = 5 },
                 };
