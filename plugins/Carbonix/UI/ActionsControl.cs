@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
@@ -44,7 +44,7 @@ namespace Carbonix
             LBL_altunits.Text = CurrentState.AltUnit;
 
             // Set up loiter radius control
-            NUM_loitradius.Increment = CurrentState.AltUnit == "m" ? 25 : 100;
+            NUM_loitradius.Increment = CurrentState.DistanceUnit == "m" ? 25 : 100;
             NUM_loitradius.Minimum = (decimal)CurrentState.toDistDisplayUnit(aircraft_settings.loitradius_min);
             NUM_loitradius.Maximum = (decimal)CurrentState.toDistDisplayUnit(aircraft_settings.loitradius_max);
             // Round to nearest increment, ceiling rounding the minimum
