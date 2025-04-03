@@ -33,23 +33,19 @@
             this.CHK_loitdirection = new System.Windows.Forms.CheckBox();
             this.BUT_rtl = new MissionPlanner.Controls.MyButton();
             this.BUT_airspeed = new MissionPlanner.Controls.MyButton();
-            this.BUT_climb = new MissionPlanner.Controls.MyButton();
             this.BUT_loitradius = new MissionPlanner.Controls.MyButton();
             this.BUT_setwp = new MissionPlanner.Controls.MyButton();
             this.BUT_qloiter = new MissionPlanner.Controls.MyButton();
             this.BUT_guidedalt = new MissionPlanner.Controls.MyButton();
             this.BUT_auto = new MissionPlanner.Controls.MyButton();
             this.NUM_airspeed = new System.Windows.Forms.NumericUpDown();
-            this.NUM_climbrate = new System.Windows.Forms.NumericUpDown();
             this.NUM_loitradius = new System.Windows.Forms.NumericUpDown();
             this.NUM_guidedalt = new System.Windows.Forms.NumericUpDown();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.LBL_loitradiusunits = new System.Windows.Forms.Label();
-            this.LBL_climbunits = new System.Windows.Forms.Label();
             this.LBL_airspeedunits = new System.Windows.Forms.Label();
             this.LBL_altunits = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_airspeed)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.NUM_climbrate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_loitradius)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_guidedalt)).BeginInit();
             this.tableLayoutPanel1.SuspendLayout();
@@ -100,7 +96,7 @@
             this.BUT_airspeed.ColorMouseOver = System.Drawing.Color.Empty;
             this.BUT_airspeed.ColorNotEnabled = System.Drawing.Color.Empty;
             this.BUT_airspeed.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.BUT_airspeed.Location = new System.Drawing.Point(92, 92);
+            this.BUT_airspeed.Location = new System.Drawing.Point(92, 62);
             this.BUT_airspeed.Margin = new System.Windows.Forms.Padding(2);
             this.BUT_airspeed.Name = "BUT_airspeed";
             this.BUT_airspeed.Size = new System.Drawing.Size(82, 26);
@@ -110,26 +106,6 @@
             this.toolTip1.SetToolTip(this.BUT_airspeed, "Changes to the airspeed on the right");
             this.BUT_airspeed.UseVisualStyleBackColor = true;
             this.BUT_airspeed.Click += new System.EventHandler(this.BUT_airspeed_Click);
-            // 
-            // BUT_climb
-            // 
-            this.BUT_climb.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.BUT_climb.ColorMouseDown = System.Drawing.Color.Empty;
-            this.BUT_climb.ColorMouseOver = System.Drawing.Color.Empty;
-            this.BUT_climb.ColorNotEnabled = System.Drawing.Color.Empty;
-            this.BUT_climb.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.BUT_climb.Location = new System.Drawing.Point(92, 62);
-            this.BUT_climb.Margin = new System.Windows.Forms.Padding(2);
-            this.BUT_climb.Name = "BUT_climb";
-            this.BUT_climb.Size = new System.Drawing.Size(82, 26);
-            this.BUT_climb.TabIndex = 81;
-            this.BUT_climb.Text = "Set Climb";
-            this.BUT_climb.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
-            this.toolTip1.SetToolTip(this.BUT_climb, "Changes to the rate on the right");
-            this.BUT_climb.UseVisualStyleBackColor = true;
-            this.BUT_climb.Click += new System.EventHandler(this.BUT_climb_Click);
             // 
             // BUT_loitradius
             // 
@@ -234,7 +210,7 @@
             // NUM_airspeed
             // 
             this.NUM_airspeed.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.NUM_airspeed.Location = new System.Drawing.Point(197, 95);
+            this.NUM_airspeed.Location = new System.Drawing.Point(197, 65);
             this.NUM_airspeed.Margin = new System.Windows.Forms.Padding(2);
             this.NUM_airspeed.Maximum = new decimal(new int[] {
             58,
@@ -256,37 +232,6 @@
             0});
             this.NUM_airspeed.ValueChanged += new System.EventHandler(this.NUM_ValueChanged);
             this.NUM_airspeed.KeyDown += new System.Windows.Forms.KeyEventHandler(this.NUM_KeyDown);
-            // 
-            // NUM_climbrate
-            // 
-            this.NUM_climbrate.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.NUM_climbrate.Increment = new decimal(new int[] {
-            10,
-            0,
-            0,
-            0});
-            this.NUM_climbrate.Location = new System.Drawing.Point(197, 65);
-            this.NUM_climbrate.Margin = new System.Windows.Forms.Padding(2);
-            this.NUM_climbrate.Maximum = new decimal(new int[] {
-            260,
-            0,
-            0,
-            0});
-            this.NUM_climbrate.Minimum = new decimal(new int[] {
-            20,
-            0,
-            0,
-            0});
-            this.NUM_climbrate.Name = "NUM_climbrate";
-            this.NUM_climbrate.Size = new System.Drawing.Size(56, 20);
-            this.NUM_climbrate.TabIndex = 80;
-            this.NUM_climbrate.Value = new decimal(new int[] {
-            20,
-            0,
-            0,
-            0});
-            this.NUM_climbrate.ValueChanged += new System.EventHandler(this.NUM_ValueChanged);
-            this.NUM_climbrate.KeyDown += new System.Windows.Forms.KeyEventHandler(this.NUM_KeyDown);
             // 
             // NUM_loitradius
             // 
@@ -359,22 +304,19 @@
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 60F));
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 40F));
             this.tableLayoutPanel1.Controls.Add(this.LBL_loitradiusunits, 4, 1);
-            this.tableLayoutPanel1.Controls.Add(this.LBL_climbunits, 4, 2);
             this.tableLayoutPanel1.Controls.Add(this.BUT_rtl, 0, 2);
-            this.tableLayoutPanel1.Controls.Add(this.BUT_airspeed, 1, 3);
-            this.tableLayoutPanel1.Controls.Add(this.NUM_airspeed, 3, 3);
-            this.tableLayoutPanel1.Controls.Add(this.BUT_climb, 1, 2);
             this.tableLayoutPanel1.Controls.Add(this.BUT_loitradius, 1, 1);
             this.tableLayoutPanel1.Controls.Add(this.BUT_setwp, 0, 3);
             this.tableLayoutPanel1.Controls.Add(this.BUT_qloiter, 0, 1);
             this.tableLayoutPanel1.Controls.Add(this.BUT_guidedalt, 1, 0);
             this.tableLayoutPanel1.Controls.Add(this.BUT_auto, 0, 0);
-            this.tableLayoutPanel1.Controls.Add(this.NUM_climbrate, 3, 2);
             this.tableLayoutPanel1.Controls.Add(this.NUM_loitradius, 3, 1);
-            this.tableLayoutPanel1.Controls.Add(this.LBL_airspeedunits, 4, 3);
             this.tableLayoutPanel1.Controls.Add(this.CHK_loitdirection, 2, 1);
             this.tableLayoutPanel1.Controls.Add(this.NUM_guidedalt, 3, 0);
             this.tableLayoutPanel1.Controls.Add(this.LBL_altunits, 4, 0);
+            this.tableLayoutPanel1.Controls.Add(this.BUT_airspeed, 1, 2);
+            this.tableLayoutPanel1.Controls.Add(this.NUM_airspeed, 3, 2);
+            this.tableLayoutPanel1.Controls.Add(this.LBL_airspeedunits, 4, 2);
             this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel1.Location = new System.Drawing.Point(0, 0);
             this.tableLayoutPanel1.Margin = new System.Windows.Forms.Padding(2);
@@ -399,20 +341,10 @@
             this.LBL_loitradiusunits.TabIndex = 88;
             this.LBL_loitradiusunits.Text = "ft";
             // 
-            // LBL_climbunits
-            // 
-            this.LBL_climbunits.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.LBL_climbunits.Location = new System.Drawing.Point(257, 68);
-            this.LBL_climbunits.Margin = new System.Windows.Forms.Padding(2);
-            this.LBL_climbunits.Name = "LBL_climbunits";
-            this.LBL_climbunits.Size = new System.Drawing.Size(36, 13);
-            this.LBL_climbunits.TabIndex = 87;
-            this.LBL_climbunits.Text = "ft/min";
-            // 
             // LBL_airspeedunits
             // 
             this.LBL_airspeedunits.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.LBL_airspeedunits.Location = new System.Drawing.Point(257, 98);
+            this.LBL_airspeedunits.Location = new System.Drawing.Point(257, 68);
             this.LBL_airspeedunits.Margin = new System.Windows.Forms.Padding(2);
             this.LBL_airspeedunits.Name = "LBL_airspeedunits";
             this.LBL_airspeedunits.Size = new System.Drawing.Size(36, 13);
@@ -438,7 +370,6 @@
             this.Size = new System.Drawing.Size(300, 122);
             this.VisibleChanged += new System.EventHandler(this.ActionsControl_VisibleChanged);
             ((System.ComponentModel.ISupportInitialize)(this.NUM_airspeed)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.NUM_climbrate)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_loitradius)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_guidedalt)).EndInit();
             this.tableLayoutPanel1.ResumeLayout(false);
@@ -456,13 +387,10 @@
         private MissionPlanner.Controls.MyButton BUT_guidedalt;
         private MissionPlanner.Controls.MyButton BUT_loitradius;
         private System.Windows.Forms.NumericUpDown NUM_loitradius;
-        private MissionPlanner.Controls.MyButton BUT_climb;
-        private System.Windows.Forms.NumericUpDown NUM_climbrate;
         private MissionPlanner.Controls.MyButton BUT_airspeed;
         private System.Windows.Forms.NumericUpDown NUM_airspeed;
         private MissionPlanner.Controls.MyButton BUT_rtl;
         private System.Windows.Forms.Label LBL_loitradiusunits;
-        private System.Windows.Forms.Label LBL_climbunits;
         private System.Windows.Forms.Label LBL_airspeedunits;
         private System.Windows.Forms.CheckBox CHK_loitdirection;
         private System.Windows.Forms.NumericUpDown NUM_guidedalt;
