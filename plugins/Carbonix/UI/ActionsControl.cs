@@ -164,13 +164,13 @@ namespace Carbonix
             value_backups[NUM_climbrate.Name] = NUM_climbrate.Value;
 
             // Get params for airspeed
-            if (Host.comPort.MAV.param["TRIM_ARSPD_CM"] != null &&
-                Host.comPort.MAV.param["ARSPD_FBW_MIN"] != null &&
-                Host.comPort.MAV.param["ARSPD_FBW_MAX"] != null)
+            if (Host.comPort.MAV.param["AIRSPEED_CRUISE"] != null &&
+                Host.comPort.MAV.param["AIRSPEED_MIN"] != null &&
+                Host.comPort.MAV.param["AIRSPEED_MAX"] != null)
             {
-                NUM_airspeed.Minimum = (decimal)CurrentState.toSpeedDisplayUnit((float)Host.comPort.MAV.param["ARSPD_FBW_MIN"]);
-                NUM_airspeed.Maximum = (decimal)CurrentState.toSpeedDisplayUnit((float)Host.comPort.MAV.param["ARSPD_FBW_MAX"]);
-                NUM_airspeed.Value = (decimal)CurrentState.toSpeedDisplayUnit((float)Host.comPort.MAV.param["TRIM_ARSPD_CM"] / 100.0);
+                NUM_airspeed.Minimum = (decimal)CurrentState.toSpeedDisplayUnit((float)Host.comPort.MAV.param["AIRSPEED_MIN"]);
+                NUM_airspeed.Maximum = (decimal)CurrentState.toSpeedDisplayUnit((float)Host.comPort.MAV.param["AIRSPEED_MAX"]);
+                NUM_airspeed.Value = (decimal)CurrentState.toSpeedDisplayUnit((float)Host.comPort.MAV.param["AIRSPEED_CRUISE"]);
                 NUM_airspeed.Enabled = true;
             }
             else
@@ -333,7 +333,7 @@ namespace Carbonix
         {
             double airspeed = CurrentState.fromSpeedDisplayUnit((double)NUM_airspeed.Value);
 
-            UpdateParameter(NUM_airspeed, "TRIM_ARSPD_CM", airspeed * 100, "Failed to set airspeed");
+            UpdateParameter(NUM_airspeed, "AIRSPEED_CRUISE", airspeed, "Failed to set airspeed");
         }
 
         private void BUT_mode_Click(object sender, EventArgs e)
