@@ -4,7 +4,6 @@ using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
 using MissionPlanner;
-using MissionPlanner.HIL;
 using MissionPlanner.Plugin;
 using MissionPlanner.Utilities;
 
@@ -13,9 +12,6 @@ namespace Carbonix
     public partial class ActionsControl : UserControl
     {
         readonly PluginHost Host;
-
-        readonly private string velz_unit;
-        readonly private double multipliervelz;
 
         readonly private Dictionary<string, decimal> value_backups = new Dictionary<string, decimal>();
 
@@ -59,30 +55,6 @@ namespace Carbonix
             CHK_loitdirection.Enabled = false;
             LBL_loitradiusunits.Text = CurrentState.DistanceUnit;
 
-            // Set up climb rate control
-            switch(settings.velz_unit)
-            {
-            case VelZUnits.feet_per_minute:
-                multipliervelz = 25000.0 / 127.0; // Exact conversion
-                velz_unit = "ft/min";
-                NUM_climbrate.Increment = 20;
-                NUM_climbrate.DecimalPlaces = 0;
-                break;
-            case VelZUnits.meters_per_second:
-                multipliervelz = 1.0;
-                velz_unit = "m/s";
-                NUM_climbrate.Increment = 0.1m;
-                NUM_climbrate.DecimalPlaces = 1;
-                break;
-            default:
-                throw new Exception("Unknown VelZUnits: " + settings.velz_unit.ToString());
-            }
-            NUM_climbrate.Minimum = (decimal)ToVelZDisplayUnit(aircraft_settings.climbrate_min);
-            NUM_climbrate.Maximum = (decimal)ToVelZDisplayUnit(aircraft_settings.climbrate_max);
-            NUM_climbrate.Value = NUM_climbrate.Maximum;
-            NUM_climbrate.Enabled = false;
-            LBL_climbunits.Text = velz_unit;
-
             // Set up the airspeed control
             NUM_airspeed.Increment = CurrentState.SpeedUnit == "m/s" ? 0.5m : 1;
             // Airspeed min/max will be determined by params, so skip those
@@ -90,16 +62,6 @@ namespace Carbonix
             LBL_airspeedunits.Text = CurrentState.SpeedUnit;
 
             freeze_handlers = false;
-        }
-
-        private double ToVelZDisplayUnit(double velz)
-        {
-            return velz * multipliervelz;
-        }
-
-        private double FromVelZDisplayUnit(double velz)
-        {
-            return velz / multipliervelz;
         }
         
         // Updates certain control values based on mavlink parameters
@@ -147,22 +109,6 @@ namespace Carbonix
             value_backups[CHK_loitdirection.Name] = CHK_loitdirection.Checked ? -1 : 1;
             value_backups[NUM_loitradius.Name] = NUM_loitradius.Value;
 
-            // Get param for climb rate
-            if (Host.comPort.MAV.param["TECS_CLMB_MAX"] != null)
-            {
-                decimal climbrate = (decimal)ToVelZDisplayUnit((float)Host.comPort.MAV.param["TECS_CLMB_MAX"]);
-                // This should not happen, but if this is outside the bounds of the control, we will change the bounds
-                if (climbrate > NUM_climbrate.Maximum) NUM_climbrate.Maximum = Math.Ceiling(climbrate * NUM_climbrate.Increment) / NUM_climbrate.Increment;
-                if (climbrate < NUM_climbrate.Minimum) NUM_climbrate.Minimum = Math.Floor(climbrate * NUM_climbrate.Increment) / NUM_climbrate.Increment;
-                NUM_climbrate.Value = climbrate;
-                NUM_climbrate.Enabled = true;
-            }
-            else
-            {
-                NUM_climbrate.Enabled = false;
-            }
-            value_backups[NUM_climbrate.Name] = NUM_climbrate.Value;
-
             // Get params for airspeed
             if (Host.comPort.MAV.param["AIRSPEED_CRUISE"] != null &&
                 Host.comPort.MAV.param["AIRSPEED_MIN"] != null &&
@@ -186,7 +132,6 @@ namespace Carbonix
         {
             NUM_loitradius.Enabled = false;
             CHK_loitdirection.Enabled = false;
-            NUM_climbrate.Enabled = false;
             NUM_airspeed.Enabled = false;
         }
 
@@ -320,13 +265,6 @@ namespace Carbonix
 
             UpdateParameter(NUM_loitradius, "WP_LOITER_RAD", radius, "Failed to set loiter radius");
 
-        }
-
-        private void BUT_climb_Click(object sender, EventArgs e)
-        {
-            double climbrate = FromVelZDisplayUnit((double)NUM_climbrate.Value);
-
-            UpdateParameter(NUM_climbrate, "TECS_CLMB_MAX", climbrate, "Failed to set climb rate");
         }
 
         private void BUT_airspeed_Click(object sender, EventArgs e)
