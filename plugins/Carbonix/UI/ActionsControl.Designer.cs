@@ -44,7 +44,7 @@
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.LBL_loitradiusunits = new System.Windows.Forms.Label();
             this.LBL_airspeedunits = new System.Windows.Forms.Label();
-            this.LBL_altunits = new System.Windows.Forms.Label();
+            this.CMB_altframe = new System.Windows.Forms.ComboBox();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_airspeed)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_loitradius)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_guidedalt)).BeginInit();
@@ -57,7 +57,7 @@
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.CHK_loitdirection.AutoSize = true;
-            this.CHK_loitdirection.Location = new System.Drawing.Point(176, 30);
+            this.CHK_loitdirection.Location = new System.Drawing.Point(156, 30);
             this.CHK_loitdirection.Margin = new System.Windows.Forms.Padding(0);
             this.CHK_loitdirection.Name = "CHK_loitdirection";
             this.CHK_loitdirection.Padding = new System.Windows.Forms.Padding(3, 0, 0, 0);
@@ -79,7 +79,7 @@
             this.BUT_rtl.Location = new System.Drawing.Point(6, 62);
             this.BUT_rtl.Margin = new System.Windows.Forms.Padding(2);
             this.BUT_rtl.Name = "BUT_rtl";
-            this.BUT_rtl.Size = new System.Drawing.Size(82, 26);
+            this.BUT_rtl.Size = new System.Drawing.Size(72, 26);
             this.BUT_rtl.TabIndex = 85;
             this.BUT_rtl.Text = "RTL";
             this.BUT_rtl.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -96,10 +96,10 @@
             this.BUT_airspeed.ColorMouseOver = System.Drawing.Color.Empty;
             this.BUT_airspeed.ColorNotEnabled = System.Drawing.Color.Empty;
             this.BUT_airspeed.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.BUT_airspeed.Location = new System.Drawing.Point(92, 62);
+            this.BUT_airspeed.Location = new System.Drawing.Point(82, 62);
             this.BUT_airspeed.Margin = new System.Windows.Forms.Padding(2);
             this.BUT_airspeed.Name = "BUT_airspeed";
-            this.BUT_airspeed.Size = new System.Drawing.Size(82, 26);
+            this.BUT_airspeed.Size = new System.Drawing.Size(72, 26);
             this.BUT_airspeed.TabIndex = 83;
             this.BUT_airspeed.Text = "Set Airspeed";
             this.BUT_airspeed.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -116,10 +116,10 @@
             this.BUT_loitradius.ColorMouseOver = System.Drawing.Color.Empty;
             this.BUT_loitradius.ColorNotEnabled = System.Drawing.Color.Empty;
             this.BUT_loitradius.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.BUT_loitradius.Location = new System.Drawing.Point(92, 32);
+            this.BUT_loitradius.Location = new System.Drawing.Point(82, 32);
             this.BUT_loitradius.Margin = new System.Windows.Forms.Padding(2);
             this.BUT_loitradius.Name = "BUT_loitradius";
-            this.BUT_loitradius.Size = new System.Drawing.Size(82, 26);
+            this.BUT_loitradius.Size = new System.Drawing.Size(72, 26);
             this.BUT_loitradius.TabIndex = 78;
             this.BUT_loitradius.Text = "Set Loiter Radius";
             this.BUT_loitradius.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -139,7 +139,7 @@
             this.BUT_setwp.Location = new System.Drawing.Point(6, 92);
             this.BUT_setwp.Margin = new System.Windows.Forms.Padding(2);
             this.BUT_setwp.Name = "BUT_setwp";
-            this.BUT_setwp.Size = new System.Drawing.Size(82, 26);
+            this.BUT_setwp.Size = new System.Drawing.Size(72, 26);
             this.BUT_setwp.TabIndex = 75;
             this.BUT_setwp.Text = "Set WP";
             this.BUT_setwp.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -159,7 +159,7 @@
             this.BUT_qloiter.Location = new System.Drawing.Point(6, 32);
             this.BUT_qloiter.Margin = new System.Windows.Forms.Padding(2);
             this.BUT_qloiter.Name = "BUT_qloiter";
-            this.BUT_qloiter.Size = new System.Drawing.Size(82, 26);
+            this.BUT_qloiter.Size = new System.Drawing.Size(72, 26);
             this.BUT_qloiter.TabIndex = 76;
             this.BUT_qloiter.Text = "QLoiter";
             this.BUT_qloiter.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -176,10 +176,10 @@
             this.BUT_guidedalt.ColorMouseOver = System.Drawing.Color.Empty;
             this.BUT_guidedalt.ColorNotEnabled = System.Drawing.Color.Empty;
             this.BUT_guidedalt.ImeMode = System.Windows.Forms.ImeMode.NoControl;
-            this.BUT_guidedalt.Location = new System.Drawing.Point(92, 2);
+            this.BUT_guidedalt.Location = new System.Drawing.Point(82, 2);
             this.BUT_guidedalt.Margin = new System.Windows.Forms.Padding(2);
             this.BUT_guidedalt.Name = "BUT_guidedalt";
-            this.BUT_guidedalt.Size = new System.Drawing.Size(82, 26);
+            this.BUT_guidedalt.Size = new System.Drawing.Size(72, 26);
             this.BUT_guidedalt.TabIndex = 73;
             this.BUT_guidedalt.Text = "Set Guided Altitude";
             this.BUT_guidedalt.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -199,7 +199,7 @@
             this.BUT_auto.Location = new System.Drawing.Point(6, 2);
             this.BUT_auto.Margin = new System.Windows.Forms.Padding(2);
             this.BUT_auto.Name = "BUT_auto";
-            this.BUT_auto.Size = new System.Drawing.Size(82, 26);
+            this.BUT_auto.Size = new System.Drawing.Size(72, 26);
             this.BUT_auto.TabIndex = 74;
             this.BUT_auto.Text = "Auto";
             this.BUT_auto.TextColorNotEnabled = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(87)))), ((int)(((byte)(4)))));
@@ -210,7 +210,7 @@
             // NUM_airspeed
             // 
             this.NUM_airspeed.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.NUM_airspeed.Location = new System.Drawing.Point(197, 65);
+            this.NUM_airspeed.Location = new System.Drawing.Point(177, 65);
             this.NUM_airspeed.Margin = new System.Windows.Forms.Padding(2);
             this.NUM_airspeed.Maximum = new decimal(new int[] {
             58,
@@ -241,7 +241,7 @@
             0,
             0,
             0});
-            this.NUM_loitradius.Location = new System.Drawing.Point(197, 35);
+            this.NUM_loitradius.Location = new System.Drawing.Point(177, 35);
             this.NUM_loitradius.Margin = new System.Windows.Forms.Padding(2);
             this.NUM_loitradius.Maximum = new decimal(new int[] {
             10000,
@@ -272,7 +272,7 @@
             0,
             0,
             0});
-            this.NUM_guidedalt.Location = new System.Drawing.Point(197, 5);
+            this.NUM_guidedalt.Location = new System.Drawing.Point(177, 5);
             this.NUM_guidedalt.Margin = new System.Windows.Forms.Padding(2);
             this.NUM_guidedalt.Maximum = new decimal(new int[] {
             10000,
@@ -302,7 +302,7 @@
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 50F));
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 19F));
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 60F));
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 40F));
+            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Absolute, 60F));
             this.tableLayoutPanel1.Controls.Add(this.LBL_loitradiusunits, 4, 1);
             this.tableLayoutPanel1.Controls.Add(this.BUT_rtl, 0, 2);
             this.tableLayoutPanel1.Controls.Add(this.BUT_loitradius, 1, 1);
@@ -313,10 +313,10 @@
             this.tableLayoutPanel1.Controls.Add(this.NUM_loitradius, 3, 1);
             this.tableLayoutPanel1.Controls.Add(this.CHK_loitdirection, 2, 1);
             this.tableLayoutPanel1.Controls.Add(this.NUM_guidedalt, 3, 0);
-            this.tableLayoutPanel1.Controls.Add(this.LBL_altunits, 4, 0);
             this.tableLayoutPanel1.Controls.Add(this.BUT_airspeed, 1, 2);
             this.tableLayoutPanel1.Controls.Add(this.NUM_airspeed, 3, 2);
             this.tableLayoutPanel1.Controls.Add(this.LBL_airspeedunits, 4, 2);
+            this.tableLayoutPanel1.Controls.Add(this.CMB_altframe, 4, 0);
             this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel1.Location = new System.Drawing.Point(0, 0);
             this.tableLayoutPanel1.Margin = new System.Windows.Forms.Padding(2);
@@ -334,32 +334,34 @@
             // LBL_loitradiusunits
             // 
             this.LBL_loitradiusunits.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.LBL_loitradiusunits.Location = new System.Drawing.Point(257, 38);
+            this.LBL_loitradiusunits.Location = new System.Drawing.Point(237, 38);
             this.LBL_loitradiusunits.Margin = new System.Windows.Forms.Padding(2);
             this.LBL_loitradiusunits.Name = "LBL_loitradiusunits";
-            this.LBL_loitradiusunits.Size = new System.Drawing.Size(36, 13);
+            this.LBL_loitradiusunits.Size = new System.Drawing.Size(56, 13);
             this.LBL_loitradiusunits.TabIndex = 88;
             this.LBL_loitradiusunits.Text = "ft";
             // 
             // LBL_airspeedunits
             // 
             this.LBL_airspeedunits.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.LBL_airspeedunits.Location = new System.Drawing.Point(257, 68);
+            this.LBL_airspeedunits.Location = new System.Drawing.Point(237, 68);
             this.LBL_airspeedunits.Margin = new System.Windows.Forms.Padding(2);
             this.LBL_airspeedunits.Name = "LBL_airspeedunits";
-            this.LBL_airspeedunits.Size = new System.Drawing.Size(36, 13);
+            this.LBL_airspeedunits.Size = new System.Drawing.Size(56, 13);
             this.LBL_airspeedunits.TabIndex = 86;
             this.LBL_airspeedunits.Text = "kts";
             // 
-            // LBL_altunits
+            // CMB_altframe
             // 
-            this.LBL_altunits.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
-            this.LBL_altunits.Location = new System.Drawing.Point(257, 8);
-            this.LBL_altunits.Margin = new System.Windows.Forms.Padding(2);
-            this.LBL_altunits.Name = "LBL_altunits";
-            this.LBL_altunits.Size = new System.Drawing.Size(36, 13);
-            this.LBL_altunits.TabIndex = 92;
-            this.LBL_altunits.Text = "ft";
+            this.CMB_altframe.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right)));
+            this.CMB_altframe.FormattingEnabled = true;
+            this.CMB_altframe.Location = new System.Drawing.Point(238, 4);
+            this.CMB_altframe.Margin = new System.Windows.Forms.Padding(3, 3, 0, 3);
+            this.CMB_altframe.Name = "CMB_altframe";
+            this.CMB_altframe.Size = new System.Drawing.Size(57, 21);
+            this.CMB_altframe.TabIndex = 93;
+            this.CMB_altframe.SelectedIndexChanged += new System.EventHandler(this.CMB_altframe_SelectedIndexChanged);
+            this.CMB_altframe.KeyDown += new System.Windows.Forms.KeyEventHandler(this.CMB_KeyDown);
             // 
             // ActionsControl
             // 
@@ -394,6 +396,6 @@
         private System.Windows.Forms.Label LBL_airspeedunits;
         private System.Windows.Forms.CheckBox CHK_loitdirection;
         private System.Windows.Forms.NumericUpDown NUM_guidedalt;
-        private System.Windows.Forms.Label LBL_altunits;
+        private System.Windows.Forms.ComboBox CMB_altframe;
     }
 }

@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.Globalization;
 using System.Windows.Forms;
@@ -41,7 +42,34 @@ namespace Carbonix
             NUM_guidedalt.Value = guidedalt;
             value_backups[NUM_guidedalt.Name] = NUM_guidedalt.Value;
             NUM_guidedalt.Enabled = true; // This one is not param-based, we can change it while disconnected
-            LBL_altunits.Text = CurrentState.AltUnit;
+
+            // Initialize the alt frame combobox
+            CMB_altframe.DropDownStyle = ComboBoxStyle.DropDownList;
+            CMB_altframe.DataSource = new BindingList<KeyValuePair<string, byte>>
+            {
+                new KeyValuePair<string, byte>(CurrentState.AltUnit + " MSL", (byte)MAVLink.MAV_FRAME.GLOBAL),
+                new KeyValuePair<string, byte>(CurrentState.AltUnit + " Rel", (byte)MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT),
+                new KeyValuePair<string, byte>(CurrentState.AltUnit + " AGL", (byte)MAVLink.MAV_FRAME.GLOBAL_TERRAIN_ALT)
+            };
+            CMB_altframe.DisplayMember = "Key";
+            CMB_altframe.ValueMember = "Value";
+            // Parse the altitude frame setting from the config file
+            byte.TryParse(Host.config["guided_alt_frame"], out byte alt_frame);
+            // Limit the frame to one of these three options
+            switch (alt_frame)
+            {
+                case (byte)MAVLink.MAV_FRAME.GLOBAL:
+                case (byte)MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT:
+                case (byte)MAVLink.MAV_FRAME.GLOBAL_TERRAIN_ALT:
+                    break;
+                default:
+                    alt_frame = (byte)MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT;
+                    // Save that setting back to the config file
+                    Host.config["guided_alt_frame"] = alt_frame.ToString();
+                    break;
+            }
+            CMB_altframe.SelectedValue = alt_frame;
+            value_backups[CMB_altframe.Name] = (byte)CMB_altframe.SelectedValue;
 
             // Set up loiter radius control
             NUM_loitradius.Increment = CurrentState.DistanceUnit == "m" ? 25 : 100;
@@ -63,7 +91,7 @@ namespace Carbonix
 
             freeze_handlers = false;
         }
-        
+
         // Updates certain control values based on mavlink parameters
         private void ParamListChanged(object sender, EventArgs e)
         {
@@ -74,20 +102,27 @@ namespace Carbonix
 
             freeze_handlers = true;
 
-            // Update the guided alt control
-            if(Host.comPort.MAV.GuidedMode.z == 0)
+            // This may be the first connection, so we may need to initialize the GuidedMode object. FlightData.cs
+            // checks this to see what altitude and frame to send when the user clicks "Fly To Here" in the map.
+            if (float.TryParse(Host.config["guided_alt"], out Host.comPort.MAV.GuidedMode.z))
             {
-                Host.comPort.MAV.GuidedMode.z = (float)NUM_guidedalt.Value / CurrentState.multiplieralt;
-                // Set this to something slightly non-zero if it was intentially set to zero
-                if(Host.comPort.MAV.GuidedMode.z == 0)
-                {
-                    Host.comPort.MAV.GuidedMode.z = 0.001f;
-                }
+                Host.comPort.MAV.GuidedMode.z /= CurrentState.multiplieralt;
             }
-            else
+            byte.TryParse(Host.config["guided_alt_frame"], out Host.comPort.MAV.GuidedMode.frame);
+            // A z value of 0 is a flag for FlightData.cs to say "nobody has set the guided altitude yet; show the the
+            // altitude popup when someone tries to do a Guided command". We need to avoid setting this to exactly 0.
+            if (Host.comPort.MAV.GuidedMode.z == 0)
             {
-                NUM_guidedalt.Value = (decimal)CurrentState.toAltDisplayUnit(Host.comPort.MAV.GuidedMode.z);
+                Host.comPort.MAV.GuidedMode.z = 0.001f;
             }
+
+            // Sync the controls with the current values
+            NUM_guidedalt.Value = (decimal)CurrentState.toAltDisplayUnit(Host.comPort.MAV.GuidedMode.z);
+            value_backups[NUM_guidedalt.Name] = NUM_guidedalt.Value;
+            NUM_guidedalt.BackColor = ThemeManager.ControlBGColor;
+            CMB_altframe.SelectedValue = Host.comPort.MAV.GuidedMode.frame;
+            value_backups[CMB_altframe.Name] = (byte)CMB_altframe.SelectedValue;
+            CMB_altframe.BackColor = ThemeManager.ControlBGColor;
 
             // Get param for loiter radius
             if (Host.comPort.MAV.param["WP_LOITER_RAD"] != null)
@@ -107,7 +142,9 @@ namespace Carbonix
                 NUM_loitradius.Enabled = false;
             }
             value_backups[CHK_loitdirection.Name] = CHK_loitdirection.Checked ? -1 : 1;
+            CHK_loitdirection.BackColor = Color.Transparent;
             value_backups[NUM_loitradius.Name] = NUM_loitradius.Value;
+            NUM_loitradius.BackColor = ThemeManager.ControlBGColor;
 
             // Get params for airspeed
             if (Host.comPort.MAV.param["AIRSPEED_CRUISE"] != null &&
@@ -124,6 +161,7 @@ namespace Carbonix
                 NUM_airspeed.Enabled = false;
             }
             value_backups[NUM_airspeed.Name] = NUM_airspeed.Value;
+            NUM_airspeed.BackColor = ThemeManager.ControlBGColor;
 
             freeze_handlers = false;
         }
@@ -170,6 +208,17 @@ namespace Carbonix
             _num_changed_manually = true;
         }
 
+        private void CMB_KeyDown(object sender, KeyEventArgs e)
+        {
+            // Check for escape key and reset value to backup
+            if (e.KeyCode == Keys.Escape)
+            {
+                ComboBox cmb = (ComboBox)sender;
+                // Handler will trigger and handle the bg color change
+                cmb.SelectedValue = (byte)value_backups[cmb.Name];
+            }
+        }
+
         private void NUM_ValueChanged(object sender, EventArgs e)
         {
             if (freeze_handlers) return;
@@ -210,6 +259,27 @@ namespace Carbonix
             }
         }
 
+        private void CMB_altframe_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (freeze_handlers) return;
+
+            ComboBox control = (ComboBox)sender;
+
+            // If the value is different than the backup value, set the background color to green
+            if ((byte)control.SelectedValue != value_backups[control.Name])
+            {
+                // Use a color that contrasts with the text color
+                control.BackColor = ThemeManager.ControlBGColor.GetBrightness() < 0.5 ? Color.DarkGreen : Color.LightGreen;
+                // Display tooltip explaining how to discard changes
+                toolTip1.SetToolTip(control, "Hit escape to cancel changes");
+            }
+            else
+            {
+                control.BackColor = ThemeManager.ControlBGColor;
+                toolTip1.SetToolTip(control, null);
+            }
+        }
+
         private void ActionsControl_VisibleChanged(object sender, EventArgs e)
         {
             ParamListChanged(null, null);
@@ -232,12 +302,17 @@ namespace Carbonix
         private void BUT_guidedalt_Click(object sender, EventArgs e)
         {
             Host.config["guided_alt"] = NUM_guidedalt.Value.ToString();
+            Host.config["guided_alt_frame"] = CMB_altframe.SelectedValue.ToString();
 
             value_backups[NUM_guidedalt.Name] = NUM_guidedalt.Value;
+            value_backups[CMB_altframe.Name] = (byte)CMB_altframe.SelectedValue;
             NUM_guidedalt.BackColor = ThemeManager.ControlBGColor;
+            CMB_altframe.BackColor = ThemeManager.ControlBGColor;
 
             Host.comPort.MAV.GuidedMode.z = (float)NUM_guidedalt.Value / CurrentState.multiplieralt;
-            // Set this to something slightly non-zero if it was intentially set to zero
+            Host.comPort.MAV.GuidedMode.frame = (byte)CMB_altframe.SelectedValue;
+
+            // "0" has special meaning. We need to use 0.001 instead.
             if (Host.comPort.MAV.GuidedMode.z == 0)
             {
                 Host.comPort.MAV.GuidedMode.z = 0.001f;
@@ -249,7 +324,8 @@ namespace Carbonix
                 {
                     alt = Host.comPort.MAV.GuidedMode.z,
                     lat = Host.comPort.MAV.GuidedMode.x / 1e7,
-                    lng = Host.comPort.MAV.GuidedMode.y / 1e7
+                    lng = Host.comPort.MAV.GuidedMode.y / 1e7,
+                    frame = Host.comPort.MAV.GuidedMode.frame
                 });
             }
         }
