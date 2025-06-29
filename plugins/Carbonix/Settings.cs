@@ -142,9 +142,11 @@ namespace Carbonix
                 {
                     "Lachlan Conn",
                     "Isaac Straatemeier",
-                    "Darwish Ismail",
-                    "Aidan Biggar",
                     "Matt Sturdy",
+                    "Yip Huang",
+                    "Bob Long",
+                    "Kent Hanson",
+                    "Matt Stokes"
                 };
 
                 payloads = new List<string>()
@@ -191,9 +193,11 @@ namespace Carbonix
                 {
                     "Lachlan Conn",
                     "Isaac Straatemeier",
-                    "Darwish Ismail",
-                    "Aidan Biggar",
                     "Matt Sturdy",
+                    "Yip Huang",
+                    "Bob Long",
+                    "Kent Hanson",
+                    "Matt Stokes"
                 };
 
                 payloads = new List<string>()
