@@ -595,7 +595,7 @@ namespace Carbonix
             // If exit altitude and transit altitude are within 5m, don't bother with a loiter to altitude
             if (Math.Abs(num_exitalt.Value - num_transit_alt.Value) > (decimal)CurrentState.toDistDisplayUnit(5))
             {
-                plugin.Host.AddWPtoList(MAVLink.MAV_CMD.WAYPOINT, 0, 0, 0, 0, loiter_point.Lng, loiter_point.Lat, (double)num_transit_alt.Value);
+                plugin.Host.AddWPtoList(MAVLink.MAV_CMD.LOITER_TURNS, 0, 0, sign * loiter_radius, 0, loiter_point.Lng, loiter_point.Lat, (double)num_transit_alt.Value);
                 plugin.Host.AddWPtoList(MAVLink.MAV_CMD.LOITER_TO_ALT, 0, sign * loiter_radius, 0, 0, loiter_point.Lng, loiter_point.Lat, Math.Round(CurrentState.toAltDisplayUnit(approach_points.Last().alt + alt_offset)));
             }
 
