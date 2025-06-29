@@ -165,9 +165,8 @@ namespace Carbonix
             // Change the text of the safety button toggle based on safety state
             but_safety.Text = Host.cs.safetyactive ? "Disable Safety" : "Engage Safety";
     
-            // Disable the manual mode button if we are likely flying
-            but_manual.Enabled = !(Host.cs.armed && (CurrentState.fromSpeedDisplayUnit(Host.cs.groundspeed) > 3 || Host.cs.ch3percent > 12));
-
+            // Disable the manual mode button if we are armed
+            but_manual.Enabled = !Host.cs.armed;
 
             //Disable the Reboot Button When armed
             but_reboot.Enabled = !Host.cs.armed;
