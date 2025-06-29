@@ -329,11 +329,11 @@ namespace Carbonix
             {
                 var action = Host.comPort.MAV.cs.armed ? "Disarm" : "Arm";
 
-                if (isitarmed)
-                    if (CustomMessageBox.Show("Are you sure you want to " + action, action,
-                            CustomMessageBox.MessageBoxButtons.YesNo) !=
-                        CustomMessageBox.DialogResult.Yes)
-                        return;
+                if (CustomMessageBox.Show("Are you sure you want to " + action, action,
+                        CustomMessageBox.MessageBoxButtons.YesNo) != CustomMessageBox.DialogResult.Yes)
+                {
+                    return;
+                }
                 StringBuilder sb = new StringBuilder();
                 var sub = Host.comPort.SubscribeToPacketType(MAVLink.MAVLINK_MSG_ID.STATUSTEXT, message =>
                 {
