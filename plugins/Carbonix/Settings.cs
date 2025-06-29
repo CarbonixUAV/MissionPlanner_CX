@@ -105,6 +105,7 @@ namespace Carbonix
         public List<string> payloads;
         public bool has_avionics_battery;
         public bool use_joystick;
+        public bool has_engine;
 
         public AircraftSettings(Aircraft aircraft)
         {
@@ -123,6 +124,7 @@ namespace Carbonix
                 max_descent_grade = 0.08;
                 cruise_speed = 21.0;
                 landing_hold_minutes = 0;
+                has_engine = false;
 
                 approach_points = new List<Point>()
                 {
@@ -174,6 +176,7 @@ namespace Carbonix
                 max_descent_grade = 0.08;
                 cruise_speed = 24.0;
                 landing_hold_minutes = 0;
+                has_engine = true;
 
                 approach_points = new List<Point>()
                 {

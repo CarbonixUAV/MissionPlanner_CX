@@ -53,6 +53,8 @@ namespace Carbonix
                 }
             }
 
+            but_engControl.Visible = aircraft_settings.has_engine;
+
             numberView1.numberColor = nvColor;
             numberView1.numberColorBackup = nvColor;
             numberView1.numberformat = aircraft_settings.takeofftab_displays[0].numberformat;
