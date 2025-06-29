@@ -85,6 +85,7 @@ namespace Carbonix
 
             // Set up the airspeed control
             NUM_airspeed.Increment = CurrentState.SpeedUnit == "m/s" ? 0.5m : 1;
+            NUM_airspeed.DecimalPlaces = CurrentState.SpeedUnit == "m/s" ? 1 : 0;
             // Airspeed min/max will be determined by params, so skip those
             NUM_airspeed.Enabled = false;
             LBL_airspeedunits.Text = CurrentState.SpeedUnit;
