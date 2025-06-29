@@ -91,54 +91,6 @@
   <CustomWarning>
     <Child>
       <Child>
-        <Name>efi_headtemp</Name>
-        <Warning>100</Warning>
-        <type>SpeakAndText</type>
-        <RepeatTime>10</RepeatTime>
-        <ConditionType>LT</ConditionType>
-        <Text>WARNING: {name} is {value}</Text>
-      </Child>
-      <Name>armed</Name>
-      <Warning>0</Warning>
-      <type>SpeakAndText</type>
-      <RepeatTime>10</RepeatTime>
-      <ConditionType>GT</ConditionType>
-      <Text>WARNING: {name} is {value}</Text>
-    </Child>
-    <Name>efi_headtemp</Name>
-    <Warning>0</Warning>
-    <type>SpeakAndText</type>
-    <RepeatTime>30</RepeatTime>
-    <ConditionType>NEQ</ConditionType>
-    <Text>Low engine temp</Text>
-  </CustomWarning>
-  <CustomWarning>
-    <Child>
-      <Child>
-        <Name>efi_headtemp</Name>
-        <Warning>260</Warning>
-        <type>SpeakAndText</type>
-        <RepeatTime>10</RepeatTime>
-        <ConditionType>GT</ConditionType>
-        <Text>WARNING: {name} is {value}</Text>
-      </Child>
-      <Name>armed</Name>
-      <Warning>0</Warning>
-      <type>SpeakAndText</type>
-      <RepeatTime>10</RepeatTime>
-      <ConditionType>GT</ConditionType>
-      <Text>WARNING: {name} is {value}</Text>
-    </Child>
-    <Name>efi_headtemp</Name>
-    <Warning>0</Warning>
-    <type>SpeakAndText</type>
-    <RepeatTime>30</RepeatTime>
-    <ConditionType>NEQ</ConditionType>
-    <Text>High engine temp</Text>
-  </CustomWarning>
-  <CustomWarning>
-    <Child>
-      <Child>
         <Name>esc5_temp</Name>
         <Warning>100</Warning>
         <type>SpeakAndText</type>
