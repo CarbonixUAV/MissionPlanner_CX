@@ -210,7 +210,7 @@ namespace Carbonix
 
             // Warn user about unofficial firmware
             if (is_connected && !is_armed && !has_warned_firmware &&
-                last_firmware_version != "" &&
+                Host.comPort?.MAV?.VersionString != "" &&
                 last_firmware_version != Host.comPort?.MAV?.VersionString)
             {
                 last_firmware_version = Host.comPort?.MAV?.VersionString;
