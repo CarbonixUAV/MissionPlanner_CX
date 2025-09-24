@@ -44,6 +44,7 @@ namespace Carbonix
                 "autoWPToolStripMenuItem",
                 "mapToolToolStripMenuItem",
                 "modifyAltToolStripMenuItem",
+                "fileLoadSaveToolStripMenuItem",
             };
             fpmap_menu_autowp_allow = new List<string>()
             {
