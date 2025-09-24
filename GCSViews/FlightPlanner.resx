@@ -2231,6 +2231,12 @@
   <data name="loadAndAppendToolStripMenuItem.Text" xml:space="preserve">
     <value>Load and Append</value>
   </data>
+  <data name="appendWPStampToolStripMenuItem.Size" type="System.Drawing.Size, System.Drawing">
+    <value>168, 22</value>
+  </data>
+  <data name="appendWPStampToolStripMenuItem.Text" xml:space="preserve">
+    <value>Append WP Stamp</value>
+  </data>
   <data name="saveWPFileToolStripMenuItem.Size" type="System.Drawing.Size, System.Drawing">
     <value>168, 22</value>
   </data>
@@ -3204,6 +3210,12 @@
     <value>gDALOpacityToolStripMenuItem</value>
   </data>
   <data name="&gt;&gt;gDALOpacityToolStripMenuItem.Type" xml:space="preserve">
+    <value>System.Windows.Forms.ToolStripMenuItem, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="&gt;&gt;appendWPStampToolStripMenuItem.Name" xml:space="preserve">
+    <value>appendWPStampToolStripMenuItem</value>
+  </data>
+  <data name="&gt;&gt;appendWPStampToolStripMenuItem.Type" xml:space="preserve">
     <value>System.Windows.Forms.ToolStripMenuItem, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </data>
   <data name="&gt;&gt;$this.Name" xml:space="preserve">
