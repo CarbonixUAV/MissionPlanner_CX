@@ -8299,6 +8299,10 @@ Column 1: Field type (RALLY is the only one at the moment -- may have RALLY_LAND
                 return;
             }
 
+            // Get a count of all the WP markers, so we can find/select all new ones later
+            var oldmarkers_count = MainMap.Overlays.First(a => a.Id == "WPOverlay").Markers
+                .Count(a => a is GMapMarkerWP);
+
             // Position comes from the right-click position on the map
             PointLatLngAlt home = new PointLatLngAlt(cmds[0]);
             PointLatLngAlt new_home = new PointLatLngAlt(MouseDownEnd);
@@ -8329,6 +8333,20 @@ Column 1: Field type (RALLY is the only one at the moment -- may have RALLY_LAND
 
             processToScreen(cmds, true);
             writeKML();
+
+            // Get a list of all the new map markers we just added
+            var markers = MainMap.Overlays.First(a => a.Id == "WPOverlay").Markers
+                .Where(a => a is GMapMarkerWP)
+                .Skip(oldmarkers_count).ToList();
+
+            // Ask the user if they want to select this new group to drag them
+            if (markers.Count > 0 && CustomMessageBox.Show("Select new waypoints for dragging?", "Waypoint Selection", MessageBoxButtons.YesNo) == (int)DialogResult.Yes)
+            {
+                foreach (var marker in markers)
+                {
+                    groupmarkeradd(marker);
+                }
+            }
         }
     }
 }
