@@ -8239,5 +8239,83 @@ Column 1: Field type (RALLY is the only one at the moment -- may have RALLY_LAND
             CustomMessageBox.Show("Number of tiles loaded per zoom : " + Environment.NewLine + results, "Injecting Custom Map Results");
             map.Dispose();
         }
+
+        private void appendWPStampToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            // Load a waypoint file and translate/rotate it relative to the file's home point
+
+            if ((MAVLink.MAV_MISSION_TYPE)cmb_missiontype.SelectedValue == MAVLink.MAV_MISSION_TYPE.FENCE ||
+                (MAVLink.MAV_MISSION_TYPE)cmb_missiontype.SelectedValue == MAVLink.MAV_MISSION_TYPE.RALLY)
+            {
+                CustomMessageBox.Show("This function is not allowed during fence/rally editing");
+            }
+
+            // Prompt for file
+            List<Locationwp> cmds;
+            using (OpenFileDialog fd = new OpenFileDialog())
+            {
+                fd.Filter = "Ardupilot Mission|*.waypoints;*.txt";
+                fd.DefaultExt = ".waypoints";
+                DialogResult result = fd.ShowDialog();
+                string file = fd.FileName;
+                if (file == "")
+                {
+                    return;
+                }
+                cmds = WaypointFile.ReadWaypointFile(file);
+                if (cmds == null || cmds.Count == 0)
+                {
+                    CustomMessageBox.Show("No waypoints found in file");
+                    return;
+                }
+            }
+
+
+            // Prompt for rotation
+            string rotation_str = "0";
+            if (DialogResult.Cancel == InputBox.Show("Rotation", "Enter rotation in degrees", ref rotation_str))
+                return;
+            double rotation = 0;
+            try
+            {
+                rotation = double.Parse(rotation_str);
+            }
+            catch
+            {
+                CustomMessageBox.Show("Invalid rotation");
+                return;
+            }
+
+            // Position comes from the right-click position on the map
+            PointLatLngAlt home = new PointLatLngAlt(cmds[0]);
+            PointLatLngAlt new_home = new PointLatLngAlt(MouseDownEnd);
+
+            var home_cmd = cmds[0];
+            home_cmd.lat = new_home.Lat;
+            home_cmd.lng = new_home.Lng;
+            cmds[0] = home_cmd;
+
+            // Loop over all the commands to translate/rotate them
+            for (int i = 1; i < cmds.Count; i++)
+            {
+                var cmd = cmds[i];
+                if (cmd.lat == 0 && cmd.lng == 0)
+                {
+                    continue;
+                }
+                var bearing = home.GetBearing(new PointLatLngAlt(cmd));
+                var distance = home.GetDistance2(new PointLatLngAlt(cmd));
+                bearing += rotation;
+
+                var newloc = new_home.newpos(bearing, distance);
+
+                cmd.lat = newloc.Lat;
+                cmd.lng = newloc.Lng;
+                cmds[i] = cmd;
+            }
+
+            processToScreen(cmds, true);
+            writeKML();
+        }
     }
 }

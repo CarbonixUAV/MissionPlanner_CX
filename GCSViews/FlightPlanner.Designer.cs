@@ -225,6 +225,7 @@ namespace MissionPlanner.GCSViews
             this.zoomToMissionToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.zoomToHomeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.gDALOpacityToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.appendWPStampToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.panel5.SuspendLayout();
             this.panel1.SuspendLayout();
             this.panelWaypoints.SuspendLayout();
@@ -1308,6 +1309,7 @@ namespace MissionPlanner.GCSViews
             this.fileLoadSaveToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.loadWPFileToolStripMenuItem,
             this.loadAndAppendToolStripMenuItem,
+            this.appendWPStampToolStripMenuItem,
             this.saveWPFileToolStripMenuItem,
             this.loadKMLFileToolStripMenuItem,
             this.loadSHPFileToolStripMenuItem});
@@ -1542,6 +1544,12 @@ namespace MissionPlanner.GCSViews
             resources.ApplyResources(this.gDALOpacityToolStripMenuItem, "gDALOpacityToolStripMenuItem");
             this.gDALOpacityToolStripMenuItem.Click += new System.EventHandler(this.gDALOpacityToolStripMenuItem_Click);
             // 
+            // appendWPStampToolStripMenuItem
+            // 
+            this.appendWPStampToolStripMenuItem.Name = "appendWPStampToolStripMenuItem";
+            resources.ApplyResources(this.appendWPStampToolStripMenuItem, "appendWPStampToolStripMenuItem");
+            this.appendWPStampToolStripMenuItem.Click += new System.EventHandler(this.appendWPStampToolStripMenuItem_Click);
+            // 
             // FlightPlanner
             // 
             this.BackColor = System.Drawing.SystemColors.Control;
@@ -1750,5 +1758,6 @@ namespace MissionPlanner.GCSViews
         private MyButton BUT_InjectCustomMap;
         private ProgressBar progressBarInjectCustomMap;
         private NumericUpDown Zoomlevel;
+        private ToolStripMenuItem appendWPStampToolStripMenuItem;
     }
 }
