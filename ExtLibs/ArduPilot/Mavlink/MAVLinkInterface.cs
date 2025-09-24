@@ -5105,7 +5105,7 @@ Mission Planner waits for 2 valid heartbeat packets before connecting
                         int numLost = (0x100 + packetSeqNo - expectedPacketSeqNo) % 0x100;
 
                         // Tolerate a small amount of packet order shuffling. This can happen on UDP
-                        if (numLost >= 252)
+                        if (numLost >= 240)
                         {
                             if (!logreadmode)
                                 log.Info($"mav {sysid}-{compid} seqno {packetSeqNo} exp {expectedPacketSeqNo} shuffle detected");
