@@ -161,6 +161,7 @@ namespace MissionPlanner.GCSViews
             MainMap.MouseUp += MainMap_MouseUp;
             MainMap.OnMarkerEnter += MainMap_OnMarkerEnter;
             MainMap.OnMarkerLeave += MainMap_OnMarkerLeave;
+            MainMap.KeyDown += MainMap_KeyDown;
 
             MainMap.MapScaleInfoEnabled = false;
             MainMap.ScalePen = new Pen(Color.Red);
@@ -1389,6 +1390,9 @@ namespace MissionPlanner.GCSViews
 
             if (Disposing)
                 return;
+
+            MainMap.SelectedArea = RectLatLng.Empty;
+            groupmarkers.Clear();
 
             updateRowNumbers();
 
@@ -3144,6 +3148,8 @@ namespace MissionPlanner.GCSViews
             }
             else if (groupmarkers.Count > 0)
             {
+                // Don't redraw as we delete rows, this speeds things up and prevents groupmarkers from being deleted
+                quickadd = true;
                 for (int a = Commands.Rows.Count; a > 0; a--)
                 {
                     try
@@ -3156,8 +3162,8 @@ namespace MissionPlanner.GCSViews
                         CustomMessageBox.Show("error selecting wp, please try again.");
                     }
                 }
-
-                groupmarkers.Clear();
+                quickadd = false;
+                writeKML();
             }
 
 
@@ -7491,8 +7497,6 @@ Column 1: Field type (RALLY is the only one at the moment -- may have RALLY_LAND
                             quickadd = false;
                         }
 
-                        MainMap.SelectedArea = RectLatLng.Empty;
-                        groupmarkers.Clear();
                         // redraw to remove selection
                         writeKML();
 
@@ -7877,6 +7881,15 @@ Column 1: Field type (RALLY is the only one at the moment -- may have RALLY_LAND
             }
         }
 
+        private void MainMap_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Escape)
+            {
+                // Clear the group select and re-render everything
+                writeKML();
+            }
+        }
+        
         private void MainMap_OnTileLoadComplete(long ElapsedMilliseconds)
         {
             //MainMap.ElapsedMilliseconds = ElapsedMilliseconds;
