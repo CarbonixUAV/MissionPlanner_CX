@@ -1,4 +1,4 @@
-﻿using com.drew.imaging.jpg;
+using com.drew.imaging.jpg;
 using com.drew.metadata;
 using com.drew.metadata.exif;
 using GMap.NET;
@@ -1701,9 +1701,24 @@ namespace MissionPlanner.Grid
                                 // only add points that are ends
                                 if (plla.Tag == "S" || plla.Tag == "E")
                                 {
-                                    if (plla.Lat != lastplla.Lat || plla.Lng != lastplla.Lng ||
-                                        plla.Alt != lastplla.Alt)
-                                        AddWP(plla.Lng, plla.Lat, plla.Alt, plla.Tag);
+                                    if (plla.Tag == "S")
+                                    {
+                                        double angle = (plla.GetBearing(grid[i + 1]) - lastplla.GetBearing(plla) + 360) % 360;
+                                        int loiterdirection = angle < 180 ? 1 : -1;
+
+                                        double offsetdir = (plla.GetBearing(grid[i + 1]) + loiterdirection * 90 + 360) % 360;
+                                        
+
+                                        PointLatLngAlt loiterPos = plla.newpos(offsetdir, (double)NUM_leadin2.Value);
+
+                                        plugin.Host.AddWPtoList(MAVLink.MAV_CMD.LOITER_TURNS,
+                                            0, 0, (double)NUM_leadin2.Value * loiterdirection, 1,
+                                            loiterPos.Lng, loiterPos.Lat, loiterPos.Alt,
+                                            gridobject);
+                                    }
+                                    //if (plla.lat != lastplla.lat || plla.lng != lastplla.lng ||
+                                    //    plla.alt != lastplla.alt)
+                                    //    addwp(plla.lng, plla.lat, plla.alt, plla.tag);
                                 }
 
                                 // check trigger method

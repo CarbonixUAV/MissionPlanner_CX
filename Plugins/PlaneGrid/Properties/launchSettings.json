@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "PlaneGrid": {
+      "commandName": "Executable",
+      "executablePath": "..\\MissionPlanner.exe"
+    }
+  }
+}

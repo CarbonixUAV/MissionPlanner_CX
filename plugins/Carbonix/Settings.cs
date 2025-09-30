@@ -50,6 +50,7 @@ namespace Carbonix
             {
                 "createWpCircleToolStripMenuItem",
                 "surveyGridToolStripMenuItem",
+                "planeGridToolStripMenuItem"
             };
             fpmap_menu_maptool_allow = new List<string>()
             {
