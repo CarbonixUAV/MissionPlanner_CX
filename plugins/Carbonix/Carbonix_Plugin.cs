@@ -696,11 +696,9 @@ namespace Carbonix
                     PointLatLngAlt pnt = new PointLatLngAlt(0, 0, altitude);
                     Host.AddWPtoList(MAVLink.MAV_CMD.VTOL_TAKEOFF, 0, 0, 0, 0, pnt.Lng, pnt.Lat, altitude);
                     pnt = Host.cs.PlannedHomeLocation;
-                    pnt.Alt = altitude;
+                    pnt = pnt.newpos(direction, aircraft_settings.transition_distance);
                     // Add a little extra altitude during the transition
-                    pnt.Alt += MissionPlanner.CurrentState.AltUnit == "m" ? 10 : 30;
-                    // Give 500m to transition
-                    pnt = pnt.newpos(direction, 500);
+                    altitude += (int)Math.Round(MissionPlanner.CurrentState.toAltDisplayUnit(aircraft_settings.transition_climb));
                     Host.AddWPtoList(MAVLink.MAV_CMD.WAYPOINT, 0, 0, 0, 0, pnt.Lng, pnt.Lat, altitude);
                 }
 
