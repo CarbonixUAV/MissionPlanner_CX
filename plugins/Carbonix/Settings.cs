@@ -93,6 +93,8 @@ namespace Carbonix
         public double max_descent_grade;
         public double cruise_speed;
         public decimal landing_hold_minutes;
+        public double transition_distance;
+        public double transition_climb;
 
         public struct Point
         {
@@ -124,6 +126,8 @@ namespace Carbonix
                 max_descent_grade = 0.08;
                 cruise_speed = 21.0;
                 landing_hold_minutes = 0;
+                transition_climb = 10;
+                transition_distance = 500;
                 has_engine = false;
 
                 approach_points = new List<Point>()
@@ -176,6 +180,8 @@ namespace Carbonix
                 max_descent_grade = 0.08;
                 cruise_speed = 24.0;
                 landing_hold_minutes = 0;
+                transition_climb = 15;
+                transition_distance = 600;
                 has_engine = true;
 
                 approach_points = new List<Point>()
