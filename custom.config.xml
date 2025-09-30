@@ -25,7 +25,7 @@
 		},
 		]
 	</AutoConnect>
-  <cbx_selected_aircraft>Volanti</cbx_selected_aircraft>
+  <cbx_selected_aircraft>Ottano</cbx_selected_aircraft>
   <CHK_autopan>False</CHK_autopan>
   <CMB_altmode>Relative</CMB_altmode>
   <comport>UDP</comport>
@@ -114,31 +114,54 @@
   <FPaltmode>3</FPaltmode>
   <fpcoordmouse>GEO</fpcoordmouse>
   <fpminaltwarning>0</fpminaltwarning>
+  <GMapMarkerBase_InactiveDisplayStyle>Transparent</GMapMarkerBase_InactiveDisplayStyle>
+  <GMapMarkerBase_length>500</GMapMarkerBase_length>
   <groundColorToolStripMenuItem>False</groundColorToolStripMenuItem>
   <guided_alt>100</guided_alt>
   <HUD_showicons>True</HUD_showicons>
+  <hud1_useritem_battery_voltage2>       AVBAT: </hud1_useritem_battery_voltage2>
   <hud1_useritem_DistToHome>          DistToHome: </hud1_useritem_DistToHome>
   <hud1_useritem_sonarrange>          Lidar: </hud1_useritem_sonarrange>
   <joy_elevons>False</joy_elevons>
-  <joystick_name>Serial/Keyboard/Mouse/Joystick</joystick_name>
-  <MainHeight>892</MainHeight>
-  <MainLocX>287</MainLocX>
-  <MainLocY>150</MainLocY>
-  <MainMaximised>Normal</MainMaximised>
-  <MainWidth>1281</MainWidth>
-  <MapType>BingSatelliteMap</MapType>
+  <joystick_name>Radiomaster GX12 Joystick</joystick_name>
+  <MapType>GoogleHybridMap</MapType>
   <menu_autohide>false</menu_autohide>
   <norcreceiver>True</norcreceiver>
+  <NUM_tracklength>800</NUM_tracklength>
   <quickView1>battery_voltage2</quickView1>
-  <quickView2>battery_voltage3</quickView2>
-  <quickView3>esc1_temp</quickView3>
-  <quickView4>timeInAirMinSec</quickView4>
-  <quickView5>altasl</quickView5>
-  <quickView6>QNH</quickView6>
+  <quickView1_color>Gray</quickView1_color>
+  <quickView1_label>Avionics Voltage (V)</quickView1_label>
+  <quickView2>efi_rpm</quickView2>
+  <quickView2_color>Gray</quickView2_color>
+  <quickView2_label>Engine RPM</quickView2_label>
+  <quickView3>timeInAir</quickView3>
+  <quickView3_color>Gray</quickView3_color>
+  <quickView3_format>hh\:mm\:ss</quickView3_format>
+  <quickView3_label>Time in Air</quickView3_label>
+  <quickView4>battery_voltage3</quickView4>
+  <quickView4_color>Gray</quickView4_color>
+  <quickView4_label>Fuel Level Sensor (kg)</quickView4_label>
+  <quickView4_scale>1.0</quickView4_scale>
+  <quickView5>ter_curalt</quickView5>
+  <quickView5_color>Gray</quickView5_color>
+  <quickView6>efi_fuelconsumed</quickView6>
+  <quickView6_color>Gray</quickView6_color>
+  <quickView6_label>Fuel Remaining EFI (kg)</quickView6_label>
+  <quickView6_offset>0.00</quickView6_offset>
+  <quickView6_scale>-0.001</quickView6_scale>
+  <quickView7>efi_headtemp</quickView7>
+  <quickView7_color>Gray</quickView7_color>
+  <quickView7_label>CHT1 (C)</quickView7_label>
+  <quickView8>customfield:MAV_CHT2</quickView8>
+  <quickView8_color>Gray</quickView8_color>
+  <quickView8_label>CHT2 (C)</quickView8_label>
+  <quickViewCols>2</quickViewCols>
+  <quickViewRows>4</quickViewRows>
   <severity>4</severity>
   <SHOWAGAIN_FlightPlan_Fence>False</SHOWAGAIN_FlightPlan_Fence>
   <SHOWAGAIN_Raw_Param_Warning>False</SHOWAGAIN_Raw_Param_Warning>
   <SHOWAGAIN_Write_Raw_Params>False</SHOWAGAIN_Write_Raw_Params>
+  <showconsole>False</showconsole>
   <speecharm>Armed</speecharm>
   <speecharmenabled>True</speecharmenabled>
   <speechdisarm>Disarmed</speechdisarm>
