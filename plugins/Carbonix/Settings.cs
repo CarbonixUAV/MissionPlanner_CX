@@ -63,7 +63,7 @@ namespace Carbonix
                 "Field",
                 "ROC1"
             };
-            controller = "Serial/Keyboard/Mouse/Joystick";
+            controller = "Radiomaster GX12 Joystick";
             /*
             It is shockingly difficult to handle this API key the "right way" in
             C#. Getting an environment variable at compile-time is not
@@ -214,7 +214,7 @@ namespace Carbonix
 
                 has_avionics_battery = true;
 
-                use_joystick = false;
+                use_joystick = true;
                 break;
             default:
                 throw new Exception("Unknown aircraft: " + aircraft.ToString());
