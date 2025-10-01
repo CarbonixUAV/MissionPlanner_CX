@@ -59,7 +59,7 @@ namespace MissionPlanner.Utilities
                 {
                     CheckMD5(frmProgressReporter,
                         ConfigurationManager.AppSettings["UpdateLocationMD5"].ToString(),
-                        ConfigurationManager.AppSettings["UpdateLocation"]);
+                        ConfigurationManager.AppSettings["UpdateLocationZip"]);
                 }
 
                 var process = new Process();
