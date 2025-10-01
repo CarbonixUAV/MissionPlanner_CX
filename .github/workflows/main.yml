@@ -38,6 +38,12 @@ jobs:
           name: MissionPlannerBeta
           path: bin\Release\net461
           
+      - name: Rename artifacts for beta release
+        if: ${{ github.ref == 'refs/tags/beta' }}
+        shell: pwsh
+        run: |
+          Rename-Item MissionPlannerBeta.zip MissionPlannerCX-beta.zip
+
       - uses: "marvinpinto/action-automatic-releases@v1.2.1"
         if: ${{ github.ref == 'refs/tags/beta' }}
         with:
@@ -46,11 +52,28 @@ jobs:
           prerelease: true
           title: "Beta Build"
           files: |
-            MissionPlannerBeta.zip
+            MissionPlannerCX-beta.zip
             checksums.txt
             version.txt
             ChangeLog.txt
 
+      - name: Rename artifacts for official release
+        if: startsWith(github.ref, 'refs/tags/MissionPlannerCX-')
+        shell: pwsh
+        run: |
+          Rename-Item MissionPlannerBeta.zip MissionPlannerCX-latest.zip
+
+      - uses: marvinpinto/action-automatic-releases@v1.2.1
+        if: startsWith(github.ref, 'refs/tags/MissionPlannerCX-')
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: false
+          title: "${{ github.ref_name }}"
+          files: |
+            MissionPlannerCX-latest.zip
+            checksums.txt
+            version.txt
+            ChangeLog.txt
 
   buildDebug:
     name: Build Debug
