@@ -282,16 +282,30 @@ namespace MissionPlanner.Controls
             {
                 foreach (character texid in _texture)
                 {
-                    if (texid != null && texid.gltextureid != 0)
-                        GL.DeleteTexture(texid.gltextureid);
+                    try
+                    {
+                        if (texid != null && texid.gltextureid != 0)
+                            GL.DeleteTexture(texid.gltextureid);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Error("HUD Dispose texid ", ex);
+                    }
                 }
 
                 this._texture = new character[_texture.Length];
 
                 foreach (character texid in charDict.Values)
                 {
-                    if (texid.gltextureid != 0)
-                        GL.DeleteTexture(texid.gltextureid);
+                    try
+                    {
+                        if (texid != null && texid.gltextureid != 0)
+                            GL.DeleteTexture(texid.gltextureid);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.Error("HUD Dispose charDict ", ex);
+                    }
                 }
             }
 
