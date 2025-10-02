@@ -242,6 +242,8 @@ namespace RedundantLinkManager
             }
 
             CopyLinkData(Host.comPort, Links[index].comPort);
+            Host.comPort.speechenabled = false;
+            Links[index].comPort.speechenabled = true;
             // Switch the link over
             // Can't use Host.comPort because it has no setter function
             MainV2.comPort = Links[index].comPort;
@@ -332,6 +334,11 @@ namespace RedundantLinkManager
                 if(has_existing_connection)
                 {
                     CopyLinkData(Host.comPort, link.comPort);
+                }
+                // If this is the currently-selected link, enable speech
+                if (link.comPort == Host.comPort)
+                {
+                    link.comPort.speechenabled = true;
                 }
             }
             // If we don't have data dispose and try again later
