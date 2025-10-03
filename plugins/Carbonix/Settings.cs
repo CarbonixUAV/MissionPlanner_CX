@@ -201,12 +201,9 @@ namespace Carbonix
                 pilots = new List<string>()
                 {
                     "Lachlan Conn",
-                    "Isaac Straatemeier",
                     "Matt Sturdy",
                     "Yip Huang",
                     "Bob Long",
-                    "Kent Hanson",
-                    "Matt Stokes"
                 };
 
                 payloads = new List<string>()
