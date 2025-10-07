@@ -62,6 +62,10 @@ namespace RedundantLinkManager
                 Bulbs[i].Color = QualityColors[linkQuality.CurrentQuality];
                 Bulbs[i].On = linkQuality.CurrentQuality != Link.Quality.Off;
 
+                // Make it clear which links are disabled, and prevent selecting them manually
+                LinkNames[i].Font = new Font(LinkNames[i].Font, link.Enabled ? FontStyle.Regular : FontStyle.Strikeout);
+                RadioButtons[i].Enabled = link.Enabled;
+
                 if (link.comPort == Plugin.Host.comPort)
                 {
                     SuppressEvents = true;
