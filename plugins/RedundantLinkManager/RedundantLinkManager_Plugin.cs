@@ -330,8 +330,21 @@ namespace RedundantLinkManager
                 MainV2.Comports.Add(link.comPort);
                 MainV2.instance.doConnect(link.comPort, "preset", "", getparams: !has_existing_connection, showui: !has_existing_connection);
 
+                // Ensure that the link has locked on to an autopilot
+                //
+                // doConnect will lock on to an autopilot after 2 successful heartbeats, or any other component after 4 heartbeats.
+                // This sometimes causes it to lock onto a companion computer, ADSB RX, or other non-autopilot component if that
+                // component starts sending a couple seconds before the autopilot does (or if it sends at 2Hz or faster).
+                //
+                // If that happens, we'll just dispose of this link and try again later.
+                if (link.comPort.compidcurrent != (int)MAVLink.MAV_COMPONENT.MAV_COMP_ID_AUTOPILOT1)
+                {
+                    link.Dispose();
+                    return;
+                }
+
                 // Copy over the params if we have another connection
-                if(has_existing_connection)
+                if (has_existing_connection)
                 {
                     CopyLinkData(Host.comPort, link.comPort);
                 }
