@@ -328,10 +328,15 @@ namespace RedundantLinkManager
                 var has_existing_connection = Host.comPort?.BaseStream?.IsOpen ?? false;
 
                 MainV2.Comports.Add(link.comPort);
-                MainV2.instance.doConnect(link.comPort, "preset", "", getparams: !has_existing_connection, showui: !has_existing_connection);
+                MainV2.instance.doConnect(
+                    link.comPort, "preset", "",
+                    getparams: !has_existing_connection,
+                    showui: !has_existing_connection,
+                    extra_logname: "_" + link.Name
+                );
 
                 // Copy over the params if we have another connection
-                if(has_existing_connection)
+                if (has_existing_connection)
                 {
                     CopyLinkData(Host.comPort, link.comPort);
                 }
