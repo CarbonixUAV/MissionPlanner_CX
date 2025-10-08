@@ -1429,7 +1429,7 @@ namespace MissionPlanner
             this.MenuConnect.Image = global::MissionPlanner.Properties.Resources.light_connect_icon;
         }
 
-        public void doConnect(MAVLinkInterface comPort, string portname, string baud, bool getparams = true, bool showui = true)
+        public void doConnect(MAVLinkInterface comPort, string portname, string baud, bool getparams = true, bool showui = true, string extra_logname = "")
         {
             bool skipconnectcheck = false;
             log.Info($"We are connecting to {portname} {baud}");
@@ -1579,12 +1579,19 @@ namespace MissionPlanner
                     Directory.CreateDirectory(Settings.Instance.LogDir);
                     lock (this)
                     {
+                        if (extra_logname != "")
+                        {
+                            // strip out invalid chars
+                            var invalids = Path.GetInvalidFileNameChars();
+                            extra_logname = new string(extra_logname.Where(ch => !invalids.Contains(ch)).ToArray());
+                        }
+
                         // create log names
                         var dt = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss");
                         var tlog = Settings.Instance.LogDir + Path.DirectorySeparatorChar +
-                                   dt + ".tlog";
+                                   dt + extra_logname + ".tlog";
                         var rlog = Settings.Instance.LogDir + Path.DirectorySeparatorChar +
-                                   dt + ".rlog";
+                                   dt + extra_logname + ".rlog";
 
                         // check if this logname already exists
                         int a = 1;
@@ -1594,9 +1601,9 @@ namespace MissionPlanner
                             // create new names with a as an index
                             dt = DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss") + "-" + a.ToString();
                             tlog = Settings.Instance.LogDir + Path.DirectorySeparatorChar +
-                                   dt + ".tlog";
+                                   dt + extra_logname + ".tlog";
                             rlog = Settings.Instance.LogDir + Path.DirectorySeparatorChar +
-                                   dt + ".rlog";
+                                   dt + extra_logname + ".rlog";
                         }
 
                         //open the logs for writing
