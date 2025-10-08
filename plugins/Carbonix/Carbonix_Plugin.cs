@@ -541,6 +541,10 @@ namespace Carbonix
 
         // Form to store the ConfigRawParams window so it can be restored if minimized
         Form _configRawParams;
+
+        /// <summary>
+        /// Add additional menu items to the FlightData right-click menu.
+        /// </summary>
         private void AddFlightDataMenuItems()
         {
             Host.FDMenuMap.Items.Add(new ToolStripSeparator());
@@ -561,6 +565,20 @@ namespace Carbonix
                     _configRawParams.WindowState = FormWindowState.Normal;
                 }
 
+            };
+            // Create button to trigger camera
+            item = new ToolStripMenuItem("Trigger Camera");
+            Host.FDMenuMap.Items.Add(item);
+            item.Click += (s, e) =>
+            {
+                try
+                {
+                    Host.comPort.setDigicamControl(true);
+                }
+                catch
+                {
+                    CustomMessageBox.Show(MissionPlanner.Strings.CommandFailed, MissionPlanner.Strings.ERROR);
+                }
             };
             // Create button to clear aircraft track, camera icons, etc.
             item = new ToolStripMenuItem("Clear Map");
