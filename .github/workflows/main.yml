@@ -76,6 +76,7 @@ jobs:
         if: ${{ env.IS_STABLE == 'true' }}
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
+          automatic_release_tag: ${{ github.ref_name }}
           prerelease: false
           title: "${{ github.ref_name }}"
           files: |
