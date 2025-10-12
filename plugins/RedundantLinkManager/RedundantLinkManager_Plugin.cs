@@ -14,7 +14,7 @@ namespace RedundantLinkManager
     public class RedundantLinkManager_Plugin : Plugin
     {
         public override string Name { get; } = "Redundant Link Manager";
-        public override string Version { get; } = "1.0";
+        public override string Version { get; } = "1.1";
         public override string Author { get; } = "Bob Long";
 
         private readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
