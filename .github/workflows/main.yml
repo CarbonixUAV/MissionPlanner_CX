@@ -45,6 +45,7 @@ jobs:
           & ".\net472\wix.exe" "..\bin\Release\net461"
           & "$env:WIX\bin\candle.exe" installer.wxs -ext WiXNetFxExtension -ext WixDifxAppExtension -ext WixUIExtension.dll -ext WixUtilExtension -ext WixIisExtension
           & "$env:WIX\bin\light.exe" installer.wixobj "$env:WIX\bin\difxapp_x86.wixlib" -sval -o ${{ env.FILE_BASENAME }}.msi -ext WiXNetFxExtension -ext WixDifxAppExtension -ext WixUIExtension.dll -ext WixUtilExtension -ext WixIisExtension
+          Move-Item ${{ env.FILE_BASENAME }}.msi ..\${{ env.FILE_BASENAME }}.msi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -55,7 +56,7 @@ jobs:
         if: ${{ env.IS_STABLE == 'true' || env.IS_BETA == 'true' }}
         with:
           name: MSI
-          path: Msi\${{ env.FILE_BASENAME }}.msi
+          path: ${{ env.FILE_BASENAME }}.msi
 
       - uses: "marvinpinto/action-automatic-releases@v1.2.1"
         if: ${{ env.IS_BETA == 'true' }}
