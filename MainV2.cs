@@ -2757,7 +2757,7 @@ namespace MissionPlanner
                                 MainV2.comPort.MAV.cs.messageHigh != null)
                             {
                                 if (!MainV2.comPort.MAV.cs.messageHigh.StartsWith("PX4v2 ") &&
-                                    !MainV2.comPort.MAV.cs.messageHigh.StartsWith("PreArm:")) // Supress audibly repeating PreArm messages
+                                    !MainV2.comPort.MAV.cs.messageHigh.ToLower().StartsWith("prearm:")) // Supress audibly repeating PreArm messages
                                 {
                                     MainV2.speechEngine.SpeakAsync(MainV2.comPort.MAV.cs.messageHigh);
                                     lastmessagehigh = MainV2.comPort.MAV.cs.messageHigh;
