@@ -75,6 +75,8 @@ namespace MissionPlanner.Utilities
             text = Regex.Replace(text, @"\b([0-9]+)\bbaud\b", "$1 baudrate", RegexOptions.IgnoreCase);
             // Stop, for example, QHover from being pronounced "kohver"
             text = Regex.Replace(text, @"\bq((?!u)[a-z]+)", "q $1", RegexOptions.IgnoreCase);
+            // Audibly suppress CX_BIT: at the start of carbonix lua messages 
+            text = Regex.Replace(text, @"^\s*CX_BIT\s*:\s*", "", RegexOptions.IgnoreCase);
 
             if (MONO)
             {
