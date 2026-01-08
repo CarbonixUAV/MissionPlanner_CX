@@ -4738,11 +4738,18 @@ namespace MissionPlanner.GCSViews
             if (DialogResult.Cancel == InputBox.Show("Loiter Turns", "Loiter Turns", ref turns))
                 return;
 
+            string radius = TXT_loiterrad.Text;
+
+            if (DialogResult.Cancel == InputBox.Show("Loiter Radius", "Loiter Radius (meters)", ref radius))
+                return;
+
             selectedrow = Commands.Rows.Add();
 
             Commands.Rows[selectedrow].Cells[Command.Index].Value = MAVLink.MAV_CMD.LOITER_TURNS.ToString();
 
             Commands.Rows[selectedrow].Cells[Param1.Index].Value = turns;
+
+            Commands.Rows[selectedrow].Cells[Param3.Index].Value = radius;
 
             ChangeColumnHeader(MAVLink.MAV_CMD.LOITER_TURNS.ToString());
 
@@ -4754,9 +4761,15 @@ namespace MissionPlanner.GCSViews
 
         public void loiterForeverToolStripMenuItem_Click(object sender, EventArgs e)
         {
+            string radius = TXT_loiterrad.Text;
+            if (DialogResult.Cancel == InputBox.Show("Loiter Radius", "Loiter Radius (meters)", ref radius))
+                return;
+            
             selectedrow = Commands.Rows.Add();
 
             Commands.Rows[selectedrow].Cells[Command.Index].Value = MAVLink.MAV_CMD.LOITER_UNLIM.ToString();
+
+            Commands.Rows[selectedrow].Cells[Param3.Index].Value = radius;
 
             ChangeColumnHeader(MAVLink.MAV_CMD.LOITER_UNLIM.ToString());
 
