@@ -97,6 +97,18 @@ namespace RedundantLinkManager
             {
                 rlm_enabled = !rlm_enabled;
                 Host.config["RedundantLinkManager_Enabled"] = rlm_enabled.ToString();
+                if (rlm_enabled)
+                {
+                    // Remove all the MAVLink entries from the stock AutoConnect
+                    Host.config["AutoConnectBACKUP"] = Host.config["AutoConnect"];
+                    var autoconnect_entries = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(Host.config["AutoConnect"]);
+                    autoconnect_entries = autoconnect_entries.Where(entry => (string)entry["Format"] != "MAVLink").ToList();
+                    Host.config["AutoConnect"] = Newtonsoft.Json.JsonConvert.SerializeObject(autoconnect_entries, Newtonsoft.Json.Formatting.Indented);
+                }
+                else
+                {
+                    Host.config["AutoConnect"] = Host.config["AutoConnectBACKUP"];
+                }
                 (sender as ToolStripMenuItem).Checked = rlm_enabled;
                 // Restart popup
                 CustomMessageBox.Show("Please restart Mission Planner", "Restart Required", MessageBoxButtons.OK);
