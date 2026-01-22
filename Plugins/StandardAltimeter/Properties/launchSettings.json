@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "StandardAltimeter": {
+      "commandName": "Executable",
+      "executablePath": "..\\MissionPlanner.exe"
+    }
+  }
+}
