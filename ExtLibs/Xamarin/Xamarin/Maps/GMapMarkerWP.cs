@@ -13,7 +13,13 @@ namespace MissionPlanner.Maps
     {
         string wpno = "";
         public bool selected = false;
+        public override bool HasLabel => true;
         SizeF txtsize = SizeF.Empty;
+        /// <summary>
+        /// Maximum number of visible markers before labels are hidden.
+        /// Set from config.xml key "MaxWPLabels" (default 100).
+        /// </summary>
+        public static int MaxWPLabels = 100;
         static Dictionary<string, Bitmap> fontBitmaps = new Dictionary<string, Bitmap>();
         static Font font;
 
@@ -53,8 +59,8 @@ namespace MissionPlanner.Maps
             if (txtsize.Width > 15)
                 midw -= 4;
 
-            if (Overlay.Control.Zoom> 16 || IsMouseOver)
-                g.DrawImageUnscaled(fontBitmaps[wpno], midw,midh);
+            if (Overlay.VisibleMarkerCount <= MaxWPLabels || IsMouseOver)
+                g.DrawImageUnscaled(fontBitmaps[wpno], midw, midh);
         }
     }
 }

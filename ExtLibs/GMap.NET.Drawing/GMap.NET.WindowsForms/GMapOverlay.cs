@@ -87,6 +87,11 @@ namespace GMap.NET.WindowsForms
         public readonly ObservableCollectionThreadSafe<GMapMarker> Markers = new ObservableCollectionThreadSafe<GMapMarker>();
 
         /// <summary>
+        /// Number of visible markers within the current viewport, updated each render pass.
+        /// </summary>
+        public int VisibleMarkerCount;
+
+        /// <summary>
         /// list of routes, should be thread safe
         /// </summary>
         public readonly ObservableCollectionThreadSafe<GMapRoute> Routes = new ObservableCollectionThreadSafe<GMapRoute>();
@@ -335,6 +340,12 @@ namespace GMap.NET.WindowsForms
 
                 if (Control.MarkersEnabled)
                 {
+                    var viewarea = Control.ViewArea;
+                    VisibleMarkerCount = 0;
+                    foreach (var m in Markers)
+                        if (m.HasLabel && m.IsVisible && viewarea.Contains(m.Position))
+                            VisibleMarkerCount++;
+
                     // markers
                     foreach (GMapMarker m in Markers.ToArray())
                     {

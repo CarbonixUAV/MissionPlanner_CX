@@ -238,6 +238,11 @@ namespace GMap.NET.WindowsForms
       }
 
       /// <summary>
+      /// Whether this marker has a label that participates in the visible-label count.
+      /// </summary>
+      public virtual bool HasLabel => false;
+
+      /// <summary>
       /// if true, marker will be rendered even if it's outside current view
       /// </summary>
       public bool DisableRegionCheck = false;
