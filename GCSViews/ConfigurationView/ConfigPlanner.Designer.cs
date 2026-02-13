@@ -123,9 +123,12 @@
             this.label13 = new System.Windows.Forms.Label();
             this.BUT_mapCacheDir = new MissionPlanner.Controls.MyButton();
             this.CHK_rtsresetesp32 = new System.Windows.Forms.CheckBox();
+            this.label_MaxWPLabels = new System.Windows.Forms.Label();
+            this.NUM_maxwplabels = new System.Windows.Forms.NumericUpDown();
             ((System.ComponentModel.ISupportInitialize)(this.NUM_tracklength)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.num_gcsid)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.num_linelength)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.NUM_maxwplabels)).BeginInit();
             this.SuspendLayout();
             // 
             // label33
@@ -891,9 +894,32 @@
             this.CHK_rtsresetesp32.UseVisualStyleBackColor = true;
             this.CHK_rtsresetesp32.CheckedChanged += new System.EventHandler(this.CHK_rtsresetesp32_CheckedChanged);
             // 
+            // label_MaxWPLabels
+            // 
+            resources.ApplyResources(this.label_MaxWPLabels, "label_MaxWPLabels");
+            this.label_MaxWPLabels.Name = "label_MaxWPLabels";
+            // 
+            // NUM_maxwplabels
+            // 
+            resources.ApplyResources(this.NUM_maxwplabels, "NUM_maxwplabels");
+            this.NUM_maxwplabels.Maximum = new decimal(new int[] {
+            10000,
+            0,
+            0,
+            0});
+            this.NUM_maxwplabels.Name = "NUM_maxwplabels";
+            this.NUM_maxwplabels.Value = new decimal(new int[] {
+            100,
+            0,
+            0,
+            0});
+            this.NUM_maxwplabels.ValueChanged += new System.EventHandler(this.NUM_maxwplabels_ValueChanged);
+            // 
             // ConfigPlanner
             // 
             resources.ApplyResources(this, "$this");
+            this.Controls.Add(this.NUM_maxwplabels);
+            this.Controls.Add(this.label_MaxWPLabels);
             this.Controls.Add(this.CHK_rtsresetesp32);
             this.Controls.Add(this.label10);
             this.Controls.Add(this.cmb_secondarydisplaystyle);
@@ -993,6 +1019,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.NUM_tracklength)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.num_gcsid)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.num_linelength)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.NUM_maxwplabels)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -1094,5 +1121,7 @@
         public System.Windows.Forms.ComboBox CMB_mapCache;
         private Controls.MyButton BUT_mapCacheDir;
         private System.Windows.Forms.CheckBox CHK_rtsresetesp32;
+        private System.Windows.Forms.Label label_MaxWPLabels;
+        private System.Windows.Forms.NumericUpDown NUM_maxwplabels;
     }
 }
