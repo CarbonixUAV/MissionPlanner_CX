@@ -2929,6 +2929,57 @@
   <data name="&gt;&gt;CHK_rtsresetesp32.ZOrder" xml:space="preserve">
     <value>0</value>
   </data>
+  <data name="label_MaxWPLabels.AutoSize" type="System.Boolean, mscorlib">
+    <value>True</value>
+  </data>
+  <data name="label_MaxWPLabels.ImeMode" type="System.Windows.Forms.ImeMode, System.Windows.Forms">
+    <value>NoControl</value>
+  </data>
+  <data name="label_MaxWPLabels.Location" type="System.Drawing.Point, System.Drawing">
+    <value>300, 327</value>
+  </data>
+  <data name="label_MaxWPLabels.Size" type="System.Drawing.Size, System.Drawing">
+    <value>82, 13</value>
+  </data>
+  <data name="label_MaxWPLabels.TabIndex" type="System.Int32, mscorlib">
+    <value>132</value>
+  </data>
+  <data name="label_MaxWPLabels.Text" xml:space="preserve">
+    <value>Max WP Labels</value>
+  </data>
+  <data name="&gt;&gt;label_MaxWPLabels.Name" xml:space="preserve">
+    <value>label_MaxWPLabels</value>
+  </data>
+  <data name="&gt;&gt;label_MaxWPLabels.Type" xml:space="preserve">
+    <value>System.Windows.Forms.Label, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="&gt;&gt;label_MaxWPLabels.Parent" xml:space="preserve">
+    <value>$this</value>
+  </data>
+  <data name="&gt;&gt;label_MaxWPLabels.ZOrder" xml:space="preserve">
+    <value>1</value>
+  </data>
+  <data name="NUM_maxwplabels.Location" type="System.Drawing.Point, System.Drawing">
+    <value>390, 325</value>
+  </data>
+  <data name="NUM_maxwplabels.Size" type="System.Drawing.Size, System.Drawing">
+    <value>67, 20</value>
+  </data>
+  <data name="NUM_maxwplabels.TabIndex" type="System.Int32, mscorlib">
+    <value>133</value>
+  </data>
+  <data name="&gt;&gt;NUM_maxwplabels.Name" xml:space="preserve">
+    <value>NUM_maxwplabels</value>
+  </data>
+  <data name="&gt;&gt;NUM_maxwplabels.Type" xml:space="preserve">
+    <value>System.Windows.Forms.NumericUpDown, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </data>
+  <data name="&gt;&gt;NUM_maxwplabels.Parent" xml:space="preserve">
+    <value>$this</value>
+  </data>
+  <data name="&gt;&gt;NUM_maxwplabels.ZOrder" xml:space="preserve">
+    <value>0</value>
+  </data>
   <metadata name="$this.Localizable" type="System.Boolean, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089">
     <value>True</value>
   </metadata>

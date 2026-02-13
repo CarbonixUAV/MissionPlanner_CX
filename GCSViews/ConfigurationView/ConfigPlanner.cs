@@ -168,6 +168,8 @@ namespace MissionPlanner.GCSViews.ConfigurationView
             // this can't fail because it set at startup
             NUM_tracklength.Value = Settings.Instance.GetInt32("NUM_tracklength", 200);
 
+            NUM_maxwplabels.Value = Settings.Instance.GetInt32("MaxWPLabels", 100);
+
             // get wps on connect
             SetCheckboxFromConfig("loadwpsonconnect", CHK_loadwponconnect);
 
@@ -688,6 +690,13 @@ namespace MissionPlanner.GCSViews.ConfigurationView
         private void NUM_tracklength_ValueChanged(object sender, EventArgs e)
         {
             Settings.Instance["NUM_tracklength"] = NUM_tracklength.Value.ToString();
+        }
+
+        private void NUM_maxwplabels_ValueChanged(object sender, EventArgs e)
+        {
+            var val = (int)NUM_maxwplabels.Value;
+            Settings.Instance["MaxWPLabels"] = val.ToString();
+            GMapMarkerWP.MaxWPLabels = val;
         }
 
         private void CHK_loadwponconnect_CheckedChanged(object sender, EventArgs e)
