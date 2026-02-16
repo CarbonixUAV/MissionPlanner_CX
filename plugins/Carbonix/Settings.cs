@@ -58,6 +58,8 @@ namespace Carbonix
                 "prefetchWPPathToolStripMenuItem",
                 "kMLOverlayToolStripMenuItem",
                 "elevationGraphToolStripMenuItem",
+                "editStyleToolStripMenuItem",
+                "useLegacyOverlayToolStripMenuItem",
             };
             pilot_locations = new List<string>()
             {
