@@ -400,6 +400,9 @@
     <None Include="plugins\example22-payloadconfig.cs">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Include="plugins\example24-annunciator.cs">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <Compile Update="Utilities\AirMarket.cs">
       <SubType>UserControl</SubType>
     </Compile>
@@ -1101,6 +1104,7 @@
     <Compile Remove="plugins\example20-multiplepositions.cs" />
     <Compile Remove="plugins\example21-persistentsimple.cs" />
     <Compile Remove="plugins\example22-fontsize.cs" />
+    <Compile Remove="plugins\example24-annunciator.cs" />
     <Compile Remove="plugins\example3-fencedist.cs" />
     <Compile Remove="plugins\example3.cs" />
     <Compile Remove="plugins\example4-herelink.cs" />
