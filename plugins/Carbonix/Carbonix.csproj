@@ -23,7 +23,6 @@
     <None Remove="ConfigFiles\checklistV1.xml" />
     <None Remove="ConfigFiles\joystickaxisArduPlane.xml" />
     <None Remove="ConfigFiles\joystickbuttonsArduPlane.xml" />
-    <None Remove="ConfigFiles\warnings.xml" />
   </ItemGroup>
 
   <ItemGroup>
@@ -31,7 +30,6 @@
     <EmbeddedResource Include="ConfigFiles\checklistV1.xml" />
     <EmbeddedResource Include="ConfigFiles\joystickaxisArduPlane.xml" />
     <EmbeddedResource Include="ConfigFiles\joystickbuttonsArduPlane.xml" />
-    <EmbeddedResource Include="ConfigFiles\warnings.xml" />
   </ItemGroup>
 
   <ItemGroup>
