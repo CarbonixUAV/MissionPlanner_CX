@@ -1,0 +1,26 @@
+namespace Carbonix.Warnings
+{
+    public enum WarningSeverity
+    {
+        Advisory,
+        Caution,
+        Warning
+    }
+
+    public enum WarningSubsystem
+    {
+        GPS,
+        Engine,
+        ESC
+    }
+
+    public enum CompareOp
+    {
+        LT,
+        LTEQ,
+        EQ,
+        GT,
+        GTEQ,
+        NEQ
+    }
+}

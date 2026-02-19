@@ -17,6 +17,7 @@ using MissionPlanner.GCSViews.ConfigurationView;
 using Newtonsoft.Json.Serialization;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Carbonix.Warnings;
 
 namespace Carbonix
 {
@@ -42,6 +43,9 @@ namespace Carbonix
 
         // Time to attempt autoconnect of joystick, 5 seconds after plugin load
         DateTime controller_autoconnect_time = DateTime.MaxValue;
+
+        CarbonixWarningEngine _warningEngine;
+        SpeechWarningConsumer _speechConsumer;
 
         public override bool Init() { return true; }
 
@@ -86,6 +90,8 @@ namespace Carbonix
 
             // Force aircraft type to plane
             Host.config["APMFirmware"] = "ArduPlane";
+
+            SetupWarningEngine();
 
             loopratehz = 1;
 
@@ -174,6 +180,21 @@ namespace Carbonix
             // If the aircraft has just been armed, send a message to the autopilot to
             // capture the pilots and other record information
             var is_connected = Host.comPort?.BaseStream?.IsOpen ?? false;
+
+            // Always feed the source — the armed gate on rules handles the rest.
+            // On disconnect, CurrentState freezes with last-known values, so
+            // gated rules stay active while armed rather than silently clearing.
+            _warningEngine.Source = Host.cs;
+
+            // Watchdog: restart the engine loop if it has silently died
+            if (_warningEngine.LastTickUtc != DateTime.MinValue &&
+                (DateTime.UtcNow - _warningEngine.LastTickUtc).TotalSeconds > 5)
+            {
+                log.Error("Warning engine loop stalled - restarting");
+                _warningEngine.Stop();
+                _warningEngine.Start();
+            }
+
             var is_armed = is_connected && Host.cs.armed;
             if (is_armed && !last_arm_state)
             {
@@ -222,6 +243,29 @@ namespace Carbonix
             }
 
             return true;
+        }
+
+        private void SetupWarningEngine()
+        {
+            MissionPlanner.Warnings.WarningEngine.Stop();
+
+            var rules = DefaultWarnings.GetAll(selected_aircraft);
+            _warningEngine = new CarbonixWarningEngine(rules);
+
+            var speech = MissionPlanner.MainV2.speechEngine;
+            if (speech != null)
+            {
+                _speechConsumer = new SpeechWarningConsumer(speech);
+                _warningEngine.WarningStateChanged += _speechConsumer.OnWarningStateChanged;
+            }
+
+            _warningEngine.WarningStateChanged += (sender, e) =>
+            {
+                if (e.IsActive)
+                    Host.cs.messageHigh = e.Rule.Text;
+            };
+
+            _warningEngine.Start();
         }
 
         private void LoadSettings()
