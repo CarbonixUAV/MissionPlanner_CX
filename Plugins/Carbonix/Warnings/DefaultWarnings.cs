@@ -10,7 +10,7 @@ namespace Carbonix.Warnings
     {
         static readonly ICondition Armed = Condition.Field("armed", CompareOp.GT, 0);
 
-        static readonly List<(Aircraft? aircraft, WarningRule rule)> AllRules =
+        public static readonly List<(Aircraft? aircraft, WarningRule rule)> AllRules =
             new List<(Aircraft?, WarningRule)>
             {
                 (null, new WarningRule(

@@ -249,7 +249,20 @@ namespace Carbonix
         {
             MissionPlanner.Warnings.WarningEngine.Stop();
 
-            var rules = DefaultWarnings.GetAll(selected_aircraft);
+            var path = Path.Combine(Settings.GetUserDataDirectory(),
+                "CarbonixWarnings.json");
+            var defaults = DefaultWarnings.AllRules
+                .Select(r => WarningRuleConfig.FromInternal(r.aircraft, r.rule))
+                .ToList();
+            var configs = JsonSettingsFile.LoadOrCreate(path, defaults,
+                WarningSerializer.JsonSettings);
+
+            var rules = configs
+                .Select(c => c.ToInternal())
+                .Where(r => r.aircraft == null || r.aircraft == selected_aircraft)
+                .Select(r => r.rule)
+                .ToList();
+
             _warningEngine = new CarbonixWarningEngine(rules);
 
             var speech = MissionPlanner.MainV2.speechEngine;

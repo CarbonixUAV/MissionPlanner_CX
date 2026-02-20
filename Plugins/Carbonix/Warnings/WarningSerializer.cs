@@ -9,7 +9,7 @@ namespace Carbonix.Warnings
     /// </summary>
     public static class WarningSerializer
     {
-        static readonly JsonSerializerSettings Settings = new JsonSerializerSettings
+        public static readonly JsonSerializerSettings JsonSettings = new JsonSerializerSettings
         {
             Formatting = Formatting.Indented,
             Converters = { new ConditionConverter() },
@@ -19,12 +19,12 @@ namespace Carbonix.Warnings
 
         public static string SerializeCondition(ICondition condition)
         {
-            return JsonConvert.SerializeObject(condition, Settings);
+            return JsonConvert.SerializeObject(condition, JsonSettings);
         }
 
         public static ICondition DeserializeCondition(string json)
         {
-            return JsonConvert.DeserializeObject<ICondition>(json, Settings);
+            return JsonConvert.DeserializeObject<ICondition>(json, JsonSettings);
         }
 
         // --- Rules ---
@@ -34,12 +34,12 @@ namespace Carbonix.Warnings
             var configs = rules
                 .Select(r => WarningRuleConfig.FromInternal(r.aircraft, r.rule))
                 .ToList();
-            return JsonConvert.SerializeObject(configs, Settings);
+            return JsonConvert.SerializeObject(configs, JsonSettings);
         }
 
         public static List<(Aircraft? aircraft, WarningRule rule)> DeserializeRules(string json)
         {
-            var configs = JsonConvert.DeserializeObject<List<WarningRuleConfig>>(json, Settings);
+            var configs = JsonConvert.DeserializeObject<List<WarningRuleConfig>>(json, JsonSettings);
             return configs.Select(c => c.ToInternal()).ToList();
         }
     }
