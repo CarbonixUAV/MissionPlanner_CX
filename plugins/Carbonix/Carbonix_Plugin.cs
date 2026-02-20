@@ -14,7 +14,6 @@ using MissionPlanner.Controls;
 using System.Threading.Tasks;
 using System.Drawing;
 using MissionPlanner.GCSViews.ConfigurationView;
-using Newtonsoft.Json.Serialization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Carbonix.Warnings;
@@ -281,34 +280,23 @@ namespace Carbonix
             _warningEngine.Start();
         }
 
+        static readonly JsonSerializerSettings _settingsJson = new JsonSerializerSettings
+        {
+            Formatting = Formatting.Indented,
+            ObjectCreationHandling = ObjectCreationHandling.Replace,
+        };
+
         private void LoadSettings()
         {
-            // Load the general settings
-            string settings_file = Path.Combine(Settings.GetUserDataDirectory(), "CarbonixSettings.json");
-            if (!GetSettingsFromFile(settings_file, ref settings))
-            {
-                // Construct the default settings and dump the file out
-                settings = new GeneralSettings();
-                using (StreamWriter file = File.CreateText(settings_file))
-                {
-                    file.Write(JsonConvert.SerializeObject(settings, Formatting.Indented));
-                }
-            }
+            var generalPath = Path.Combine(Settings.GetUserDataDirectory(), "CarbonixSettings.json");
+            settings = JsonSettingsFile.LoadOrCreate(generalPath, new GeneralSettings(), _settingsJson);
 
-            // Get the selected aircraft from the host config.xml
-            selected_aircraft = (Aircraft)Enum.Parse(typeof(Aircraft), Host.config["cbx_selected_aircraft", "Volanti"]);
+            selected_aircraft = (Aircraft)Enum.Parse(typeof(Aircraft),
+                Host.config["cbx_selected_aircraft", "Volanti"]);
 
-            // Load the aircraft settings
-            string aircraft_file = Path.Combine(Settings.GetUserDataDirectory(), selected_aircraft.ToString() + ".json");
-            if (!GetSettingsFromFile(aircraft_file, ref aircraft_settings))
-            {
-                // Construct the default settings and dump the file out
-                aircraft_settings = new AircraftSettings(selected_aircraft);
-                using (StreamWriter file = File.CreateText(aircraft_file))
-                {
-                    file.Write(JsonConvert.SerializeObject(aircraft_settings, Formatting.Indented));
-                }
-            }
+            var aircraftPath = Path.Combine(Settings.GetUserDataDirectory(), selected_aircraft + ".json");
+            aircraft_settings = JsonSettingsFile.LoadOrCreate(aircraftPath,
+                new AircraftSettings(selected_aircraft), _settingsJson);
         }
 
         /// <summary>
@@ -360,55 +348,6 @@ namespace Carbonix
             Host.config["CxPluginVersion"] = Version;
         }
 
-        /// <summary>
-        /// Forces all properties to be required when deserializing JSON. This prevents newly-added
-        /// fields from being silently ignored if settings file already exists from an old version.
-        /// </summary>
-        public class RequiredPropertiesContractResolver : DefaultContractResolver
-        {
-            protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
-            {
-                JsonProperty property = base.CreateProperty(member, memberSerialization);
-                property.Required = Required.Always;
-                return property;
-            }
-        }
-
-        private bool GetSettingsFromFile<T>(string filename, ref T outobj)
-        {
-            // For debugging, always load default settings
-            // This is so the settings in the git repo always match what I am testing
-#if !DEBUG
-            if (File.Exists(filename))
-            {
-                try
-                {
-                    outobj = JsonConvert.DeserializeObject<T>(File.ReadAllText(filename), new JsonSerializerSettings()
-                    {
-                        ContractResolver = new RequiredPropertiesContractResolver(),
-                        ObjectCreationHandling = ObjectCreationHandling.Replace,
-                        MissingMemberHandling = MissingMemberHandling.Error
-                    });
-                    return true;
-                }
-                catch (Exception e)
-                {
-                    log.Error(e);
-                    // Something went wrong importing this file, save a backup of it and we'll create a new one
-                    int i = 1;
-                    string newFilename;
-                    do
-                    {
-                        newFilename = filename + "." + i + ".bak";
-                        i++;
-                    } while (File.Exists(newFilename));
-                    File.Move(filename, newFilename);
-                }
-            }
-#endif
-
-            return false;
-        }
 
         private void LoadTabs()
         {
