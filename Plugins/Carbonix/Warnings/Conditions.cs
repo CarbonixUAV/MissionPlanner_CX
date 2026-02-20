@@ -22,6 +22,11 @@ namespace Carbonix.Warnings
         PropertyInfo _cachedProperty;
         bool _isSet;
 
+        public string PropertyName => _propertyName;
+        public CompareOp Op => _op;
+        public double Threshold => _threshold;
+        public double? ClearThreshold => _clearThreshold;
+
         public FieldCondition(string propertyName, CompareOp op, double threshold,
             double? clearThreshold = null)
         {
@@ -98,6 +103,9 @@ namespace Carbonix.Warnings
         readonly ICondition _left;
         readonly ICondition _right;
 
+        public ICondition Left => _left;
+        public ICondition Right => _right;
+
         public AndCondition(ICondition left, ICondition right)
         {
             _left = left;
@@ -112,6 +120,9 @@ namespace Carbonix.Warnings
         readonly ICondition _left;
         readonly ICondition _right;
 
+        public ICondition Left => _left;
+        public ICondition Right => _right;
+
         public OrCondition(ICondition left, ICondition right)
         {
             _left = left;
@@ -124,6 +135,8 @@ namespace Carbonix.Warnings
     public class NotCondition : ICondition
     {
         readonly ICondition _inner;
+
+        public ICondition Inner => _inner;
 
         public NotCondition(ICondition inner)
         {
