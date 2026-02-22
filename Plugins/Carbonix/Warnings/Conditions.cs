@@ -7,10 +7,13 @@ namespace Carbonix.Warnings
     /// Represents a condition that compares a named property against a threshold.
     /// </summary>
     /// <remarks>
-    /// Property access uses cached reflection, resolved once per source type.
+    /// Looks up the named property via reflection, then caches the PropertyInfo
+    /// to avoid repeated reflection on the hot path. The cache is keyed by object
+    /// reference, so it re-resolves if the source instance changes (e.g. vehicle
+    /// switch).
     /// When <c>clearThreshold</c> is provided, the condition uses hysteresis:
-    /// it activates when the value meets the op/threshold and clears when the
-    /// value meets the inverse op against the clear threshold.
+    /// it activates when the value crosses the trigger threshold and doesn't
+    /// clear until the value crosses back past the clear threshold.
     /// </remarks>
     public class FieldCondition : ICondition
     {

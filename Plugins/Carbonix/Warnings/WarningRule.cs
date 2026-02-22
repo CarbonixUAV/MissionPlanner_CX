@@ -14,7 +14,7 @@ namespace Carbonix.Warnings
         public WarningSubsystem Subsystem { get; }
 
         /// <summary>
-        /// Gets the condition that must be true for the rule to be evaluated, or <c>null</c> if always active.
+        /// Gets the condition that must be true for the rule to be evaluated, or <c>null</c> if always ungated.
         /// </summary>
         public ICondition Gate { get; }
 

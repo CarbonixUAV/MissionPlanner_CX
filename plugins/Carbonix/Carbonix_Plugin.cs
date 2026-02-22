@@ -16,6 +16,7 @@ using System.Drawing;
 using MissionPlanner.GCSViews.ConfigurationView;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Carbonix.CAS;
 using Carbonix.Warnings;
 
 namespace Carbonix
@@ -45,6 +46,8 @@ namespace Carbonix
 
         CarbonixWarningEngine _warningEngine;
         SpeechWarningConsumer _speechConsumer;
+
+        CasCoordinator _cas;
 
         public override bool Init() { return true; }
 
@@ -91,13 +94,25 @@ namespace Carbonix
             Host.config["APMFirmware"] = "ArduPlane";
 
             SetupWarningEngine();
+            _cas = new CasCoordinator(
+                _warningEngine,
+                _speechConsumer,
+                MissionPlanner.GCSViews.FlightData.myhud,
+                Host.FDGMapControl,
+                Host.comPort,
+                msg => Host.cs.messageHigh = msg);
 
             loopratehz = 1;
 
             return true;
         }
 
-        public override bool Exit() { return true; }
+        public override bool Exit()
+        {
+            _cas?.Dispose();
+
+            return true;
+        }
 
         bool last_arm_state = false; // Used to detect rising edge from disarm to arm
         bool last_controller_state = false; // Used to detect change in controller connection
@@ -194,6 +209,8 @@ namespace Carbonix
                 _warningEngine.Start();
             }
 
+            _cas.Tick(Host.comPort);
+
             var is_armed = is_connected && Host.cs.armed;
             if (is_armed && !last_arm_state)
             {
@@ -266,16 +283,7 @@ namespace Carbonix
 
             var speech = MissionPlanner.MainV2.speechEngine;
             if (speech != null)
-            {
                 _speechConsumer = new SpeechWarningConsumer(speech);
-                _warningEngine.WarningStateChanged += _speechConsumer.OnWarningStateChanged;
-            }
-
-            _warningEngine.WarningStateChanged += (sender, e) =>
-            {
-                if (e.IsActive)
-                    Host.cs.messageHigh = e.Rule.Text;
-            };
 
             _warningEngine.Start();
         }

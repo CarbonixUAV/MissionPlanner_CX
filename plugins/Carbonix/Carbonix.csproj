@@ -6,6 +6,12 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Carbonix.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <NoWarn>1701;1702;NU1605</NoWarn>
     <DebugType>portable</DebugType>
@@ -41,6 +47,9 @@
       <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\MissionPlanner.csproj">
+      <Private>false</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\..\ExtLibs\LEDBulb\Bulb\Bulb.csproj">
       <Private>false</Private>
     </ProjectReference>
   </ItemGroup>

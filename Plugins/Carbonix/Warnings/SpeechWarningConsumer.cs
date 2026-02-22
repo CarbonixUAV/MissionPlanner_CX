@@ -1,9 +1,10 @@
+using Carbonix.CAS;
 using MissionPlanner.Utilities;
 
 namespace Carbonix.Warnings
 {
     /// <summary>
-    /// Speaks warning alerts when <see cref="CarbonixWarningEngine"/> fires state changes.
+    /// Announces new crew alerts via text-to-speech.
     /// </summary>
     public class SpeechWarningConsumer
     {
@@ -14,15 +15,12 @@ namespace Carbonix.Warnings
             _speech = speech;
         }
 
-        public void OnWarningStateChanged(object sender, WarningStateChangedEventArgs e)
+        public void OnNewAlert(AlertEntry entry)
         {
-            if (!e.IsActive)
-                return;
-
             if (_speech == null || !_speech.speechEnable)
                 return;
 
-            _speech.SpeakAsync(e.Rule.Text);
+            _speech.SpeakAsync(entry.Message);
         }
     }
 }
