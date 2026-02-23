@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Carbonix.Warnings;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json.Linq;
@@ -166,6 +167,137 @@ namespace Carbonix.Tests.Warnings
                 ConditionAssert.AreStructurallyEqual(exp.Trigger, act.Trigger);
                 ConditionAssert.AreStructurallyEqual(exp.Gate, act.Gate);
             }
+        }
+
+        // ---- StatusTextPattern serialization ----
+
+        [TestMethod]
+        public void SerializeRules_StatusTextPatternIncludedWhenSet()
+        {
+            var rules = new List<(Aircraft?, WarningRule)>
+            {
+                (null, new WarningRule(
+                    id: "test", text: "Test", severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.Engine, trigger: null,
+                    statusTextPattern: new Regex("engine stop",
+                        RegexOptions.Compiled | RegexOptions.IgnoreCase))),
+            };
+
+            var json = WarningSerializer.SerializeRules(rules);
+            var obj = JArray.Parse(json)[0] as JObject;
+
+            Assert.AreEqual("engine stop", (string)obj["statusTextPattern"]);
+            Assert.IsNull(obj["trigger"]); // null trigger omitted
+        }
+
+        [TestMethod]
+        public void SerializeRules_StatusTextPatternOmittedWhenNull()
+        {
+            var rules = new List<(Aircraft?, WarningRule)>
+            {
+                (null, new WarningRule(
+                    id: "test", text: "Test", severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.GPS,
+                    trigger: Condition.Field("x", CompareOp.GT, 0))),
+            };
+
+            var json = WarningSerializer.SerializeRules(rules);
+            var obj = JArray.Parse(json)[0] as JObject;
+
+            Assert.IsNull(obj["statusTextPattern"]);
+        }
+
+        [TestMethod]
+        public void DeserializeRules_StatusTextPatternParsed()
+        {
+            var json = @"[{
+                ""id"": ""test"",
+                ""text"": ""Test"",
+                ""severity"": ""Warning"",
+                ""subsystem"": ""Engine"",
+                ""statusTextPattern"": ""Uncommanded engine stop""
+            }]";
+
+            var result = WarningSerializer.DeserializeRules(json);
+            var rule = result[0].rule;
+
+            Assert.IsNull(rule.Trigger);
+            Assert.IsNotNull(rule.StatusTextPattern);
+            Assert.IsTrue(rule.StatusTextPattern.IsMatch("Uncommanded engine stop"));
+            Assert.IsTrue(rule.StatusTextPattern.IsMatch("UNCOMMANDED ENGINE STOP"));
+        }
+
+        [TestMethod]
+        public void DeserializeRules_NullTriggerAccepted()
+        {
+            var json = @"[{
+                ""id"": ""test"",
+                ""text"": ""Test"",
+                ""severity"": ""Warning"",
+                ""subsystem"": ""Engine"",
+                ""statusTextPattern"": ""engine stop""
+            }]";
+
+            var result = WarningSerializer.DeserializeRules(json);
+            Assert.IsNull(result[0].rule.Trigger);
+            Assert.IsNotNull(result[0].rule.StatusTextPattern);
+        }
+
+        [TestMethod]
+        public void RoundTrip_StatusTextOnlyRule()
+        {
+            var original = new List<(Aircraft?, WarningRule)>
+            {
+                (Aircraft.Ottano, new WarningRule(
+                    id: "engine_stop", text: "Engine stop",
+                    severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.Engine,
+                    trigger: null,
+                    gate: Condition.Field("armed", CompareOp.GT, 0),
+                    statusTextPattern: new Regex("Uncommanded engine stop",
+                        RegexOptions.Compiled | RegexOptions.IgnoreCase))),
+            };
+
+            var json = WarningSerializer.SerializeRules(original);
+            var result = WarningSerializer.DeserializeRules(json);
+
+            Assert.AreEqual(1, result.Count);
+            var rule = result[0].rule;
+            Assert.AreEqual("engine_stop", rule.Id);
+            Assert.IsNull(rule.Trigger);
+            Assert.IsNotNull(rule.Gate);
+            Assert.IsNotNull(rule.StatusTextPattern);
+            Assert.AreEqual("Uncommanded engine stop", rule.StatusTextPattern.ToString());
+        }
+
+        [TestMethod]
+        public void RoundTrip_CombinedRule()
+        {
+            var original = new List<(Aircraft?, WarningRule)>
+            {
+                (null, new WarningRule(
+                    id: "qassist", text: "QASSIST",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.FlightControl,
+                    trigger: Condition.NamedValue("VTOLState", CompareOp.GT, 0),
+                    gate: Condition.Field("armed", CompareOp.GT, 0),
+                    statusTextPattern: new Regex("QASSIST",
+                        RegexOptions.Compiled | RegexOptions.IgnoreCase))),
+            };
+
+            var json = WarningSerializer.SerializeRules(original);
+            var result = WarningSerializer.DeserializeRules(json);
+
+            Assert.AreEqual(1, result.Count);
+            var rule = result[0].rule;
+            Assert.AreEqual("qassist", rule.Id);
+            Assert.IsInstanceOfType(rule.Trigger, typeof(CompareCondition));
+            Assert.IsNotNull(rule.Gate);
+            Assert.IsNotNull(rule.StatusTextPattern);
+            Assert.AreEqual("QASSIST", rule.StatusTextPattern.ToString());
+
+            ConditionAssert.AreStructurallyEqual(
+                original[0].Item2.Trigger, rule.Trigger);
         }
     }
 }

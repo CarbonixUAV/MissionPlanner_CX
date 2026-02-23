@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 
 namespace Carbonix.Warnings
 {
@@ -19,9 +20,17 @@ namespace Carbonix.Warnings
         public ICondition Gate { get; }
 
         /// <summary>
-        /// Gets the condition that fires the alert when satisfied.
+        /// Gets the condition that fires the alert when satisfied, or <c>null</c>
+        /// for STATUSTEXT-only rules.
         /// </summary>
         public ICondition Trigger { get; }
+
+        /// <summary>
+        /// Optional regex that claims matching STATUSTEXT messages. Claimed
+        /// messages are routed through this rule's gate and trigger logic
+        /// instead of creating a standalone auto-resolve alert.
+        /// </summary>
+        public Regex StatusTextPattern { get; }
 
         public WarningRule(
             string id,
@@ -29,14 +38,19 @@ namespace Carbonix.Warnings
             WarningSeverity severity,
             WarningSubsystem subsystem,
             ICondition trigger,
-            ICondition gate = null)
+            ICondition gate = null,
+            Regex statusTextPattern = null)
         {
             Id = id ?? throw new ArgumentNullException(nameof(id));
             Text = text ?? throw new ArgumentNullException(nameof(text));
+            if (trigger == null && statusTextPattern == null)
+                throw new ArgumentException(
+                    "At least one of trigger or statusTextPattern must be provided.");
             Severity = severity;
             Subsystem = subsystem;
-            Trigger = trigger ?? throw new ArgumentNullException(nameof(trigger));
+            Trigger = trigger;
             Gate = gate;
+            StatusTextPattern = statusTextPattern;
         }
     }
 }

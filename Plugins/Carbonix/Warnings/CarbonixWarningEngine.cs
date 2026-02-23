@@ -33,6 +33,7 @@ namespace Carbonix.Warnings
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         internal const int EvalIntervalMs = 250;
+        internal const int TextTriggerTimeoutMs = 5000;
 
         readonly List<WarningRule> _rules;
         readonly Dictionary<string, bool> _state = new Dictionary<string, bool>();
@@ -44,6 +45,14 @@ namespace Carbonix.Warnings
         /// </summary>
         readonly ConcurrentDictionary<string, float> _namedValues =
             new ConcurrentDictionary<string, float>();
+
+        /// <summary>
+        /// Tracks when each rule's STATUSTEXT trigger was last activated.
+        /// Written by <see cref="ClaimStatusText"/> (MAVLink thread), read by
+        /// the poll loop.
+        /// </summary>
+        readonly ConcurrentDictionary<string, DateTime> _textTriggers =
+            new ConcurrentDictionary<string, DateTime>();
 
         volatile bool _run;
         volatile object _source;
@@ -109,6 +118,33 @@ namespace Carbonix.Warnings
             _namedValues[name] = value;
         }
 
+        /// <summary>
+        /// Attempts to claim a STATUSTEXT message against all rules with a
+        /// <see cref="WarningRule.StatusTextPattern"/>. First-match semantics.
+        /// </summary>
+        public bool ClaimStatusText(string text)
+        {
+            var source = _source;
+
+            foreach (var rule in _rules)
+            {
+                if (rule.StatusTextPattern == null)
+                    continue;
+                if (!rule.StatusTextPattern.IsMatch(text))
+                    continue;
+
+                // Pattern matched — check gate
+                if (rule.Gate != null && source != null && !rule.Gate.Evaluate(source))
+                    return true; // suppressed (gate closed)
+
+                // Gate open (or no gate / no source yet) — set text trigger
+                _textTriggers[rule.Id] = DateTime.UtcNow;
+                return true;
+            }
+
+            return false;
+        }
+
         async Task RunLoop()
         {
             _run = true;
@@ -160,7 +196,9 @@ namespace Carbonix.Warnings
                 return;
             }
 
-            bool isActive = rule.Trigger.Evaluate(source);
+            bool fieldActive = rule.Trigger?.Evaluate(source) ?? false;
+            bool textActive = IsTextTriggerActive(rule.Id);
+            bool isActive = fieldActive || textActive;
 
             if (isActive && !wasActive)
             {
@@ -172,6 +210,13 @@ namespace Carbonix.Warnings
                 _state[rule.Id] = false;
                 OnWarningStateChanged(rule, false);
             }
+        }
+
+        bool IsTextTriggerActive(string ruleId)
+        {
+            if (!_textTriggers.TryGetValue(ruleId, out var lastSeen))
+                return false;
+            return (DateTime.UtcNow - lastSeen).TotalMilliseconds < TextTriggerTimeoutMs;
         }
 
         void OnWarningStateChanged(WarningRule rule, bool isActive)

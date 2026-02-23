@@ -66,8 +66,9 @@ namespace Carbonix.Tests.Warnings
             {
                 Assert.AreNotSame(defaults[i], result[i],
                     $"Rule {i}: expected a new instance from round-trip");
-                Assert.AreNotSame(defaults[i].Trigger, result[i].Trigger,
-                    $"Rule {i}: trigger should be a new instance from round-trip");
+                if (defaults[i].Trigger != null)
+                    Assert.AreNotSame(defaults[i].Trigger, result[i].Trigger,
+                        $"Rule {i}: trigger should be a new instance from round-trip");
             }
         }
 

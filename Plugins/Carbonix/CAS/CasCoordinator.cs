@@ -206,6 +206,10 @@ namespace Carbonix.CAS
                 return true;
             }
 
+            // Check if a warning rule claims this STATUSTEXT
+            if (_warningEngine.ClaimStatusText(text))
+                return true;
+
             _alertManager.Fire(tier, text, TimeSpan.FromSeconds(5));
             return true;
         }

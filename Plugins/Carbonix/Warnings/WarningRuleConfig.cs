@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 
@@ -26,7 +27,7 @@ namespace Carbonix.Warnings
         [JsonConverter(typeof(StringEnumConverter))]
         public Aircraft? Aircraft { get; set; }
 
-        [JsonProperty("trigger")]
+        [JsonProperty("trigger", NullValueHandling = NullValueHandling.Ignore)]
         [JsonConverter(typeof(ConditionConverter))]
         public ICondition Trigger { get; set; }
 
@@ -34,9 +35,15 @@ namespace Carbonix.Warnings
         [JsonConverter(typeof(ConditionConverter))]
         public ICondition Gate { get; set; }
 
+        [JsonProperty("statusTextPattern", NullValueHandling = NullValueHandling.Ignore)]
+        public string StatusTextPattern { get; set; }
+
         public (Aircraft? aircraft, WarningRule rule) ToInternal()
         {
-            return (Aircraft, new WarningRule(Id, Text, Severity, Subsystem, Trigger, Gate));
+            Regex pattern = StatusTextPattern != null
+                ? new Regex(StatusTextPattern, RegexOptions.Compiled | RegexOptions.IgnoreCase)
+                : null;
+            return (Aircraft, new WarningRule(Id, Text, Severity, Subsystem, Trigger, Gate, pattern));
         }
 
         public static WarningRuleConfig FromInternal(Aircraft? aircraft, WarningRule rule)
@@ -50,6 +57,7 @@ namespace Carbonix.Warnings
                 Aircraft = aircraft,
                 Trigger = rule.Trigger,
                 Gate = rule.Gate,
+                StatusTextPattern = rule.StatusTextPattern?.ToString(),
             };
         }
     }
