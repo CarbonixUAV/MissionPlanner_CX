@@ -28,6 +28,7 @@ namespace Carbonix.CAS
         readonly MasterLightRenderer _cautLight;
         readonly CarbonixWarningEngine _warningEngine;
         readonly HUD _hud;
+        readonly PrearmTracker _prearmTracker;
 
         int? _statusTextSub;
         MissionPlanner.MAVLinkInterface _subscribedPort;
@@ -85,6 +86,18 @@ namespace Carbonix.CAS
                 _hadUnclearedAlerts = _alertManager.HasUnclearedAlerts();
             };
 
+            // Prearm tracking
+            _prearmTracker = new PrearmTracker(_alertManager, () =>
+            {
+                var port = _subscribedPort;
+                if (port == null) return;
+                port.doCommand(
+                    (byte)port.sysidcurrent, (byte)port.compidcurrent,
+                    MAVLink.MAV_CMD.RUN_PREARM_CHECKS,
+                    0, 0, 0, 0, 0, 0, 0,
+                    false);
+            });
+
             // STATUSTEXT ingestion
             SubscribeStatusText(comPort);
         }
@@ -103,6 +116,10 @@ namespace Carbonix.CAS
                 SubscribeStatusText(comPort);
 
             _alertManager.SweepAutoResolve();
+
+            var cs = comPort?.MAV?.cs;
+            if (cs != null)
+                _prearmTracker.Tick(cs.prearmstatus, cs.armed);
         }
 
         public void Dispose()
@@ -171,6 +188,13 @@ namespace Carbonix.CAS
             int idx = text.IndexOf('\0');
             if (idx >= 0)
                 text = text.Substring(0, idx);
+
+            // Determine with alert tracker should handle this message
+            if (text.StartsWith("PreArm:", StringComparison.OrdinalIgnoreCase))
+            {
+                _prearmTracker.OnPrearmMessage(text);
+                return true;
+            }
 
             _alertManager.Fire(tier, text, TimeSpan.FromSeconds(5));
             return true;
