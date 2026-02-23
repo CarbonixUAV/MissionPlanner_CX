@@ -11,7 +11,8 @@ namespace Carbonix.Warnings
     {
         GPS,
         Engine,
-        ESC
+        ESC,
+        FlightControl
     }
 
     public enum CompareOp
@@ -22,5 +23,11 @@ namespace Carbonix.Warnings
         GT,
         GTEQ,
         NEQ
+    }
+
+    public enum ValueSource
+    {
+        StateField,
+        NamedValue
     }
 }

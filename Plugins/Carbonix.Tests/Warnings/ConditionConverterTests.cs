@@ -13,12 +13,12 @@ namespace Carbonix.Tests.Warnings
         [TestMethod]
         public void Serialize_FieldCondition_ProducesExpectedJson()
         {
-            var condition = new FieldCondition("satcount", CompareOp.LT, 20);
+            var condition = Condition.Field("satcount", CompareOp.LT, 20);
 
             var json = WarningSerializer.SerializeCondition(condition);
             var obj = JObject.Parse(json);
 
-            Assert.AreEqual("satcount", (string)obj["field"]);
+            Assert.AreEqual("satcount", (string)obj["stateField"]);
             Assert.AreEqual("<", (string)obj["op"]);
             Assert.AreEqual(20.0, (double)obj["value"]);
             Assert.IsNull(obj["clear"]);
@@ -27,12 +27,12 @@ namespace Carbonix.Tests.Warnings
         [TestMethod]
         public void Serialize_FieldCondition_WithClear_IncludesClearValue()
         {
-            var condition = new FieldCondition("satcount", CompareOp.LT, 18, clearThreshold: 22);
+            var condition = Condition.Field("satcount", CompareOp.LT, 18, clear: 22);
 
             var json = WarningSerializer.SerializeCondition(condition);
             var obj = JObject.Parse(json);
 
-            Assert.AreEqual("satcount", (string)obj["field"]);
+            Assert.AreEqual("satcount", (string)obj["stateField"]);
             Assert.AreEqual("<", (string)obj["op"]);
             Assert.AreEqual(18.0, (double)obj["value"]);
             Assert.AreEqual(22.0, (double)obj["clear"]);
@@ -50,8 +50,8 @@ namespace Carbonix.Tests.Warnings
             var arr = obj["and"] as JArray;
             Assert.IsNotNull(arr);
             Assert.AreEqual(2, arr.Count);
-            Assert.AreEqual("a", (string)arr[0]["field"]);
-            Assert.AreEqual("b", (string)arr[1]["field"]);
+            Assert.AreEqual("a", (string)arr[0]["stateField"]);
+            Assert.AreEqual("b", (string)arr[1]["stateField"]);
         }
 
         [TestMethod]
@@ -68,9 +68,9 @@ namespace Carbonix.Tests.Warnings
             var arr = obj["and"] as JArray;
             Assert.IsNotNull(arr);
             Assert.AreEqual(3, arr.Count);
-            Assert.AreEqual("a", (string)arr[0]["field"]);
-            Assert.AreEqual("b", (string)arr[1]["field"]);
-            Assert.AreEqual("c", (string)arr[2]["field"]);
+            Assert.AreEqual("a", (string)arr[0]["stateField"]);
+            Assert.AreEqual("b", (string)arr[1]["stateField"]);
+            Assert.AreEqual("c", (string)arr[2]["stateField"]);
         }
 
         [TestMethod]
@@ -97,7 +97,7 @@ namespace Carbonix.Tests.Warnings
             var obj = JObject.Parse(json);
 
             Assert.IsNotNull(obj["not"]);
-            Assert.AreEqual("x", (string)obj["not"]["field"]);
+            Assert.AreEqual("x", (string)obj["not"]["stateField"]);
         }
 
         [TestMethod]
@@ -116,7 +116,7 @@ namespace Carbonix.Tests.Warnings
             foreach (var (op, symbol) in ops)
             {
                 var json = WarningSerializer.SerializeCondition(
-                    new FieldCondition("x", op, 1));
+                    Condition.Field("x", op, 1));
                 var obj = JObject.Parse(json);
                 Assert.AreEqual(symbol, (string)obj["op"],
                     $"Operator {op} should serialize to \"{symbol}\"");
@@ -128,37 +128,38 @@ namespace Carbonix.Tests.Warnings
         [TestMethod]
         public void Deserialize_FieldCondition_ParsesCorrectly()
         {
-            var json = @"{ ""field"": ""rpm"", ""op"": ""<"", ""value"": 500 }";
+            var json = @"{ ""stateField"": ""rpm"", ""op"": ""<"", ""value"": 500 }";
 
             var result = WarningSerializer.DeserializeCondition(json);
 
-            Assert.IsInstanceOfType(result, typeof(FieldCondition));
-            var field = (FieldCondition)result;
-            Assert.AreEqual("rpm", field.PropertyName);
-            Assert.AreEqual(CompareOp.LT, field.Op);
-            Assert.AreEqual(500.0, field.Threshold);
-            Assert.IsNull(field.ClearThreshold);
+            Assert.IsInstanceOfType(result, typeof(CompareCondition));
+            var cc = (CompareCondition)result;
+            Assert.AreEqual(ValueSource.StateField, cc.ValueSource);
+            Assert.AreEqual("rpm", cc.Name);
+            Assert.AreEqual(CompareOp.LT, cc.Op);
+            Assert.AreEqual(500.0, cc.Threshold);
+            Assert.IsNull(cc.ClearThreshold);
         }
 
         [TestMethod]
         public void Deserialize_FieldCondition_WithClear()
         {
-            var json = @"{ ""field"": ""satcount"", ""op"": ""<"", ""value"": 18, ""clear"": 22 }";
+            var json = @"{ ""stateField"": ""satcount"", ""op"": ""<"", ""value"": 18, ""clear"": 22 }";
 
             var result = WarningSerializer.DeserializeCondition(json);
 
-            var field = (FieldCondition)result;
-            Assert.AreEqual(18.0, field.Threshold);
-            Assert.AreEqual(22.0, field.ClearThreshold);
+            var cc = (CompareCondition)result;
+            Assert.AreEqual(18.0, cc.Threshold);
+            Assert.AreEqual(22.0, cc.ClearThreshold);
         }
 
         [TestMethod]
         public void Deserialize_And_BuildsBinaryTree()
         {
             var json = @"{ ""and"": [
-                { ""field"": ""a"", ""op"": "">"", ""value"": 1 },
-                { ""field"": ""b"", ""op"": ""<"", ""value"": 2 },
-                { ""field"": ""c"", ""op"": ""=="", ""value"": 3 }
+                { ""stateField"": ""a"", ""op"": "">"", ""value"": 1 },
+                { ""stateField"": ""b"", ""op"": ""<"", ""value"": 2 },
+                { ""stateField"": ""c"", ""op"": ""=="", ""value"": 3 }
             ]}";
 
             var result = WarningSerializer.DeserializeCondition(json);
@@ -167,25 +168,25 @@ namespace Carbonix.Tests.Warnings
             Assert.IsInstanceOfType(result, typeof(AndCondition));
             var outer = (AndCondition)result;
             Assert.IsInstanceOfType(outer.Left, typeof(AndCondition));
-            Assert.IsInstanceOfType(outer.Right, typeof(FieldCondition));
-            Assert.AreEqual("c", ((FieldCondition)outer.Right).PropertyName);
+            Assert.IsInstanceOfType(outer.Right, typeof(CompareCondition));
+            Assert.AreEqual("c", ((CompareCondition)outer.Right).Name);
 
             var inner = (AndCondition)outer.Left;
-            Assert.AreEqual("a", ((FieldCondition)inner.Left).PropertyName);
-            Assert.AreEqual("b", ((FieldCondition)inner.Right).PropertyName);
+            Assert.AreEqual("a", ((CompareCondition)inner.Left).Name);
+            Assert.AreEqual("b", ((CompareCondition)inner.Right).Name);
         }
 
         [TestMethod]
         public void Deserialize_Not_WrapsInner()
         {
-            var json = @"{ ""not"": { ""field"": ""armed"", ""op"": "">"", ""value"": 0 } }";
+            var json = @"{ ""not"": { ""stateField"": ""armed"", ""op"": "">"", ""value"": 0 } }";
 
             var result = WarningSerializer.DeserializeCondition(json);
 
             Assert.IsInstanceOfType(result, typeof(NotCondition));
             var not = (NotCondition)result;
-            Assert.IsInstanceOfType(not.Inner, typeof(FieldCondition));
-            Assert.AreEqual("armed", ((FieldCondition)not.Inner).PropertyName);
+            Assert.IsInstanceOfType(not.Inner, typeof(CompareCondition));
+            Assert.AreEqual("armed", ((CompareCondition)not.Inner).Name);
         }
 
         [TestMethod]
@@ -201,7 +202,7 @@ namespace Carbonix.Tests.Warnings
         [TestMethod]
         public void Deserialize_UnknownOperator_ThrowsWithMessage()
         {
-            var json = @"{ ""field"": ""x"", ""op"": ""~="", ""value"": 1 }";
+            var json = @"{ ""stateField"": ""x"", ""op"": ""~="", ""value"": 1 }";
 
             var ex = Assert.ThrowsException<JsonSerializationException>(
                 () => WarningSerializer.DeserializeCondition(json));
@@ -213,14 +214,14 @@ namespace Carbonix.Tests.Warnings
         [TestMethod]
         public void RoundTrip_SimpleField()
         {
-            var original = new FieldCondition("rpm", CompareOp.LT, 500);
+            var original = Condition.Field("rpm", CompareOp.LT, 500);
             AssertRoundTrip(original);
         }
 
         [TestMethod]
         public void RoundTrip_FieldWithClear()
         {
-            var original = new FieldCondition("satcount", CompareOp.LT, 18, clearThreshold: 22);
+            var original = Condition.Field("satcount", CompareOp.LT, 18, clear: 22);
             AssertRoundTrip(original);
         }
 
@@ -234,6 +235,52 @@ namespace Carbonix.Tests.Warnings
                     .Or(Condition.Field("c", CompareOp.NEQ, 0))
                     .Not();
 
+            AssertRoundTrip(original);
+        }
+
+        // -- NamedValueCondition --
+
+        [TestMethod]
+        public void Serialize_NamedValueCondition_ProducesExpectedJson()
+        {
+            var condition = Condition.NamedValue("VTOLState", CompareOp.GT, 0);
+
+            var json = WarningSerializer.SerializeCondition(condition);
+            var obj = JObject.Parse(json);
+
+            Assert.AreEqual("VTOLState", (string)obj["namedValue"]);
+            Assert.AreEqual(">", (string)obj["op"]);
+            Assert.AreEqual(0.0, (double)obj["value"]);
+        }
+
+        [TestMethod]
+        public void Deserialize_NamedValueCondition_ParsesCorrectly()
+        {
+            var json = @"{ ""namedValue"": ""VTOLState"", ""op"": "">"", ""value"": 0 }";
+
+            var result = WarningSerializer.DeserializeCondition(json);
+
+            Assert.IsInstanceOfType(result, typeof(CompareCondition));
+            var cc = (CompareCondition)result;
+            Assert.AreEqual(ValueSource.NamedValue, cc.ValueSource);
+            Assert.AreEqual("VTOLState", cc.Name);
+            Assert.AreEqual(CompareOp.GT, cc.Op);
+            Assert.AreEqual(0.0, cc.Threshold);
+            Assert.IsNull(cc.Store); // Store not bound during deserialization
+        }
+
+        [TestMethod]
+        public void RoundTrip_NamedValueCondition()
+        {
+            var original = Condition.NamedValue("VTOLState", CompareOp.GT, 0);
+            AssertRoundTrip(original);
+        }
+
+        [TestMethod]
+        public void RoundTrip_NamedValueInComposite()
+        {
+            var original = Condition.NamedValue("VTOLState", CompareOp.GT, 0)
+                .And(Condition.Field("armed", CompareOp.GT, 0));
             AssertRoundTrip(original);
         }
 

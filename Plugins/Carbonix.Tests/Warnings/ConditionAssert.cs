@@ -18,12 +18,13 @@ namespace Carbonix.Tests.Warnings
 
             switch (expected)
             {
-                case FieldCondition ef:
-                    var af = (FieldCondition)actual;
-                    Assert.AreEqual(ef.PropertyName, af.PropertyName, "PropertyName mismatch");
-                    Assert.AreEqual(ef.Op, af.Op, "Op mismatch");
-                    Assert.AreEqual(ef.Threshold, af.Threshold, "Threshold mismatch");
-                    Assert.AreEqual(ef.ClearThreshold, af.ClearThreshold, "ClearThreshold mismatch");
+                case CompareCondition ec:
+                    var ac = (CompareCondition)actual;
+                    Assert.AreEqual(ec.ValueSource, ac.ValueSource, "ValueSource mismatch");
+                    Assert.AreEqual(ec.Name, ac.Name, "Name mismatch");
+                    Assert.AreEqual(ec.Op, ac.Op, "Op mismatch");
+                    Assert.AreEqual(ec.Threshold, ac.Threshold, "Threshold mismatch");
+                    Assert.AreEqual(ec.ClearThreshold, ac.ClearThreshold, "ClearThreshold mismatch");
                     break;
 
                 case AndCondition ea:

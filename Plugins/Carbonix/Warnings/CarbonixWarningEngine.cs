@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -31,10 +32,18 @@ namespace Carbonix.Warnings
         static readonly ILog _log =
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        const int EvalIntervalMs = 250;
+        internal const int EvalIntervalMs = 250;
 
         readonly List<WarningRule> _rules;
         readonly Dictionary<string, bool> _state = new Dictionary<string, bool>();
+
+        /// <summary>
+        /// Named value store populated by <see cref="UpdateNamedValue"/> from
+        /// NAMED_VALUE_FLOAT messages. <see cref="ValueSource.NamedValue"/>
+        /// conditions read from this dictionary.
+        /// </summary>
+        readonly ConcurrentDictionary<string, float> _namedValues =
+            new ConcurrentDictionary<string, float>();
 
         volatile bool _run;
         volatile object _source;
@@ -48,11 +57,21 @@ namespace Carbonix.Warnings
         /// </summary>
         public DateTime LastTickUtc => _lastTickUtc;
 
+        /// <summary>
+        /// Gets the named value store so that <see cref="ValueSource.NamedValue"/>
+        /// conditions can be bound to it.
+        /// </summary>
+        public ConcurrentDictionary<string, float> NamedValues => _namedValues;
+
         public CarbonixWarningEngine(List<WarningRule> rules)
         {
             _rules = rules;
             foreach (var rule in _rules)
+            {
                 _state[rule.Id] = false;
+                BindNamedValueConditions(rule.Trigger);
+                BindNamedValueConditions(rule.Gate);
+            }
         }
 
         /// <summary>
@@ -79,6 +98,15 @@ namespace Carbonix.Warnings
         {
             get => _source;
             set => _source = value;
+        }
+
+        /// <summary>
+        /// Updates a named value in the store. Called from the MAVLink receive
+        /// thread when a NAMED_VALUE_FLOAT message arrives.
+        /// </summary>
+        public void UpdateNamedValue(string name, float value)
+        {
+            _namedValues[name] = value;
         }
 
         async Task RunLoop()
@@ -149,6 +177,31 @@ namespace Carbonix.Warnings
         void OnWarningStateChanged(WarningRule rule, bool isActive)
         {
             WarningStateChanged?.Invoke(this, new WarningStateChangedEventArgs(rule, isActive));
+        }
+
+        /// <summary>
+        /// Walks a condition tree and binds any <see cref="ValueSource.NamedValue"/>
+        /// conditions to this engine's <see cref="NamedValues"/> store.
+        /// </summary>
+        void BindNamedValueConditions(ICondition condition)
+        {
+            switch (condition)
+            {
+                case CompareCondition cc when cc.ValueSource == ValueSource.NamedValue:
+                    cc.Store = _namedValues;
+                    break;
+                case AndCondition and:
+                    BindNamedValueConditions(and.Left);
+                    BindNamedValueConditions(and.Right);
+                    break;
+                case OrCondition or:
+                    BindNamedValueConditions(or.Left);
+                    BindNamedValueConditions(or.Right);
+                    break;
+                case NotCondition not:
+                    BindNamedValueConditions(not.Inner);
+                    break;
+            }
         }
     }
 }

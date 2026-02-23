@@ -84,8 +84,8 @@ namespace Carbonix.Tests.Warnings
                 ""severity"": ""Warning"",
                 ""subsystem"": ""Engine"",
                 ""aircraft"": ""Volanti"",
-                ""trigger"": { ""field"": ""rpm"", ""op"": ""<"", ""value"": 500 },
-                ""gate"": { ""field"": ""armed"", ""op"": "">"", ""value"": 0 }
+                ""trigger"": { ""stateField"": ""rpm"", ""op"": ""<"", ""value"": 500 },
+                ""gate"": { ""stateField"": ""armed"", ""op"": "">"", ""value"": 0 }
             }]";
 
             var result = WarningSerializer.DeserializeRules(json);
@@ -97,8 +97,8 @@ namespace Carbonix.Tests.Warnings
             Assert.AreEqual("Test alert", rule.Text);
             Assert.AreEqual(WarningSeverity.Warning, rule.Severity);
             Assert.AreEqual(WarningSubsystem.Engine, rule.Subsystem);
-            Assert.IsInstanceOfType(rule.Trigger, typeof(FieldCondition));
-            Assert.IsInstanceOfType(rule.Gate, typeof(FieldCondition));
+            Assert.IsInstanceOfType(rule.Trigger, typeof(CompareCondition));
+            Assert.IsInstanceOfType(rule.Gate, typeof(CompareCondition));
         }
 
         [TestMethod]
@@ -109,7 +109,7 @@ namespace Carbonix.Tests.Warnings
                 ""text"": ""x"",
                 ""severity"": ""Advisory"",
                 ""subsystem"": ""GPS"",
-                ""trigger"": { ""field"": ""a"", ""op"": "">"", ""value"": 0 }
+                ""trigger"": { ""stateField"": ""a"", ""op"": "">"", ""value"": 0 }
             }]";
 
             var result = WarningSerializer.DeserializeRules(json);

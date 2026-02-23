@@ -31,6 +31,7 @@ namespace Carbonix.CAS
         readonly PrearmTracker _prearmTracker;
 
         int? _statusTextSub;
+        int? _namedValueSub;
         MissionPlanner.MAVLinkInterface _subscribedPort;
         bool _hadUnclearedAlerts;
 
@@ -98,22 +99,22 @@ namespace Carbonix.CAS
                     false);
             });
 
-            // STATUSTEXT ingestion
-            SubscribeStatusText(comPort);
+            // MAVLink subscriptions
+            SubscribeToPort(comPort);
         }
 
         /// <summary>
         /// Performs periodic housekeeping for the alerting system.
         /// </summary>
         /// <remarks>
-        /// Re-subscribes to STATUSTEXT if the connection has changed and
+        /// Re-subscribes to MAVLink messages if the connection has changed and
         /// sweeps auto-resolve deadlines.
         /// </remarks>
         /// <param name="comPort">The current MAVLink interface.</param>
         public void Tick(MissionPlanner.MAVLinkInterface comPort)
         {
             if (comPort != _subscribedPort)
-                SubscribeStatusText(comPort);
+                SubscribeToPort(comPort);
 
             _alertManager.SweepAutoResolve();
 
@@ -131,6 +132,8 @@ namespace Carbonix.CAS
 
             if (_statusTextSub.HasValue)
                 _subscribedPort?.UnSubscribeToPacketType(_statusTextSub.Value);
+            if (_namedValueSub.HasValue)
+                _subscribedPort?.UnSubscribeToPacketType(_namedValueSub.Value);
 
             _alertPanel?.Dispose();
         }
@@ -147,12 +150,14 @@ namespace Carbonix.CAS
                 _alertManager.Resolve(e.Rule.Text);
         }
 
-        void SubscribeStatusText(MissionPlanner.MAVLinkInterface port)
+        void SubscribeToPort(MissionPlanner.MAVLinkInterface port)
         {
             if (port == null) return;
 
             if (_statusTextSub.HasValue)
                 _subscribedPort?.UnSubscribeToPacketType(_statusTextSub.Value);
+            if (_namedValueSub.HasValue)
+                _subscribedPort?.UnSubscribeToPacketType(_namedValueSub.Value);
 
             _subscribedPort = port;
 
@@ -162,6 +167,11 @@ namespace Carbonix.CAS
             _statusTextSub = _subscribedPort.SubscribeToPacketType(
                 MAVLink.MAVLINK_MSG_ID.STATUSTEXT,
                 OnStatusText,
+                0, 0);
+
+            _namedValueSub = _subscribedPort.SubscribeToPacketType(
+                MAVLink.MAVLINK_MSG_ID.NAMED_VALUE_FLOAT,
+                OnNamedValueFloat,
                 0, 0);
         }
 
@@ -189,7 +199,7 @@ namespace Carbonix.CAS
             if (idx >= 0)
                 text = text.Substring(0, idx);
 
-            // Determine with alert tracker should handle this message
+            // Determine which alert tracker should handle this message
             if (text.StartsWith("PreArm:", StringComparison.OrdinalIgnoreCase))
             {
                 _prearmTracker.OnPrearmMessage(text);
@@ -197,6 +207,24 @@ namespace Carbonix.CAS
             }
 
             _alertManager.Fire(tier, text, TimeSpan.FromSeconds(5));
+            return true;
+        }
+
+        bool OnNamedValueFloat(MAVLink.MAVLinkMessage message)
+        {
+            if (_subscribedPort == null ||
+                message.sysid != _subscribedPort.sysidcurrent ||
+                message.compid != _subscribedPort.compidcurrent)
+                return true;
+
+            var msg = (MAVLink.mavlink_named_value_float_t)message.data;
+
+            var name = Encoding.UTF8.GetString(msg.name);
+            int idx = name.IndexOf('\0');
+            if (idx >= 0)
+                name = name.Substring(0, idx);
+
+            _warningEngine.UpdateNamedValue(name, msg.value);
             return true;
         }
     }

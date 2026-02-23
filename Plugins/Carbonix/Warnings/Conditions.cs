@@ -1,50 +1,66 @@
 using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace Carbonix.Warnings
 {
     /// <summary>
-    /// Represents a condition that compares a named property against a threshold.
+    /// Compares a resolved value against a threshold using a pluggable value
+    /// resolver. The resolver is injected via the <see cref="Condition.Field"/>
+    /// and <see cref="Condition.NamedValue"/> factory methods.
     /// </summary>
     /// <remarks>
-    /// Looks up the named property via reflection, then caches the PropertyInfo
-    /// to avoid repeated reflection on the hot path. The cache is keyed by object
-    /// reference, so it re-resolves if the source instance changes (e.g. vehicle
-    /// switch).
-    /// When <c>clearThreshold</c> is provided, the condition uses hysteresis:
+    /// When <c>ClearThreshold</c> is provided, the condition uses hysteresis:
     /// it activates when the value crosses the trigger threshold and doesn't
     /// clear until the value crosses back past the clear threshold.
     /// </remarks>
-    public class FieldCondition : ICondition
+    public class CompareCondition : ICondition
     {
-        readonly string _propertyName;
+        readonly string _name;
         readonly CompareOp _op;
         readonly double _threshold;
         readonly double? _clearThreshold;
-        object _cachedSource;
-        PropertyInfo _cachedProperty;
+        readonly ValueSource _valueSource;
+        readonly Func<object, double?> _resolve;
         bool _isSet;
 
-        public string PropertyName => _propertyName;
+        ConcurrentDictionary<string, float> _store;
+
+        public string Name => _name;
         public CompareOp Op => _op;
         public double Threshold => _threshold;
         public double? ClearThreshold => _clearThreshold;
+        public ValueSource ValueSource => _valueSource;
 
-        public FieldCondition(string propertyName, CompareOp op, double threshold,
-            double? clearThreshold = null)
+        /// <summary>
+        /// Gets or sets the backing store for <see cref="ValueSource.NamedValue"/>
+        /// conditions. Ignored for <see cref="ValueSource.StateField"/> conditions.
+        /// May be <c>null</c> after deserialization; the engine binds it during setup.
+        /// </summary>
+        public ConcurrentDictionary<string, float> Store
         {
-            _propertyName = propertyName;
+            get => _store;
+            set => _store = value;
+        }
+
+        internal CompareCondition(string name, CompareOp op, double threshold,
+            double? clearThreshold, ValueSource valueSource,
+            Func<object, double?> resolve)
+        {
+            _name = name ?? throw new ArgumentNullException(nameof(name));
             _op = op;
             _threshold = threshold;
             _clearThreshold = clearThreshold;
+            _valueSource = valueSource;
+            _resolve = resolve;
         }
 
         public bool Evaluate(object source)
         {
-            if (source != _cachedSource)
-                ResolveProperty(source);
-
-            var value = Convert.ToDouble(_cachedProperty.GetValue(source, null));
+            var resolved = _resolve(source);
+            if (!resolved.HasValue)
+                return false;
+            double value = resolved.Value;
 
             if (_clearThreshold == null)
                 return Compare(value, _op, _threshold);
@@ -57,7 +73,7 @@ namespace Carbonix.Warnings
             return _isSet;
         }
 
-        static bool Compare(double value, CompareOp op, double threshold)
+        internal static bool Compare(double value, CompareOp op, double threshold)
         {
             switch (op)
             {
@@ -83,21 +99,6 @@ namespace Carbonix.Warnings
                 case CompareOp.NEQ:  return CompareOp.EQ;
                 default: return op;
             }
-        }
-
-        void ResolveProperty(object source)
-        {
-            var sourceType = source.GetType();
-            _cachedProperty = sourceType.GetProperty(_propertyName);
-            _cachedSource = source;
-
-            if (_cachedProperty == null)
-                throw new MissingMemberException(
-                    $"Property '{_propertyName}' not found on {sourceType.Name}");
-
-            if (!typeof(IConvertible).IsAssignableFrom(_cachedProperty.PropertyType))
-                throw new InvalidOperationException(
-                    $"Property '{_propertyName}' on {sourceType.Name} is {_cachedProperty.PropertyType.Name}, not convertible to double");
         }
     }
 
@@ -154,9 +155,49 @@ namespace Carbonix.Warnings
     /// </summary>
     public static class Condition
     {
-        public static ICondition Field(string name, CompareOp op, double threshold,
-                double? clear = null)
-            => new FieldCondition(name, op, threshold, clear);
+        public static CompareCondition Field(string name, CompareOp op,
+            double threshold, double? clear = null)
+        {
+            object cachedSource = null;
+            PropertyInfo cachedProp = null;
+
+            return new CompareCondition(name, op, threshold, clear,
+                ValueSource.StateField, source =>
+            {
+                if (source != cachedSource)
+                {
+                    var type = source.GetType();
+                    cachedProp = type.GetProperty(name);
+                    cachedSource = source;
+
+                    if (cachedProp == null)
+                        throw new MissingMemberException(
+                            $"Property '{name}' not found on {type.Name}");
+
+                    if (!typeof(IConvertible).IsAssignableFrom(cachedProp.PropertyType))
+                        throw new InvalidOperationException(
+                            $"Property '{name}' on {type.Name} is " +
+                            $"{cachedProp.PropertyType.Name}, not convertible to double");
+                }
+                return Convert.ToDouble(cachedProp.GetValue(source, null));
+            });
+        }
+
+        public static CompareCondition NamedValue(string name, CompareOp op,
+            double threshold, ConcurrentDictionary<string, float> store = null)
+        {
+            CompareCondition cond = null;
+            cond = new CompareCondition(name, op, threshold, null,
+                ValueSource.NamedValue, _ =>
+            {
+                var s = cond.Store;
+                if (s == null || !s.TryGetValue(name, out var val))
+                    return null;
+                return (double)val;
+            });
+            cond.Store = store;
+            return cond;
+        }
 
         public static ICondition And(this ICondition left, ICondition right)
             => new AndCondition(left, right);

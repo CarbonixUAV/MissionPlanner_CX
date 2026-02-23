@@ -10,7 +10,7 @@ namespace Carbonix.Warnings
     /// Provides polymorphic JSON conversion for <see cref="ICondition"/> trees.
     /// </summary>
     /// <remarks>
-    /// Dispatches on key presence: "field", "and", "or", "not".
+    /// Dispatches on key presence: "stateField", "namedValue", "and", "or", "not".
     /// Operators use symbols in JSON: &lt;, &lt;=, ==, &gt;, &gt;=, !=
     /// </remarks>
     public class ConditionConverter : JsonConverter<ICondition>
@@ -34,8 +34,10 @@ namespace Carbonix.Warnings
         {
             var obj = JObject.Load(reader);
 
-            if (obj["field"] != null)
+            if (obj["stateField"] != null)
                 return ReadField(obj);
+            if (obj["namedValue"] != null)
+                return ReadNamedValue(obj);
             if (obj["and"] != null)
                 return ReadComposite(obj, "and", serializer);
             if (obj["or"] != null)
@@ -44,7 +46,7 @@ namespace Carbonix.Warnings
                 return ReadNot(obj, serializer);
 
             throw new JsonSerializationException(
-                $"Unknown condition type. Expected one of: field, and, or, not. " +
+                $"Unknown condition type. Expected one of: stateField, namedValue, and, or, not. " +
                 $"Found keys: {string.Join(", ", obj.Properties().Select(p => p.Name))}");
         }
 
@@ -53,8 +55,11 @@ namespace Carbonix.Warnings
         {
             switch (value)
             {
-                case FieldCondition field:
-                    WriteField(writer, field);
+                case CompareCondition cc:
+                    if (cc.ValueSource == ValueSource.NamedValue)
+                        WriteNamedValue(writer, cc);
+                    else
+                        WriteField(writer, cc);
                     break;
                 case AndCondition and:
                     WriteComposite(writer, "and", and, serializer);
@@ -73,7 +78,7 @@ namespace Carbonix.Warnings
 
         static ICondition ReadField(JObject obj)
         {
-            var name = obj["field"].Value<string>();
+            var name = obj["stateField"].Value<string>();
             var opStr = obj["op"].Value<string>();
             var threshold = obj["value"].Value<double>();
 
@@ -83,7 +88,20 @@ namespace Carbonix.Warnings
 
             double? clear = obj["clear"]?.Value<double>();
 
-            return new FieldCondition(name, op, threshold, clear);
+            return Condition.Field(name, op, threshold, clear);
+        }
+
+        static ICondition ReadNamedValue(JObject obj)
+        {
+            var name = obj["namedValue"].Value<string>();
+            var opStr = obj["op"].Value<string>();
+            var threshold = obj["value"].Value<double>();
+
+            if (!SymbolToOp.TryGetValue(opStr, out var op))
+                throw new JsonSerializationException(
+                    $"Unknown operator '{opStr}'. Expected one of: {string.Join(", ", SymbolToOp.Keys)}");
+
+            return Condition.NamedValue(name, op, threshold);
         }
 
         static ICondition ReadComposite(JObject obj, string key, JsonSerializer serializer)
@@ -109,20 +127,32 @@ namespace Carbonix.Warnings
             return new NotCondition(inner);
         }
 
-        static void WriteField(JsonWriter writer, FieldCondition field)
+        static void WriteField(JsonWriter writer, CompareCondition cc)
         {
             writer.WriteStartObject();
-            writer.WritePropertyName("field");
-            writer.WriteValue(field.PropertyName);
+            writer.WritePropertyName("stateField");
+            writer.WriteValue(cc.Name);
             writer.WritePropertyName("op");
-            writer.WriteValue(OpToSymbol[field.Op]);
+            writer.WriteValue(OpToSymbol[cc.Op]);
             writer.WritePropertyName("value");
-            writer.WriteValue(field.Threshold);
-            if (field.ClearThreshold.HasValue)
+            writer.WriteValue(cc.Threshold);
+            if (cc.ClearThreshold.HasValue)
             {
                 writer.WritePropertyName("clear");
-                writer.WriteValue(field.ClearThreshold.Value);
+                writer.WriteValue(cc.ClearThreshold.Value);
             }
+            writer.WriteEndObject();
+        }
+
+        static void WriteNamedValue(JsonWriter writer, CompareCondition cc)
+        {
+            writer.WriteStartObject();
+            writer.WritePropertyName("namedValue");
+            writer.WriteValue(cc.Name);
+            writer.WritePropertyName("op");
+            writer.WriteValue(OpToSymbol[cc.Op]);
+            writer.WritePropertyName("value");
+            writer.WriteValue(cc.Threshold);
             writer.WriteEndObject();
         }
 
