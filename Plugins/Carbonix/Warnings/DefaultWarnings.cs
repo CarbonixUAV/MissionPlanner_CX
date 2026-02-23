@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace Carbonix.Warnings
 {
@@ -60,6 +61,26 @@ namespace Carbonix.Warnings
                     subsystem: WarningSubsystem.ESC,
                     trigger: Condition.Field("esc5_temp", CompareOp.GT, 100),
                     gate: Armed)),
+
+                (Aircraft.Ottano, new WarningRule(
+                    id: "uncommanded_engine_stop",
+                    text: "Uncommanded engine stop",
+                    severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.Engine,
+                    trigger: null,
+                    gate: Armed,
+                    statusTextPattern: new Regex("Uncommanded engine stop",
+                        RegexOptions.Compiled | RegexOptions.IgnoreCase))),
+
+                (null, new WarningRule(
+                    id: "qassist",
+                    text: "QASSIST",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.FlightControl,
+                    trigger: Condition.NamedValue("VTOLState", CompareOp.GT, 0),
+                    gate: Armed,
+                    statusTextPattern: new Regex("QASSIST",
+                        RegexOptions.Compiled | RegexOptions.IgnoreCase))),
             };
 
         public static List<WarningRule> GetAll(Aircraft aircraft)
