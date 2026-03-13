@@ -232,6 +232,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StandardAltimeter", "Plugin
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PlaneGrid", "Plugins\PlaneGrid\PlaneGrid.csproj", "{A3884BC4-0ECB-4664-848C-BFAE4C483A49}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Carbonix.Tests", "Plugins\Carbonix.Tests\Carbonix.Tests.csproj", "{DF9D2E9B-F823-4D05-988E-750C9B05E9F3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -579,6 +581,10 @@ Global
 		{A3884BC4-0ECB-4664-848C-BFAE4C483A49}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A3884BC4-0ECB-4664-848C-BFAE4C483A49}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A3884BC4-0ECB-4664-848C-BFAE4C483A49}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DF9D2E9B-F823-4D05-988E-750C9B05E9F3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DF9D2E9B-F823-4D05-988E-750C9B05E9F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DF9D2E9B-F823-4D05-988E-750C9B05E9F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DF9D2E9B-F823-4D05-988E-750C9B05E9F3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -669,6 +675,7 @@ Global
 		{6B6AF209-F65C-41A5-8B70-A60067EF9AF3} = {9B3AC501-5FCB-4A2A-A628-BE0985DB2BD4}
 		{1A295949-16F2-4740-BC6C-01EB5E801286} = {9B3AC501-5FCB-4A2A-A628-BE0985DB2BD4}
 		{A3884BC4-0ECB-4664-848C-BFAE4C483A49} = {9B3AC501-5FCB-4A2A-A628-BE0985DB2BD4}
+		{DF9D2E9B-F823-4D05-988E-750C9B05E9F3} = {9B3AC501-5FCB-4A2A-A628-BE0985DB2BD4}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FD2C9507-1A09-4F5B-98AB-B6B194A4B260}
