@@ -17,6 +17,7 @@ using System.Drawing;
 using MissionPlanner.GCSViews.ConfigurationView;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Carbonix.CAS;
 using Carbonix.Warnings;
 
 namespace Carbonix
@@ -46,6 +47,8 @@ namespace Carbonix
 
         CarbonixWarningEngine _warningEngine;
         SpeechWarningConsumer _speechConsumer;
+
+        CasCoordinator _cas;
 
         public override bool Init() { return true; }
 
@@ -93,6 +96,15 @@ namespace Carbonix
 
             SetupWarningEngine();
             _warningEngine.UpdatePort(Host.comPort);
+            _cas = new CasCoordinator(
+                _warningEngine,
+                _speechConsumer,
+                MissionPlanner.GCSViews.FlightData.myhud,
+                Host.FDGMapControl,
+                msg => Host.cs.messageHigh = msg);
+
+            // Disable the built-in STATUSTEXT TTS, since the CAS handles it
+            Host.config["severity"] = "0";
 
             loopratehz = 1;
 
@@ -101,6 +113,7 @@ namespace Carbonix
 
         public override bool Exit()
         {
+            _cas?.Dispose();
             _warningEngine?.Dispose();
 
             return true;
@@ -201,6 +214,7 @@ namespace Carbonix
             }
 
             _warningEngine.UpdatePort(Host.comPort);
+            _cas.Tick();
 
             var is_armed = is_connected && Host.cs.armed;
             if (is_armed && !last_arm_state)

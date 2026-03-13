@@ -49,6 +49,9 @@
     <ProjectReference Include="..\..\MissionPlanner.csproj">
       <Private>false</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\ExtLibs\LEDBulb\Bulb\Bulb.csproj">
+      <Private>false</Private>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
