@@ -1,0 +1,30 @@
+name: Carbonix Tests
+on: [push, workflow_dispatch, pull_request]
+
+jobs:
+  test:
+    name: Carbonix Unit Tests
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 10
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $msbuildPath = Split-Path (& "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\Current\Bin\amd64\MSBuild.exe | Select-Object -First 1) -Parent
+          $env:PATH = $msbuildPath + ';' + $env:PATH
+          msbuild -v:m -restore -t:Build -p:Configuration=Debug ExtLibs\DriverCleanup\DriverCleanup.csproj
+          msbuild -v:m -restore -t:Build -p:Configuration=Debug Plugins\Carbonix.Tests\Carbonix.Tests.csproj
+
+      - name: Test
+        run: dotnet vstest Plugins\Carbonix.Tests\bin\Debug\net472\Carbonix.Tests.dll --logger:"trx"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: TestResults\*.trx
