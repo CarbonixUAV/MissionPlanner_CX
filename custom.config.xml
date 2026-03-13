@@ -122,6 +122,7 @@
   <hud1_useritem_battery_voltage2>       AVBAT: </hud1_useritem_battery_voltage2>
   <hud1_useritem_DistToHome>          DistToHome: </hud1_useritem_DistToHome>
   <hud1_useritem_sonarrange>          Lidar: </hud1_useritem_sonarrange>
+  <HudItems>AOA;GPS</HudItems>
   <joy_elevons>False</joy_elevons>
   <joystick_name>Radiomaster GX12 Joystick</joystick_name>
   <MapType>GoogleHybridMap</MapType>

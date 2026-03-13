@@ -130,4 +130,16 @@
   <data name="volanti_light" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>Resources\volanti_light.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="warn_on" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>Resources\warn_on.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="warn_off" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>Resources\warn_off.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="caut_on" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>Resources\caut_on.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="caut_off" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>Resources\caut_off.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
 </root>
