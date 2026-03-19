@@ -79,6 +79,16 @@ namespace Carbonix.CAS
                 {
                     entry = new AlertEntry(severity, message);
                     entry.AutoResolveAfter = autoResolveAfter;
+
+                    // Advisories are informational — born resolved and acked
+                    // so the operator can clear them immediately.
+                    if (severity == WarningSeverity.Advisory)
+                    {
+                        entry.State = AlertState.Resolved;
+                        entry.ResolvedUtc = entry.FiredUtc;
+                        entry.IsAcked = true;
+                    }
+
                     _alerts.Add(entry);
                     isNew = true;
                 }
@@ -199,7 +209,8 @@ namespace Carbonix.CAS
             {
                 return _alerts
                     .Where(a => a.IsUncleared)
-                    .OrderBy(a => a.Severity == WarningSeverity.Warning ? 0 : 1)
+                    .OrderBy(a => a.Severity == WarningSeverity.Warning ? 0
+                                : a.Severity == WarningSeverity.Caution ? 1 : 2)
                     .ThenByDescending(a => a.FiredUtc)
                     .ToList();
             }

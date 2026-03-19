@@ -3,7 +3,8 @@ namespace Carbonix.Warnings
     public enum WarningSeverity
     {
         Caution,
-        Warning
+        Warning,
+        Advisory,
     }
 
     public enum WarningSubsystem

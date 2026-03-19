@@ -52,6 +52,16 @@ namespace Carbonix.Tests.CAS
         }
 
         [TestMethod]
+        public void DeriveLightState_Off_WhenOnlyAdvisories()
+        {
+            _mgr.Fire(WarningSeverity.Advisory, "Info");
+            Assert.AreEqual(LightState.Off,
+                MasterLightRenderer.DeriveLightState(_mgr.GetUnclearedAlerts(), WarningSeverity.Warning));
+            Assert.AreEqual(LightState.Off,
+                MasterLightRenderer.DeriveLightState(_mgr.GetUnclearedAlerts(), WarningSeverity.Caution));
+        }
+
+        [TestMethod]
         public void DeriveLightState_Off_WhenEmpty()
         {
             Assert.AreEqual(LightState.Off,
