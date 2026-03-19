@@ -26,6 +26,9 @@ namespace Carbonix.Warnings
             if (!_isArmed())
                 return;
 
+            if (entry.Severity == WarningSeverity.Advisory)
+                return;
+
             _speech.SpeakAsync(entry.Message);
         }
     }

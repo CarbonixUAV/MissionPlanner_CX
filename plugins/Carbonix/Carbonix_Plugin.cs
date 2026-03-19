@@ -100,8 +100,7 @@ namespace Carbonix
                 _warningEngine,
                 _speechConsumer,
                 MissionPlanner.GCSViews.FlightData.myhud,
-                Host.FDGMapControl,
-                msg => Host.cs.messageHigh = msg);
+                Host.FDGMapControl);
 
             // Disable the built-in STATUSTEXT TTS, since the CAS handles it
             Host.config["severity"] = "0";
@@ -143,7 +142,7 @@ namespace Carbonix
                     }
                     else
                     {
-                        CustomMessageBox.Show("Failed to start " + settings.controller);
+                        log.Warn("Failed to start " + settings.controller);
                     }
                 }
             }
@@ -258,7 +257,9 @@ namespace Carbonix
                 last_firmware_version = Host.comPort?.MAV?.VersionString;
                 if (!Regex.IsMatch(last_firmware_version, @"^CxPilot-\d+\.\d+\.\d+(\s+\([a-z0-9]+\))?$", RegexOptions.IgnoreCase))
                 {
-                    CustomMessageBox.Show("This aircraft is not running an official Carbonix firmware release.", "Warning");
+                    _cas.AlertManager.Fire(
+                        WarningSeverity.Advisory,
+                        "Unofficial firmware: " + last_firmware_version);
                     has_warned_firmware = true;
                 }
             }

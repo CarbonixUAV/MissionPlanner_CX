@@ -265,6 +265,50 @@ namespace Carbonix.Tests.CAS
             Assert.IsFalse(alert.IsAcked);
         }
 
+        // --- Advisory ---
+
+        [TestMethod]
+        public void Fire_Advisory_BornResolvedAndAcked()
+        {
+            _mgr.Fire(WarningSeverity.Advisory, "Unofficial firmware");
+
+            var alert = _mgr.GetUnclearedAlerts()[0];
+            Assert.AreEqual(AlertState.Resolved, alert.State);
+            Assert.IsTrue(alert.IsAcked);
+            Assert.IsNotNull(alert.ResolvedUtc);
+        }
+
+        [TestMethod]
+        public void Fire_Advisory_RaisesNewAlertFired()
+        {
+            _mgr.Fire(WarningSeverity.Advisory, "Unofficial firmware");
+
+            Assert.AreEqual(1, _newAlerts.Count);
+        }
+
+        [TestMethod]
+        public void Fire_Advisory_ImmediatelyDismissable()
+        {
+            _mgr.Fire(WarningSeverity.Advisory, "Unofficial firmware");
+            var id = _mgr.GetUnclearedAlerts()[0].Id;
+
+            Assert.IsTrue(_mgr.Dismiss(id));
+            Assert.AreEqual(0, _mgr.GetUnclearedAlerts().Count);
+        }
+
+        [TestMethod]
+        public void GetUnclearedAlerts_SortsAdvisoryAfterCaution()
+        {
+            _mgr.Fire(WarningSeverity.Advisory, "INFO");
+            _mgr.Fire(WarningSeverity.Caution, "CAUT");
+            _mgr.Fire(WarningSeverity.Warning, "WARN");
+
+            var alerts = _mgr.GetUnclearedAlerts();
+            Assert.AreEqual(WarningSeverity.Warning, alerts[0].Severity);
+            Assert.AreEqual(WarningSeverity.Caution, alerts[1].Severity);
+            Assert.AreEqual(WarningSeverity.Advisory, alerts[2].Severity);
+        }
+
         // --- Auto-resolve ---
 
         [TestMethod]

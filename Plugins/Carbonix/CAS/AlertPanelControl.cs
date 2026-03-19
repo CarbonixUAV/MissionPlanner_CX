@@ -37,6 +37,7 @@ namespace Carbonix.CAS
 
         static readonly Color WarnColor = Color.FromArgb(255, 51, 51);
         static readonly Color CautColor = Color.FromArgb(255, 170, 0);
+        static readonly Color AdvColor = Color.FromArgb(100, 180, 255);
 
         // Theme-derived colors, computed once at construction
         readonly Color _bgColor;
@@ -224,27 +225,30 @@ namespace Carbonix.CAS
                 Tag = alert,
             };
 
+            bool isAdvisory = alert.Severity == WarningSeverity.Advisory;
+            var baseColor = SeverityColor(alert.Severity);
+
             // Severity indicator (LedBulb)
             // On = active, Off = resolved, Blink = unacked
             var bulb = new LedBulb
             {
                 Size = new Size(12, 12),
                 Location = new Point(6, 8),
-                Color = alert.Severity == WarningSeverity.Warning ? WarnColor : CautColor,
+                Color = baseColor,
                 On = alert.IsActive,
             };
 
             if (!alert.IsAcked)
                 bulb.Blink(500);
 
-            // Severity label
-            var severityColor = alert.Severity == WarningSeverity.Warning ? WarnColor : CautColor;
-            if (alert.IsResolved)
+            // Severity label — dim resolved alerts, but not advisories
+            var severityColor = baseColor;
+            if (alert.IsResolved && !isAdvisory)
                 severityColor = BlendColors(severityColor, _bgColor, 0.6);
 
             var severityLabel = new Label
             {
-                Text = alert.Severity == WarningSeverity.Warning ? "W" : "C",
+                Text = SeverityLetter(alert.Severity),
                 Font = new Font(FontFamily.GenericMonospace, 8f, FontStyle.Bold),
                 ForeColor = severityColor,
                 AutoSize = true,
@@ -252,12 +256,12 @@ namespace Carbonix.CAS
             };
 
             var msgText = alert.Message;
-            if (alert.IsResolved) msgText += "  [RESOLVED]";
+            if (alert.IsResolved && !isAdvisory) msgText += "  [RESOLVED]";
             // Elapsed time: since fired when active, since resolved when resolved
             var timeBase = alert.IsResolved && alert.ResolvedUtc.HasValue
                 ? alert.ResolvedUtc.Value
                 : alert.FiredUtc;
-            var timeColor = alert.IsResolved ? _dimColor : _textColor;
+            var timeColor = (alert.IsResolved && !isAdvisory) ? _dimColor : _textColor;
             var timeLabel = new Label
             {
                 Name = "elapsed",
@@ -389,7 +393,7 @@ namespace Carbonix.CAS
 
             var severityLabel = new Label
             {
-                Text = alert.Severity == WarningSeverity.Warning ? "W" : "C",
+                Text = SeverityLetter(alert.Severity),
                 Font = new Font(FontFamily.GenericMonospace, 7.5f),
                 ForeColor = _dimColor,
                 AutoSize = true,
@@ -488,6 +492,8 @@ namespace Carbonix.CAS
 
         Color GetForeColor(AlertEntry alert)
         {
+            if (alert.Severity == WarningSeverity.Advisory)
+                return _textColor;
             return alert.IsActive ? _textColor : _dimColor;
         }
 
@@ -502,6 +508,26 @@ namespace Carbonix.CAS
             return alert.IsAcked
                 ? new Font(FontFamily.GenericSansSerif, 8.5f)
                 : new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold);
+        }
+
+        static Color SeverityColor(WarningSeverity severity)
+        {
+            switch (severity)
+            {
+                case WarningSeverity.Warning: return WarnColor;
+                case WarningSeverity.Caution: return CautColor;
+                default: return AdvColor;
+            }
+        }
+
+        static string SeverityLetter(WarningSeverity severity)
+        {
+            switch (severity)
+            {
+                case WarningSeverity.Warning: return "W";
+                case WarningSeverity.Caution: return "C";
+                default: return "A";
+            }
         }
 
         static string FormatElapsed(TimeSpan elapsed)
