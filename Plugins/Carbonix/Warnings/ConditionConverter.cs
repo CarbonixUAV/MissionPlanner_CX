@@ -77,9 +77,11 @@ namespace Carbonix.Warnings
                 return ReadLatch(obj, serializer);
             if (obj["statusText"] != null)
                 return ReadStatusText(obj);
+            if (obj["sustain"] != null)
+                return ReadSustain(obj, serializer);
 
             throw new JsonSerializationException(
-                $"Unknown condition type. Expected one of: ref, stateField, namedValue, statusText, and, or, not, edge, latch. " +
+                $"Unknown condition type. Expected one of: ref, stateField, namedValue, statusText, and, or, not, edge, latch, sustain. " +
                 $"Found keys: {string.Join(", ", obj.Properties().Select(p => p.Name))}");
         }
 
@@ -120,6 +122,9 @@ namespace Carbonix.Warnings
                     break;
                 case LatchCondition latch:
                     WriteLatch(writer, latch, serializer);
+                    break;
+                case SustainCondition sustain:
+                    WriteSustain(writer, sustain, serializer);
                     break;
                 default:
                     throw new JsonSerializationException(
@@ -311,6 +316,35 @@ namespace Carbonix.Warnings
             writer.WritePropertyName("clear");
             serializer.Serialize(writer, latch.Clear);
             writer.WriteEndObject();
+            writer.WriteEndObject();
+        }
+
+        static ICondition ReadSustain(JObject obj, JsonSerializer serializer)
+        {
+            var riseMs = obj["riseMs"]?.Value<int>()
+                ?? throw new JsonSerializationException("'sustain' requires 'riseMs'");
+            var fallMs = obj["fallMs"]?.Value<int>()
+                ?? throw new JsonSerializationException("'sustain' requires 'fallMs'");
+            var inner = obj["sustain"].ToObject<ICondition>(serializer);
+            var reset = obj["reset"]?.ToObject<ICondition>(serializer);
+            return new SustainCondition(inner, riseMs, fallMs, reset);
+        }
+
+        static void WriteSustain(JsonWriter writer, SustainCondition sustain,
+            JsonSerializer serializer)
+        {
+            writer.WriteStartObject();
+            writer.WritePropertyName("sustain");
+            serializer.Serialize(writer, sustain.Inner);
+            writer.WritePropertyName("riseMs");
+            writer.WriteValue(sustain.RiseMs);
+            writer.WritePropertyName("fallMs");
+            writer.WriteValue(sustain.FallMs);
+            if (sustain.Reset != null)
+            {
+                writer.WritePropertyName("reset");
+                serializer.Serialize(writer, sustain.Reset);
+            }
             writer.WriteEndObject();
         }
 
