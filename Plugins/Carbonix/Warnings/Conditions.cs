@@ -335,6 +335,98 @@ namespace Carbonix.Warnings
     }
 
     /// <summary>
+    /// Applies an asymmetric low-pass filter to a boolean condition.
+    /// The filter value V ∈ [0,1] rises toward 1 while the inner condition
+    /// is true and decays toward 0 while it is false. Time constants are
+    /// derived from <c>riseMs</c> and <c>fallMs</c> such that continuous
+    /// true input reaches the trip threshold (0.8) in exactly <c>riseMs</c>,
+    /// and continuous false input reaches the clear threshold (0.2) in exactly
+    /// <c>fallMs</c>. Brief transients accumulate only partially, suppressing
+    /// single-blip noise while still detecting sustained or frequently recurring faults.
+    /// Pass 0 for <c>riseMs</c> or <c>fallMs</c> for immediate transition on that edge.
+    /// </summary>
+    public class SustainCondition : ICondition
+    {
+        const double TripThreshold = 0.8;
+        const double ClearThreshold = 0.2;
+
+        // ln(1 / (1 - TripThreshold)) = ln(5). Derives tau from riseMs/fallMs
+        // so that V reaches TripThreshold after exactly riseMs of continuous input.
+        const double LnFive = 1.6094379124341003;
+
+        // Must match CarbonixWarningEngine.EvalIntervalMs.
+        const double EvalIntervalMs = 250.0;
+
+        readonly ICondition _inner;
+        readonly ICondition _reset;
+        readonly int _riseMs;
+        readonly int _fallMs;
+        readonly string _stateKey;
+
+        public ICondition Inner => _inner;
+        public ICondition Reset => _reset;
+        public int RiseMs => _riseMs;
+        public int FallMs => _fallMs;
+        public string StateKey => _stateKey;
+
+        public SustainCondition(ICondition inner, int riseMs, int fallMs,
+            ICondition reset = null)
+        {
+            if (inner == null) throw new ArgumentNullException(nameof(inner));
+            if (riseMs < 0) throw new ArgumentOutOfRangeException(nameof(riseMs));
+            if (fallMs < 0) throw new ArgumentOutOfRangeException(nameof(fallMs));
+            _inner = inner;
+            _reset = reset;
+            _riseMs = riseMs;
+            _fallMs = fallMs;
+            _stateKey = reset != null
+                ? $"sustain:{riseMs}:{fallMs}:{inner.StateKey}|reset:{reset.StateKey}"
+                : $"sustain:{riseMs}:{fallMs}:{inner.StateKey}";
+        }
+
+        public bool Evaluate(object source, ConditionState state)
+        {
+            if (_reset != null && _reset.Evaluate(source, state))
+            {
+                state.SetSustainV(_stateKey, 0.0);
+                state.SetSustainTripped(_stateKey, false);
+                return false;
+            }
+
+            bool input = _inner.Evaluate(source, state);
+            double v = state.GetSustainV(_stateKey);
+
+            if (input)
+            {
+                if (_riseMs == 0)
+                    v = 1.0;
+                else
+                {
+                    double alpha = 1.0 - Math.Exp(-EvalIntervalMs * LnFive / _riseMs);
+                    v += (1.0 - v) * alpha;
+                }
+            }
+            else
+            {
+                if (_fallMs == 0)
+                    v = 0.0;
+                else
+                {
+                    double alpha = 1.0 - Math.Exp(-EvalIntervalMs * LnFive / _fallMs);
+                    v -= v * alpha;
+                }
+            }
+
+            state.SetSustainV(_stateKey, v);
+
+            bool wasTripped = state.GetSustainTripped(_stateKey);
+            bool tripped = wasTripped ? v > ClearThreshold : v >= TripThreshold;
+            state.SetSustainTripped(_stateKey, tripped);
+            return tripped;
+        }
+    }
+
+    /// <summary>
     /// Provides factory and extension methods for building <see cref="ICondition"/> trees.
     /// </summary>
     public static class Condition
@@ -435,5 +527,9 @@ namespace Carbonix.Warnings
 
         public static ICondition Not(this ICondition condition)
             => new NotCondition(condition);
+
+        public static SustainCondition Sustain(this ICondition inner, int riseMs, int fallMs,
+            ICondition reset = null)
+            => new SustainCondition(inner, riseMs, fallMs, reset);
     }
 }

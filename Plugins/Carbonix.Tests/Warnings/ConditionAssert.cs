@@ -64,6 +64,14 @@ namespace Carbonix.Tests.Warnings
                     AreStructurallyEqual(el.Clear, al.Clear);
                     break;
 
+                case SustainCondition es:
+                    var as2 = (SustainCondition)actual;
+                    Assert.AreEqual(es.RiseMs, as2.RiseMs, "RiseMs mismatch");
+                    Assert.AreEqual(es.FallMs, as2.FallMs, "FallMs mismatch");
+                    AreStructurallyEqual(es.Inner, as2.Inner);
+                    AreStructurallyEqual(es.Reset, as2.Reset);
+                    break;
+
                 default:
                     Assert.Fail($"Unknown condition type: {expected.GetType().Name}");
                     break;

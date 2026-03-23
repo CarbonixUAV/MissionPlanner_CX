@@ -475,6 +475,10 @@ namespace Carbonix.Warnings
                     BindConditions(latch.Set);
                     BindConditions(latch.Clear);
                     break;
+                case SustainCondition sustain:
+                    BindConditions(sustain.Inner);
+                    BindConditions(sustain.Reset);
+                    break;
             }
         }
     }

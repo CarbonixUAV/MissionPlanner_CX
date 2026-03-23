@@ -30,6 +30,12 @@ namespace Carbonix.Warnings
         /// <summary>Hysteresis state for CompareConditions with clear thresholds.</summary>
         readonly Dictionary<string, bool> _hysteresis = new Dictionary<string, bool>();
 
+        /// <summary>Low-pass filter value V ∈ [0,1] for SustainConditions.</summary>
+        readonly Dictionary<string, double> _sustainV = new Dictionary<string, double>();
+
+        /// <summary>Output hysteresis (tripped/not) for SustainConditions.</summary>
+        readonly Dictionary<string, bool> _sustainTripped = new Dictionary<string, bool>();
+
         // --- StatusText state ---
 
         public long GetFiredTicks(string key)
@@ -77,5 +83,19 @@ namespace Carbonix.Warnings
         {
             _hysteresis[key] = value;
         }
+
+        // --- Sustain state ---
+
+        public double GetSustainV(string key)
+            => _sustainV.TryGetValue(key, out var v) ? v : 0.0;
+
+        public void SetSustainV(string key, double value)
+            => _sustainV[key] = value;
+
+        public bool GetSustainTripped(string key)
+            => _sustainTripped.TryGetValue(key, out var v) && v;
+
+        public void SetSustainTripped(string key, bool value)
+            => _sustainTripped[key] = value;
     }
 }
