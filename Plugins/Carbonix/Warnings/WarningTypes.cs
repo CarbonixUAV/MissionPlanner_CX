@@ -14,6 +14,13 @@ namespace Carbonix.Warnings
         ESC,
         FlightControl,
         Terrain,
+        Compass,
+        Airspeed,
+        Baro,
+        Navigation,
+        Attitude,
+        Power,
+        Geofence,
     }
 
     public enum CompareOp
