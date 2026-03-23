@@ -43,7 +43,15 @@ namespace Carbonix.Warnings
         static readonly ICondition EngineOut = Condition.StatusText("Engine out", clearPattern: "Engine running")
             .Or(Condition.StatusText("Uncommanded engine stop", timeoutMs: 1_000))
             .Or(Condition.Field("efi_rpm", CompareOp.LT, 500));
-        
+
+        static readonly ICondition EkfVelocityVariance = Condition.Field("ekfvelv", CompareOp.GTEQ, 1.0, clear: 0.8);
+        static readonly ICondition EkfCompassVariance = Condition.Field("ekfcompv", CompareOp.GTEQ, 1.0, clear: 0.8);
+        static readonly ICondition EkfPosHorizVariance = Condition.Field("ekfposhor", CompareOp.GTEQ, 1.0, clear: 0.8);
+        static readonly ICondition EkfPosVertVariance = Condition.Field("ekfposvert", CompareOp.GTEQ, 1.0, clear: 0.8);
+        static readonly ICondition EkfTerrainVariance = Condition.Field("ekfteralt", CompareOp.GTEQ, 1.0, clear: 0.8);
+        static readonly ICondition EkfNavVariance = EkfVelocityVariance.Or(EkfPosHorizVariance).Or(EkfPosVertVariance);
+        static readonly ICondition FenceBreach = Condition.Field("fenceb_status", CompareOp.GT, 0);
+
         // Catch
         // PreArm: Rangefinder 1: not detected
         // PreArm: Rangefinder 1: not connected
@@ -119,6 +127,45 @@ namespace Carbonix.Warnings
                     subsystem: WarningSubsystem.Terrain,
                     trigger: RangeFinderMissing,
                     gate: Armed.Not()),
+
+                // --- EKF variance ---
+
+                new WarningRule(
+                    id: "ekf_nav_variance",
+                    text: "EKF nav variance",
+                    severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.Navigation,
+                    trigger: EkfNavVariance,
+                    gate: SafetyOff),
+
+                new WarningRule(
+                    id: "ekf_compass_variance",
+                    text: "EKF compass variance",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Compass,
+                    trigger: EkfCompassVariance,
+                    gate: SafetyOff),
+
+                // In ArduPilot, this is hard-coded to report 0 if you are not not using rangefinder
+                // as a z-position source (which will always be the case for us; it was designed for
+                // low alt, optical-flow type setups). Nonetheless, I might as well have this rule.
+                new WarningRule(
+                    id: "ekf_terrain_variance",
+                    text: "EKF terrain variance",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Terrain,
+                    trigger: EkfTerrainVariance,
+                    gate: Armed),
+
+                // --- Fence breach ---
+
+                new WarningRule(
+                    id: "fence_breach",
+                    text: "Fence breach",
+                    severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.Geofence,
+                    trigger: FenceBreach,
+                    gate: Armed),
             };
 
         /// <summary>
