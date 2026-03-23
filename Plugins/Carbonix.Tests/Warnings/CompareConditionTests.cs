@@ -11,6 +11,13 @@ namespace Carbonix.Tests.Warnings
         float _rawSpeed;
         public float ScaledSpeed => _rawSpeed * 2;
         public void SetRawSpeed(float v) => _rawSpeed = v;
+        public SensorFlags sensors = new SensorFlags();
+    }
+
+    public class SensorFlags
+    {
+        public bool gps { get; set; }
+        public bool compass { get; set; }
     }
 
     [TestClass]
@@ -152,6 +159,30 @@ namespace Carbonix.Tests.Warnings
 
             Assert.ThrowsException<FormatException>(
                 () => c.Evaluate(new ConditionSource { label = "text" }, _state));
+        }
+
+        // ---- Dotted path resolution ----
+
+        [TestMethod]
+        public void Evaluate_DottedPath_ResolvesNestedProperty()
+        {
+            var c = Condition.Field("sensors.gps", CompareOp.GT, 0);
+            var src = new ConditionSource();
+
+            src.sensors.gps = false;
+            Assert.IsFalse(c.Evaluate(src, _state));
+
+            src.sensors.gps = true;
+            Assert.IsTrue(c.Evaluate(src, _state));
+        }
+
+        [TestMethod]
+        public void Evaluate_DottedPath_MissingSegment_Throws()
+        {
+            var c = Condition.Field("sensors.nonexistent", CompareOp.GT, 0);
+
+            Assert.ThrowsException<MissingMemberException>(
+                () => c.Evaluate(new ConditionSource(), _state));
         }
 
         // ---- NamedValue basics ----

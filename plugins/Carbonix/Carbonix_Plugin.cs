@@ -120,8 +120,6 @@ namespace Carbonix
 
         bool last_arm_state = false; // Used to detect rising edge from disarm to arm
         bool last_controller_state = false; // Used to detect change in controller connection
-        DateTime last_rchealthy = DateTime.MinValue; // Used to detect long periods of bad RC Receiver health
-        DateTime last_rcwarning = DateTime.MinValue;
         string last_firmware_version = ""; // Used to prevent unecessary repeated regex parsing (probably unnecessary optimization, but whatever)
         bool has_warned_firmware = false; // We only need to pop up a firmware warning once per session
         public override bool Loop()
@@ -144,28 +142,6 @@ namespace Carbonix
                     {
                         log.Warn("Failed to start " + settings.controller);
                     }
-                }
-            }
-
-            if (bool.Parse(Settings.Instance["norcreceiver", "false"]))
-            {
-                // Check for RC Receiver health
-                // If RC shows unhealthy for 5 seconds straight, or if the joystick is disconnected, then trigger a warning
-                if (Host.comPort.BaseStream.IsOpen && !Host.cs.sensors_health.rc_receiver && Host.cs.sensors_enabled.rc_receiver && Host.cs.sensors_present.rc_receiver)
-                {
-                    if (DateTime.UtcNow - last_rchealthy > TimeSpan.FromSeconds(5) || !controller_state)
-                    {
-                        // Trigger a warning every 10 seconds
-                        if (DateTime.UtcNow - last_rcwarning > TimeSpan.FromSeconds(10))
-                        {
-                            last_rcwarning = DateTime.UtcNow;
-                            Host.cs.messageHigh = "No Controller";
-                        }
-                    }
-                }
-                else
-                {
-                    last_rchealthy = DateTime.UtcNow;
                 }
             }
 

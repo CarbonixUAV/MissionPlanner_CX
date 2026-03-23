@@ -343,33 +343,58 @@ namespace Carbonix.Warnings
             double threshold, double? clear = null)
         {
             object cachedSource = null;
-            Func<object, object> cachedGet = null;
+            Func<object, double?> cachedResolve = null;
 
             return new CompareCondition(name, op, threshold, clear,
                 ValueSource.StateField, source =>
             {
                 if (source != cachedSource)
                 {
-                    var type = source.GetType();
-                    var field = type.GetField(name,
-                        BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (field != null)
-                    {
-                        cachedGet = field.GetValue;
-                    }
-                    else
-                    {
-                        var prop = type.GetProperty(name,
-                            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                        if (prop == null)
-                            throw new MissingMemberException(
-                                $"Member '{name}' not found on {type.Name}");
-                        cachedGet = o => prop.GetValue(o, null);
-                    }
+                    cachedResolve = BuildFieldResolver(name, source.GetType());
                     cachedSource = source;
                 }
-                return Convert.ToDouble(cachedGet(source));
+                return cachedResolve(source);
             });
+        }
+
+        static Func<object, double?> BuildFieldResolver(string path, Type rootType)
+        {
+            const BindingFlags flags =
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
+            var segments = path.Split('.');
+            var getters = new Func<object, object>[segments.Length];
+            var type = rootType;
+
+            for (int i = 0; i < segments.Length; i++)
+            {
+                var field = type.GetField(segments[i], flags);
+                if (field != null)
+                {
+                    getters[i] = field.GetValue;
+                    type = field.FieldType;
+                }
+                else
+                {
+                    var prop = type.GetProperty(segments[i], flags);
+                    if (prop == null)
+                        throw new MissingMemberException(
+                            $"Member '{segments[i]}' not found on {type.Name}");
+                    getters[i] = o => prop.GetValue(o, null);
+                    type = prop.PropertyType;
+                }
+            }
+
+            return source =>
+            {
+                object current = source;
+                foreach (var getter in getters)
+                {
+                    current = getter(current);
+                    if (current == null) return null;
+                }
+                return Convert.ToDouble(current);
+            };
         }
 
         public static CompareCondition NamedValue(string name, CompareOp op,
