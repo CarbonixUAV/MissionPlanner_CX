@@ -730,6 +730,18 @@ namespace Carbonix
             items.Insert(index, landitem);
             items.Insert(index, takeoffitem);
 
+            // Add Corridor Survey planner
+            var corridoritem = new ToolStripMenuItem("Corridor Survey");
+            corridoritem.Click += (o, e) =>
+            {
+                using (Form corridor_form = new CorridorPlanForm(this))
+                {
+                    ThemeManager.ApplyThemeTo(corridor_form);
+                    corridor_form.ShowDialog();
+                }
+            };
+            ((ToolStripMenuItem)Host.FPMenuMap.Items["autoWPToolStripMenuItem"]).DropDownItems.Add(corridoritem);
+
             // Add Loiter-to-Alt
             landitem = new ToolStripMenuItem("To Altitude");
             landitem.Click += (o, e) =>

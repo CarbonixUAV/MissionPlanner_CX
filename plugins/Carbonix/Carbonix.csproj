@@ -43,6 +43,9 @@
       <Aliases>Drawing</Aliases>
       <Private>false</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\ExtLibs\Maps\MissionPlanner.Maps.csproj">
+      <Private>false</Private>
+    </ProjectReference>
     <ProjectReference Include="..\..\ExtLibs\Utilities\MissionPlanner.Utilities.csproj">
       <Private>false</Private>
     </ProjectReference>
@@ -52,6 +55,27 @@
     <ProjectReference Include="..\..\ExtLibs\LEDBulb\Bulb\Bulb.csproj">
       <Private>false</Private>
     </ProjectReference>
+  </ItemGroup>
+
+  <!-- Direct DLL references for assemblies already present in the MissionPlanner output.
+       Private=false so they are not copied to the plugin output; MP already loads them. -->
+  <ItemGroup>
+    <Reference Include="ZedGraph">
+      <HintPath>..\..\bin\$(Configuration)\net461\ZedGraph.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SharpKml">
+      <HintPath>..\..\bin\$(Configuration)\net461\SharpKml.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="DotSpatial.Data">
+      <HintPath>..\..\bin\$(Configuration)\net461\DotSpatial.Data.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="DotSpatial.Projections">
+      <HintPath>..\..\bin\$(Configuration)\net461\DotSpatial.Projections.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
