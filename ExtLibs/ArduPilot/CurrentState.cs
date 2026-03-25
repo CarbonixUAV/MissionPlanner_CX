@@ -2358,11 +2358,11 @@ namespace MissionPlanner
                             fenceb_count = fence.breach_count;
 
 
-                            if (fence.breach_status != 0)
-                            {
-                                // fence breached
-                                messageHigh = "Fence Breach " + (MAVLink.FENCE_BREACH)fence.breach_type;
-                            }
+                            // if (fence.breach_status != 0)
+                            // {
+                            //     // fence breached
+                            //     messageHigh = "Fence Breach " + (MAVLink.FENCE_BREACH)fence.breach_type;
+                            // }
                         }
 
                         break;
@@ -2626,30 +2626,30 @@ namespace MissionPlanner
                                 Math.Max(ekfvelv,
                                     Math.Max(ekfcompv, Math.Max(ekfposhor, Math.Max(ekfposvert, ekfteralt))));
 
-                            if (ekfvelv >= 1)
-                            {
-                                messageHigh = Strings.ERROR + " " + Strings.velocity_variance;
-                            }
+                            // if (ekfvelv >= 1)
+                            // {
+                            //     messageHigh = Strings.ERROR + " " + Strings.velocity_variance;
+                            // }
 
-                            if (ekfcompv >= 1)
-                            {
-                                messageHigh = Strings.ERROR + " " + Strings.compass_variance;
-                            }
+                            // if (ekfcompv >= 1)
+                            // {
+                            //     messageHigh = Strings.ERROR + " " + Strings.compass_variance;
+                            // }
 
-                            if (ekfposhor >= 1)
-                            {
-                                messageHigh = Strings.ERROR + " " + Strings.pos_horiz_variance;
-                            }
+                            // if (ekfposhor >= 1)
+                            // {
+                            //     messageHigh = Strings.ERROR + " " + Strings.pos_horiz_variance;
+                            // }
 
-                            if (ekfposvert >= 1)
-                            {
-                                messageHigh = Strings.ERROR + " " + Strings.pos_vert_variance;
-                            }
+                            // if (ekfposvert >= 1)
+                            // {
+                            //     messageHigh = Strings.ERROR + " " + Strings.pos_vert_variance;
+                            // }
 
-                            if (ekfteralt >= 1)
-                            {
-                                messageHigh = Strings.ERROR + " " + Strings.terrain_alt_variance;
-                            }
+                            // if (ekfteralt >= 1)
+                            // {
+                            //     messageHigh = Strings.ERROR + " " + Strings.terrain_alt_variance;
+                            // }
 
                             for (var a = 1; a <= (int)MAVLink.EKF_STATUS_FLAGS.EKF_UNINITIALIZED; a = a << 1)
                             {
@@ -2904,92 +2904,92 @@ namespace MissionPlanner
 
                             safetyactive = !sensors_enabled.motor_control;
 
-                            if (errors_count1 > 0 || errors_count2 > 0)
-                            {
-                                messageHigh = "InternalError 0x" + (errors_count1 + (errors_count2 << 16)).ToString("X");
-                            }
+                            // if (errors_count1 > 0 || errors_count2 > 0)
+                            // {
+                            //     messageHigh = "InternalError 0x" + (errors_count1 + (errors_count2 << 16)).ToString("X");
+                            // }
 
-                            if (!sensors_health.prearm && sensors_enabled.prearm && sensors_present.prearm)
-                            {
-                                messageHigh = messages.LastOrDefault(a => a.message.ToLower().Contains("prearm")).message
-                                    ?.ToString();
-                            }
-                            else if (!sensors_health.gps && sensors_enabled.gps && sensors_present.gps)
-                            {
-                                messageHigh = Strings.BadGPSHealth;
-                            }
-                            else if (!sensors_health.gyro && sensors_enabled.gyro && sensors_present.gyro)
-                            {
-                                messageHigh = Strings.BadGyroHealth;
-                            }
-                            else if (!sensors_health.accelerometer && sensors_enabled.accelerometer &&
-                                     sensors_present.accelerometer)
-                            {
-                                messageHigh = Strings.BadAccelHealth;
-                            }
-                            else if (!sensors_health.compass && sensors_enabled.compass && sensors_present.compass)
-                            {
-                                messageHigh = Strings.BadCompassHealth;
-                            }
-                            else if (!sensors_health.barometer && sensors_enabled.barometer && sensors_present.barometer)
-                            {
-                                messageHigh = Strings.BadBaroHealth;
-                            }
-                            else if (!sensors_health.LASER_POSITION && sensors_enabled.LASER_POSITION &&
-                                     sensors_present.LASER_POSITION)
-                            {
-                                messageHigh = Strings.BadLiDARHealth;
-                            }
-                            else if (!sensors_health.optical_flow && sensors_enabled.optical_flow &&
-                                     sensors_present.optical_flow)
-                            {
-                                messageHigh = Strings.BadOptFlowHealth;
-                            }
-                            else if (!sensors_health.VISION_POSITION && sensors_enabled.VISION_POSITION &&
-                                     sensors_present.VISION_POSITION)
-                            {
-                                messageHigh = Strings.Bad_Vision_Position;
-                            }
-                            else if (!sensors_health.terrain && sensors_enabled.terrain && sensors_present.terrain)
-                            {
-                                messageHigh = Strings.BadorNoTerrainData;
-                            }
-                            else if (!sensors_health.geofence && sensors_enabled.geofence &&
-                                     sensors_present.geofence)
-                            {
-                                messageHigh = Strings.GeofenceBreach;
-                            }
-                            else if (!sensors_health.ahrs && sensors_enabled.ahrs && sensors_present.ahrs)
-                            {
-                                messageHigh = Strings.BadAHRS;
-                            }
-                            else if (!sensors_health.rc_receiver && sensors_enabled.rc_receiver &&
-                                     sensors_present.rc_receiver)
-                            {
-                                var reporterror = true;
-                                if (Settings.Instance["norcreceiver"] != null)
-                                    reporterror = !bool.Parse(Settings.Instance["norcreceiver"]);
-                                if (reporterror)
-                                {
-                                    messageHigh = Strings.NORCReceiver;
-                                }
-                            }
-                            else if (!sensors_health.battery && sensors_enabled.battery && sensors_present.battery)
-                            {
-                                messageHigh = Strings.Bad_Battery;
-                            }
-                            else if (!sensors_health.proximity && sensors_enabled.proximity && sensors_present.proximity)
-                            {
-                                messageHigh = Strings.Bad_Proximity;
-                            }
-                            else if (!sensors_health.satcom && sensors_enabled.satcom && sensors_present.satcom)
-                            {
-                                messageHigh = Strings.Bad_SatCom;
-                            }
-                            else if (!sensors_health.differential_pressure && sensors_enabled.differential_pressure && sensors_present.differential_pressure)
-                            {
-                                messageHigh = Strings.BadAirspeed;
-                            }
+                            // if (!sensors_health.prearm && sensors_enabled.prearm && sensors_present.prearm)
+                            // {
+                            //     messageHigh = messages.LastOrDefault(a => a.message.ToLower().Contains("prearm")).message
+                            //         ?.ToString();
+                            // }
+                            // else if (!sensors_health.gps && sensors_enabled.gps && sensors_present.gps)
+                            // {
+                            //     messageHigh = Strings.BadGPSHealth;
+                            // }
+                            // else if (!sensors_health.gyro && sensors_enabled.gyro && sensors_present.gyro)
+                            // {
+                            //     messageHigh = Strings.BadGyroHealth;
+                            // }
+                            // else if (!sensors_health.accelerometer && sensors_enabled.accelerometer &&
+                            //          sensors_present.accelerometer)
+                            // {
+                            //     messageHigh = Strings.BadAccelHealth;
+                            // }
+                            // else if (!sensors_health.compass && sensors_enabled.compass && sensors_present.compass)
+                            // {
+                            //     messageHigh = Strings.BadCompassHealth;
+                            // }
+                            // else if (!sensors_health.barometer && sensors_enabled.barometer && sensors_present.barometer)
+                            // {
+                            //     messageHigh = Strings.BadBaroHealth;
+                            // }
+                            // else if (!sensors_health.LASER_POSITION && sensors_enabled.LASER_POSITION &&
+                            //          sensors_present.LASER_POSITION)
+                            // {
+                            //     messageHigh = Strings.BadLiDARHealth;
+                            // }
+                            // else if (!sensors_health.optical_flow && sensors_enabled.optical_flow &&
+                            //          sensors_present.optical_flow)
+                            // {
+                            //     messageHigh = Strings.BadOptFlowHealth;
+                            // }
+                            // else if (!sensors_health.VISION_POSITION && sensors_enabled.VISION_POSITION &&
+                            //          sensors_present.VISION_POSITION)
+                            // {
+                            //     messageHigh = Strings.Bad_Vision_Position;
+                            // }
+                            // else if (!sensors_health.terrain && sensors_enabled.terrain && sensors_present.terrain)
+                            // {
+                            //     messageHigh = Strings.BadorNoTerrainData;
+                            // }
+                            // else if (!sensors_health.geofence && sensors_enabled.geofence &&
+                            //          sensors_present.geofence)
+                            // {
+                            //     messageHigh = Strings.GeofenceBreach;
+                            // }
+                            // else if (!sensors_health.ahrs && sensors_enabled.ahrs && sensors_present.ahrs)
+                            // {
+                            //     messageHigh = Strings.BadAHRS;
+                            // }
+                            // else if (!sensors_health.rc_receiver && sensors_enabled.rc_receiver &&
+                            //          sensors_present.rc_receiver)
+                            // {
+                            //     var reporterror = true;
+                            //     if (Settings.Instance["norcreceiver"] != null)
+                            //         reporterror = !bool.Parse(Settings.Instance["norcreceiver"]);
+                            //     if (reporterror)
+                            //     {
+                            //         messageHigh = Strings.NORCReceiver;
+                            //     }
+                            // }
+                            // else if (!sensors_health.battery && sensors_enabled.battery && sensors_present.battery)
+                            // {
+                            //     messageHigh = Strings.Bad_Battery;
+                            // }
+                            // else if (!sensors_health.proximity && sensors_enabled.proximity && sensors_present.proximity)
+                            // {
+                            //     messageHigh = Strings.Bad_Proximity;
+                            // }
+                            // else if (!sensors_health.satcom && sensors_enabled.satcom && sensors_present.satcom)
+                            // {
+                            //     messageHigh = Strings.Bad_SatCom;
+                            // }
+                            // else if (!sensors_health.differential_pressure && sensors_enabled.differential_pressure && sensors_present.differential_pressure)
+                            // {
+                            //     messageHigh = Strings.BadAirspeed;
+                            // }
                         }
 
                         break;
