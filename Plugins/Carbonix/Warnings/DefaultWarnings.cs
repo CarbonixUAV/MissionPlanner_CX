@@ -44,6 +44,8 @@ namespace Carbonix.Warnings
             .Or(Condition.StatusText("Uncommanded engine stop", timeoutMs: 1_000))
             .Or(Condition.Field("efi_rpm", CompareOp.LT, 500));
 
+        static readonly ICondition Connected = Condition.Field("linkqualitygcs", CompareOp.GT, 0);
+
         static readonly ICondition EkfVelocityVariance = Condition.Field("ekfvelv", CompareOp.GTEQ, 1.0, clear: 0.8);
         static readonly ICondition EkfCompassVariance = Condition.Field("ekfcompv", CompareOp.GTEQ, 1.0, clear: 0.8);
         static readonly ICondition EkfPosHorizVariance = Condition.Field("ekfposhor", CompareOp.GTEQ, 1.0, clear: 0.8);
@@ -165,6 +167,16 @@ namespace Carbonix.Warnings
                     severity: WarningSeverity.Warning,
                     subsystem: WarningSubsystem.Geofence,
                     trigger: FenceBreach,
+                    gate: Armed),
+
+                // --- Data link ---
+
+                new WarningRule(
+                    id: "no_data",
+                    text: "Comm loss",
+                    severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.DataLink,
+                    trigger: Connected.Not(),
                     gate: Armed),
             };
 
