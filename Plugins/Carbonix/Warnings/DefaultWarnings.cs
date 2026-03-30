@@ -89,6 +89,24 @@ namespace Carbonix.Warnings
             
         static readonly ICondition FenceBreach = Condition.Field("fenceb_status", CompareOp.GT, 0).Or(SensorUnhealthy("geofence"));
 
+        static readonly ICondition EscTelemLost = Condition.StatusText("CX_BIT: ESC 1 Telemetry Lost", clearPattern: "CX_BIT: ESC 1 Telemetry Recovered", timeoutMs: null)
+            .Or(Condition.StatusText("CX_BIT: ESC 2 Telemetry Lost", clearPattern: "CX_BIT: ESC 2 Telemetry Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 3 Telemetry Lost", clearPattern: "CX_BIT: ESC 3 Telemetry Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 4 Telemetry Lost", clearPattern: "CX_BIT: ESC 4 Telemetry Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 5 Telemetry Lost", clearPattern: "CX_BIT: ESC 5 Telemetry Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 6 Telemetry Lost", clearPattern: "CX_BIT: ESC 6 Telemetry Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 7 Telemetry Lost", clearPattern: "CX_BIT: ESC 7 Telemetry Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 8 Telemetry Lost", clearPattern: "CX_BIT: ESC 8 Telemetry Recovered", timeoutMs: null));
+
+        static readonly ICondition EscRpmLost = Condition.StatusText("CX_BIT: ESC 1 RPM Drop", clearPattern: "CX_BIT: ESC 1 RPM Recovered", timeoutMs: null)
+            .Or(Condition.StatusText("CX_BIT: ESC 2 RPM Drop", clearPattern: "CX_BIT: ESC 2 RPM Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 3 RPM Drop", clearPattern: "CX_BIT: ESC 3 RPM Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 4 RPM Drop", clearPattern: "CX_BIT: ESC 4 RPM Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 5 RPM Drop", clearPattern: "CX_BIT: ESC 5 RPM Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 6 RPM Drop", clearPattern: "CX_BIT: ESC 6 RPM Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 7 RPM Drop", clearPattern: "CX_BIT: ESC 7 RPM Recovered", timeoutMs: null))
+            .Or(Condition.StatusText("CX_BIT: ESC 8 RPM Drop", clearPattern: "CX_BIT: ESC 8 RPM Recovered", timeoutMs: null));
+
         static readonly List<WarningRule> AllRules = new List<WarningRule>
             {
                 new WarningRule(
@@ -287,6 +305,16 @@ namespace Carbonix.Warnings
                     subsystem: WarningSubsystem.DataLink,
                     trigger: Connected.Not(),
                     gate: Armed),
+
+                // --- ESC ---
+
+                new WarningRule(
+                    id: "vtol_loss",
+                    text: "VTOL loss",
+                    severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.VTOL,
+                    trigger: EscTelemLost.Or(EscRpmLost),
+                    gate: SafetyOff),
             };
 
         /// <summary>
