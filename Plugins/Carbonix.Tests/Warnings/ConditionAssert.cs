@@ -72,6 +72,17 @@ namespace Carbonix.Tests.Warnings
                     AreStructurallyEqual(es.Reset, as2.Reset);
                     break;
 
+                case DeltaCondition ed:
+                    var ad = (DeltaCondition)actual;
+                    Assert.AreEqual(ed.LeftName, ad.LeftName, "LeftName mismatch");
+                    Assert.AreEqual(ed.LeftSource, ad.LeftSource, "LeftSource mismatch");
+                    Assert.AreEqual(ed.RightName, ad.RightName, "RightName mismatch");
+                    Assert.AreEqual(ed.RightSource, ad.RightSource, "RightSource mismatch");
+                    Assert.AreEqual(ed.Op, ad.Op, "Op mismatch");
+                    Assert.AreEqual(ed.Threshold, ad.Threshold, "Threshold mismatch");
+                    Assert.AreEqual(ed.ClearThreshold, ad.ClearThreshold, "ClearThreshold mismatch");
+                    break;
+
                 default:
                     Assert.Fail($"Unknown condition type: {expected.GetType().Name}");
                     break;

@@ -106,7 +106,7 @@ namespace Carbonix.Warnings
             }
         }
 
-        static CompareOp Invert(CompareOp op)
+        internal static CompareOp Invert(CompareOp op)
         {
             switch (op)
             {
@@ -427,6 +427,109 @@ namespace Carbonix.Warnings
     }
 
     /// <summary>
+    /// Compares the absolute difference between two resolved values against a
+    /// threshold. Each side carries its own <see cref="ValueSource"/> so the
+    /// left and right values can come from different data sources (e.g. a
+    /// CurrentState field and a NAMED_VALUE_FLOAT).
+    /// </summary>
+    public class DeltaCondition : ICondition
+    {
+        readonly string _leftName;
+        readonly ValueSource _leftSource;
+        readonly Func<object, double?> _leftResolve;
+
+        readonly string _rightName;
+        readonly ValueSource _rightSource;
+        readonly Func<object, double?> _rightResolve;
+
+        readonly CompareOp _op;
+        readonly double _threshold;
+        readonly double? _clearThreshold;
+        readonly string _stateKey;
+
+        ConcurrentDictionary<string, float> _leftStore;
+        ConcurrentDictionary<string, float> _rightStore;
+
+        public string LeftName => _leftName;
+        public ValueSource LeftSource => _leftSource;
+        public string RightName => _rightName;
+        public ValueSource RightSource => _rightSource;
+        public CompareOp Op => _op;
+        public double Threshold => _threshold;
+        public double? ClearThreshold => _clearThreshold;
+        public string StateKey => _stateKey;
+
+        public ConcurrentDictionary<string, float> LeftStore
+        {
+            get => _leftStore;
+            set => _leftStore = value;
+        }
+
+        public ConcurrentDictionary<string, float> RightStore
+        {
+            get => _rightStore;
+            set => _rightStore = value;
+        }
+
+        internal DeltaCondition(
+            string leftName, ValueSource leftSource, Func<object, double?> leftResolve,
+            string rightName, ValueSource rightSource, Func<object, double?> rightResolve,
+            CompareOp op, double threshold, double? clearThreshold)
+        {
+            _leftName = leftName ?? throw new ArgumentNullException(nameof(leftName));
+            _leftSource = leftSource;
+            _leftResolve = leftResolve;
+            _rightName = rightName ?? throw new ArgumentNullException(nameof(rightName));
+            _rightSource = rightSource;
+            _rightResolve = rightResolve;
+            _op = op;
+            _threshold = threshold;
+            _clearThreshold = clearThreshold;
+
+            var ls = leftSource == ValueSource.NamedValue ? "nv" : "sf";
+            var rs = rightSource == ValueSource.NamedValue ? "nv" : "sf";
+            _stateKey = clearThreshold.HasValue
+                ? $"delta:{ls}:{leftName}:{rs}:{rightName}:{op}:{threshold}:{clearThreshold}"
+                : $"delta:{ls}:{leftName}:{rs}:{rightName}:{op}:{threshold}";
+        }
+
+        public bool Evaluate(object source, ConditionState state)
+        {
+            double? left = ResolveValue(_leftSource, _leftResolve, _leftStore, _leftName, source);
+            double? right = ResolveValue(_rightSource, _rightResolve, _rightStore, _rightName, source);
+
+            if (!left.HasValue || !right.HasValue)
+                return false;
+
+            double delta = Math.Abs(left.Value - right.Value);
+
+            if (_clearThreshold == null)
+                return CompareCondition.Compare(delta, _op, _threshold);
+
+            bool isSet = state.GetHysteresis(_stateKey);
+            if (!isSet && CompareCondition.Compare(delta, _op, _threshold))
+                isSet = true;
+            else if (isSet && CompareCondition.Compare(delta, CompareCondition.Invert(_op), _clearThreshold.Value))
+                isSet = false;
+
+            state.SetHysteresis(_stateKey, isSet);
+            return isSet;
+        }
+
+        static double? ResolveValue(ValueSource source, Func<object, double?> resolve,
+            ConcurrentDictionary<string, float> store, string name, object obj)
+        {
+            if (source == ValueSource.NamedValue)
+            {
+                if (store == null || !store.TryGetValue(name, out var val))
+                    return null;
+                return (double)val;
+            }
+            return resolve(obj);
+        }
+    }
+
+    /// <summary>
     /// Provides factory and extension methods for building <see cref="ICondition"/> trees.
     /// </summary>
     public static class Condition
@@ -449,7 +552,7 @@ namespace Carbonix.Warnings
             });
         }
 
-        static Func<object, double?> BuildFieldResolver(string path, Type rootType)
+        internal static Func<object, double?> BuildFieldResolver(string path, Type rootType)
         {
             const BindingFlags flags =
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -494,6 +597,50 @@ namespace Carbonix.Warnings
         {
             return new CompareCondition(name, op, threshold, clear,
                 ValueSource.NamedValue, resolve: null);
+        }
+
+        public static DeltaCondition Delta(
+            string leftName, ValueSource leftSource,
+            string rightName, ValueSource rightSource,
+            CompareOp op, double threshold, double? clear = null)
+        {
+            Func<object, double?> leftResolve = null;
+            Func<object, double?> rightResolve = null;
+
+            if (leftSource == ValueSource.StateField)
+            {
+                object cachedSource = null;
+                Func<object, double?> cachedResolve = null;
+                leftResolve = source =>
+                {
+                    if (source != cachedSource)
+                    {
+                        cachedResolve = BuildFieldResolver(leftName, source.GetType());
+                        cachedSource = source;
+                    }
+                    return cachedResolve(source);
+                };
+            }
+
+            if (rightSource == ValueSource.StateField)
+            {
+                object cachedSource = null;
+                Func<object, double?> cachedResolve = null;
+                rightResolve = source =>
+                {
+                    if (source != cachedSource)
+                    {
+                        cachedResolve = BuildFieldResolver(rightName, source.GetType());
+                        cachedSource = source;
+                    }
+                    return cachedResolve(source);
+                };
+            }
+
+            return new DeltaCondition(
+                leftName, leftSource, leftResolve,
+                rightName, rightSource, rightResolve,
+                op, threshold, clear);
         }
 
         public static StatusTextCondition StatusText(string pattern)
