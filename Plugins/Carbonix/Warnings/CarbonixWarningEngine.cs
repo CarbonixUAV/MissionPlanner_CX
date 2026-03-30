@@ -479,6 +479,12 @@ namespace Carbonix.Warnings
                     BindConditions(sustain.Inner);
                     BindConditions(sustain.Reset);
                     break;
+                case DeltaCondition dc:
+                    if (dc.LeftSource == ValueSource.NamedValue)
+                        dc.LeftStore = _namedValues;
+                    if (dc.RightSource == ValueSource.NamedValue)
+                        dc.RightStore = _namedValues;
+                    break;
             }
         }
     }

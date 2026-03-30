@@ -79,9 +79,11 @@ namespace Carbonix.Warnings
                 return ReadStatusText(obj);
             if (obj["sustain"] != null)
                 return ReadSustain(obj, serializer);
+            if (obj["delta"] != null)
+                return ReadDelta(obj);
 
             throw new JsonSerializationException(
-                $"Unknown condition type. Expected one of: ref, stateField, namedValue, statusText, and, or, not, edge, latch, sustain. " +
+                $"Unknown condition type. Expected one of: ref, stateField, namedValue, statusText, and, or, not, edge, latch, sustain, delta. " +
                 $"Found keys: {string.Join(", ", obj.Properties().Select(p => p.Name))}");
         }
 
@@ -125,6 +127,9 @@ namespace Carbonix.Warnings
                     break;
                 case SustainCondition sustain:
                     WriteSustain(writer, sustain, serializer);
+                    break;
+                case DeltaCondition delta:
+                    WriteDelta(writer, delta);
                     break;
                 default:
                     throw new JsonSerializationException(
@@ -345,6 +350,85 @@ namespace Carbonix.Warnings
                 writer.WritePropertyName("reset");
                 serializer.Serialize(writer, sustain.Reset);
             }
+            writer.WriteEndObject();
+        }
+
+        static ICondition ReadDelta(JObject obj)
+        {
+            var deltaObj = obj["delta"] as JObject;
+            if (deltaObj == null || deltaObj["left"] == null || deltaObj["right"] == null)
+                throw new JsonSerializationException(
+                    "'delta' must be an object with 'left' and 'right' properties");
+
+            var opStr = obj["op"]?.Value<string>()
+                ?? throw new JsonSerializationException("'delta' requires 'op'");
+            if (!SymbolToOp.TryGetValue(opStr, out var op))
+                throw new JsonSerializationException(
+                    $"Unknown operator '{opStr}'. Expected one of: {string.Join(", ", SymbolToOp.Keys)}");
+
+            var threshold = obj["value"]?.Value<double>()
+                ?? throw new JsonSerializationException("'delta' requires 'value'");
+            double? clear = obj["clear"]?.Value<double>();
+
+            ReadValueRef(deltaObj["left"] as JObject, out var leftName, out var leftSource);
+            ReadValueRef(deltaObj["right"] as JObject, out var rightName, out var rightSource);
+
+            return Condition.Delta(leftName, leftSource, rightName, rightSource,
+                op, threshold, clear);
+        }
+
+        static void ReadValueRef(JObject obj, out string name, out ValueSource source)
+        {
+            if (obj == null)
+                throw new JsonSerializationException("Delta value ref must be an object");
+
+            if (obj["stateField"] != null)
+            {
+                name = obj["stateField"].Value<string>();
+                source = ValueSource.StateField;
+            }
+            else if (obj["namedValue"] != null)
+            {
+                name = obj["namedValue"].Value<string>();
+                source = ValueSource.NamedValue;
+            }
+            else
+            {
+                throw new JsonSerializationException(
+                    "Delta value ref must have 'stateField' or 'namedValue'");
+            }
+        }
+
+        static void WriteDelta(JsonWriter writer, DeltaCondition dc)
+        {
+            writer.WriteStartObject();
+            writer.WritePropertyName("delta");
+            writer.WriteStartObject();
+            writer.WritePropertyName("left");
+            WriteValueRef(writer, dc.LeftName, dc.LeftSource);
+            writer.WritePropertyName("right");
+            WriteValueRef(writer, dc.RightName, dc.RightSource);
+            writer.WriteEndObject();
+            writer.WritePropertyName("op");
+            writer.WriteValue(OpToSymbol[dc.Op]);
+            writer.WritePropertyName("value");
+            writer.WriteValue(dc.Threshold);
+            if (dc.ClearThreshold.HasValue)
+            {
+                writer.WritePropertyName("clear");
+                writer.WriteValue(dc.ClearThreshold.Value);
+            }
+            writer.WriteEndObject();
+        }
+
+        static void WriteValueRef(JsonWriter writer, string name, ValueSource source)
+        {
+            writer.WriteStartObject();
+            if (source == ValueSource.NamedValue)
+                writer.WritePropertyName("namedValue");
+            else
+                writer.WritePropertyName("stateField");
+            writer.WriteValue(name);
             writer.WriteEndObject();
         }
 
