@@ -22,6 +22,7 @@ namespace Carbonix.Warnings
         Power,
         Geofence,
         DataLink,
+        VTOL,
     }
 
     public enum CompareOp
