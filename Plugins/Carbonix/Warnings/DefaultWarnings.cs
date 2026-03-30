@@ -107,6 +107,30 @@ namespace Carbonix.Warnings
             .Or(Condition.StatusText("CX_BIT: ESC 7 RPM Drop", clearPattern: "CX_BIT: ESC 7 RPM Recovered", timeoutMs: null))
             .Or(Condition.StatusText("CX_BIT: ESC 8 RPM Drop", clearPattern: "CX_BIT: ESC 8 RPM Recovered", timeoutMs: null));
 
+        static readonly ICondition ChtHot = Condition.Field("efi_headtemp", CompareOp.GT, 280, clear: 270)
+            .Or(Condition.NamedValue("CHT2", CompareOp.GT, 280, clear: 270));
+
+        static readonly ICondition ChtCold = Condition.Field("efi_headtemp", CompareOp.LT, 100, clear: 120)
+            .Or(Condition.NamedValue("CHT2", CompareOp.LT, 100, clear: 120));
+
+        static readonly ICondition EgtHot = Condition.Field("efi_exhasttemp", CompareOp.GT, 720, clear: 710)
+            .Or(Condition.NamedValue("EGT2", CompareOp.GT, 720, clear: 710));
+
+        static readonly ICondition ChtSplit = Condition.Delta("efi_headtemp", ValueSource.StateField, "CHT2", ValueSource.NamedValue, CompareOp.GT, 50, clear: 45)
+            .Sustain(riseMs: 1_000, fallMs: 0); // These come over different messages, so we need a little debounce (e.g., initial connection)
+
+        static readonly ICondition EgtSplit = Condition.Delta("efi_exhasttemp", ValueSource.StateField, "EGT2", ValueSource.NamedValue, CompareOp.GT, 75, clear: 70)
+            .Sustain(riseMs: 1_000, fallMs: 0); // These come over different messages, so we need a little debounce (e.g., initial connection)
+
+        static readonly ICondition EngineWarmupComplete = ChtCold.Not().Latch(EngineOut);
+
+        static readonly ICondition IgnoreEgtSplit = Condition.Field("efi_rpm", CompareOp.LT, 3000).Sustain(riseMs: 0, fallMs: 10_000)
+            .And(EngineWarmupComplete);
+
+        // List of status text patterns to simply catch and kill. We don't actually *use* this
+        // condition anywhere, this just keeps them silenced.
+        static readonly ICondition IgnoreTheseMessages = Condition.StatusText("CX_BIT: Engine.*");
+
         static readonly List<WarningRule> AllRules = new List<WarningRule>
             {
                 new WarningRule(
@@ -315,6 +339,54 @@ namespace Carbonix.Warnings
                     subsystem: WarningSubsystem.VTOL,
                     trigger: EscTelemLost.Or(EscRpmLost),
                     gate: SafetyOff),
+
+                // --- Engine ---
+
+                new WarningRule(
+                    id: "cht_hot",
+                    text: "CHT hot",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Engine,
+                    trigger: ChtHot,
+                    gate: EngineOut.Not(),
+                    aircraft: Aircraft.Ottano),
+
+                new WarningRule(
+                    id: "cht_cold",
+                    text: "CHT cold",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Engine,
+                    trigger: ChtCold,
+                    gate: EngineWarmupComplete.Or(Armed.And(EngineOut.Not())),
+                    aircraft: Aircraft.Ottano),
+
+                new WarningRule(
+                    id: "cht_split",
+                    text: "CHT split",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Engine,
+                    trigger: ChtSplit,
+                    gate: EngineWarmupComplete.Or(Armed.And(EngineOut.Not())),
+                    aircraft: Aircraft.Ottano),
+
+                new WarningRule(
+                    id: "egt_hot",
+                    text: "EGT hot",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Engine,
+                    trigger: EgtHot,
+                    gate: EngineOut.Not(),
+                    aircraft: Aircraft.Ottano),
+
+                new WarningRule(
+                    id: "egt_split",
+                    text: "EGT split",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Engine,
+                    trigger: EgtSplit.And(IgnoreEgtSplit.Not()),
+                    gate: EngineWarmupComplete.Or(Armed.And(EngineOut.Not())),
+                    aircraft: Aircraft.Ottano),
+
             };
 
         /// <summary>
