@@ -21,6 +21,7 @@ namespace Carbonix.Warnings
         Attitude,
         Power,
         Geofence,
+        DataLink,
     }
 
     public enum CompareOp
