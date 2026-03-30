@@ -35,7 +35,12 @@ namespace Carbonix.Warnings
         static readonly ICondition VtolStateMC = Condition.Field("vtol_state", CompareOp.EQ, (double)MAVLink.MAV_VTOL_STATE.MC);
         static readonly ICondition VtolStateFW = Condition.Field("vtol_state", CompareOp.EQ, (double)MAVLink.MAV_VTOL_STATE.FW);
         static readonly ICondition IntendedFixedWing = VtolStateFW.Latch(VtolStateMC.Or(VtolStateToMC));
-        static readonly ICondition QAssist = VtolStateToFW.Or(Condition.StatusText("QASSIST"));
+        static readonly ICondition QAssist = VtolStateToFW
+            // The StatusText rule does two things, it catches/kills the nuisance alert, and it also
+            // serves to catch blips brief enough that VtolStateToFW can't catch them. We slightly
+            // delay it to avoid the race where the message comes just before the intentional
+            // back-transition is detected with VtolStateToMC.
+            .Or(Condition.StatusText("QASSIST", timeoutMs: 1_500).Sustain(riseMs: 1_000, fallMs: 0).Edge());
         static readonly ICondition OnGround = Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.ON_GROUND);
         // IsLanding starts at the airbrake stage, or, if that gets skipped, as soon as landed_state is LANDING.
         static readonly ICondition IsLanding = VtolStateToMC.Latch(VtolStateToFW.Or(VtolStateFW).Or(OnGround))
