@@ -48,6 +48,10 @@ namespace Carbonix.Warnings
         static readonly ICondition EngineOut = Condition.StatusText("Engine out", clearPattern: "Engine running")
             .Or(Condition.StatusText("Uncommanded engine stop", timeoutMs: 1_000))
             .Or(Condition.Field("efi_rpm", CompareOp.LT, 500));
+        static readonly ICondition AirGroundSpeedDiff1 = Condition.StatusText("Airspeed 1.*air to gnd speed diff", timeoutMs: 0)
+            .Or(Condition.Delta("_airspeed", ValueSource.StateField, "_groundspeed", ValueSource.StateField, CompareOp.GT, 25, clear: 20));
+        static readonly ICondition AirGroundSpeedDiff2 = Condition.StatusText("Airspeed 2.*air to gnd speed diff", timeoutMs: 0)
+            .Or(Condition.Delta("AS2", ValueSource.NamedValue, "_groundspeed", ValueSource.StateField, CompareOp.GT, 25, clear: 20));
 
         static readonly ICondition Connected = Condition.Field("linkqualitygcs", CompareOp.GT, 0);
 
@@ -387,6 +391,39 @@ namespace Carbonix.Warnings
                     gate: EngineWarmupComplete.Or(Armed.And(EngineOut.Not())),
                     aircraft: Aircraft.Ottano),
 
+                // --- Airspeed ---
+
+                new WarningRule(
+                    id: "airspeed_test1",
+                    text: "Airspeed 1 test success",
+                    severity: WarningSeverity.Advisory,
+                    subsystem: WarningSubsystem.Airspeed,
+                    trigger: AirGroundSpeedDiff1,
+                    gate: Armed.Not()),
+
+                new WarningRule(
+                    id: "airspeed_test2",
+                    text: "Airspeed 2 test success",
+                    severity: WarningSeverity.Advisory,
+                    subsystem: WarningSubsystem.Airspeed,
+                    trigger: AirGroundSpeedDiff2,
+                    gate: Armed.Not()),
+
+                new WarningRule(
+                    id: "airspeed_diff",
+                    text: "Airspeed 1 diff",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Airspeed,
+                    trigger: AirGroundSpeedDiff1,
+                    gate: Armed),
+
+                new WarningRule(
+                    id: "airspeed_diff2",
+                    text: "Airspeed 2 diff",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Airspeed,
+                    trigger: AirGroundSpeedDiff2,
+                    gate: Armed),
             };
 
         /// <summary>
