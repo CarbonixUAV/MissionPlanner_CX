@@ -50,6 +50,7 @@ namespace MissionPlanner
 
         public static int KIndexstatic = -1;
         private float _airspeed;
+        private float _airspeed2;
 
         private float _alt;
         private float _alt_error;
@@ -535,10 +536,39 @@ namespace MissionPlanner
         [GroupText("Sensor")]
         public float airspeed1_temp { get; set; }
 
+        [DisplayFieldName("airspeed1_health.Field")]
+        [DisplayText("Airspeed1 Health")]
+        [GroupText("Sensor")]
+        public bool airspeed1_health { get; set; }
+
+        [DisplayFieldName("airspeed1_using.Field")]
+        [DisplayText("Airspeed1 Using")]
+        [GroupText("Sensor")]
+        public bool airspeed1_using { get; set; }
+
+        [DisplayFieldName("airspeed2.Field")]
+        [DisplayText("AirSpeed2 (speed)")]
+        [GroupText("Sensor")]
+        public float airspeed2
+        {
+            get => _airspeed2 * multiplierspeed;
+            set => _airspeed2 = value;
+        }
+
         [DisplayFieldName("airspeed2_temp.Field")]
         [DisplayText("Airspeed2 Temperature")]
         [GroupText("Sensor")]
         public float airspeed2_temp { get; set; }
+
+        [DisplayFieldName("airspeed2_health.Field")]
+        [DisplayText("Airspeed2 Health")]
+        [GroupText("Sensor")]
+        public bool airspeed2_health { get; set; }
+
+        [DisplayFieldName("airspeed2_using.Field")]
+        [DisplayText("Airspeed2 Using")]
+        [GroupText("Sensor")]
+        public bool airspeed2_using { get; set; }
 
         [GroupText("Position")]
         [DisplayFieldName("groundspeed.Field")]
@@ -4116,6 +4146,15 @@ namespace MissionPlanner
                             {
                                 airspeed = airspeedp.airspeed;
                                 airspeed1_temp = (float)(airspeedp.temperature / 100.0);
+                                airspeed1_health = (airspeedp.flags & (uint)MAVLink.AIRSPEED_SENSOR_FLAGS.AIRSPEED_SENSOR_UNHEALTHY) == 0;
+                                airspeed1_using = (airspeedp.flags & (uint)MAVLink.AIRSPEED_SENSOR_FLAGS.AIRSPEED_SENSOR_USING) > 0;
+                            }
+                            else if(airspeedp.id == 1)
+                            {
+                                airspeed2 = airspeedp.airspeed;
+                                airspeed2_temp = (float)(airspeedp.temperature / 100.0);
+                                airspeed2_health = (airspeedp.flags & (uint)MAVLink.AIRSPEED_SENSOR_FLAGS.AIRSPEED_SENSOR_UNHEALTHY) == 0;
+                                airspeed2_using = (airspeedp.flags & (uint)MAVLink.AIRSPEED_SENSOR_FLAGS.AIRSPEED_SENSOR_USING) > 0;
                             }
                         }
                         break;
@@ -4418,7 +4457,7 @@ namespace MissionPlanner
         /// <summary>
         ///     use for main serial port only
         /// </summary>
-        /// <param name="bs"></param>
+        /// < name="bs"></param>
         public void UpdateCurrentSettings(Action<CurrentState> bs)
         {
             UpdateCurrentSettings(bs, false, parent.parent, parent.parent.MAV);
