@@ -60,8 +60,16 @@ namespace Carbonix.Warnings
         static readonly ICondition EkfPosHorizVariance = Condition.Field("ekfposhor", CompareOp.GTEQ, 1.0, clear: 0.8);
         static readonly ICondition EkfPosVertVariance = Condition.Field("ekfposvert", CompareOp.GTEQ, 1.0, clear: 0.8);
         static readonly ICondition EkfTerrainVariance = Condition.Field("ekfteralt", CompareOp.GTEQ, 1.0, clear: 0.8);
-        static readonly ICondition EkfNavVariance = EkfVelocityVariance.Or(EkfPosHorizVariance).Or(EkfPosVertVariance);
+        static readonly ICondition EkfFailsafe = Condition.StatusText("EKF variance", timeoutMs: 0);
+        static readonly ICondition EkfNavVariance = EkfVelocityVariance.Or(EkfPosHorizVariance).Or(EkfPosVertVariance).Or(EkfFailsafe);
+        static readonly ICondition EkfLaneSwitch = Condition.StatusText("EK.*lane switch", timeoutMs: 5_000);
         static readonly ICondition InternalError = Condition.Field("errors_count1", CompareOp.GT, 0).Or(Condition.Field("errors_count2", CompareOp.GT, 0));
+        static readonly ICondition Gps1Fix = Condition.Field("gpsstatus", CompareOp.GTEQ, 3);
+        static readonly ICondition Gps2Fix = Condition.Field("gpsstatus2", CompareOp.GTEQ, 3);
+        static readonly ICondition Gps1SatcountLow = Condition.Field("satcount", CompareOp.LT, 18, 22);
+        static readonly ICondition Gps2SatcountLow = Condition.Field("satcount2", CompareOp.LT, 18, 22);
+        static readonly ICondition Gps1AccLow = Condition.Field("gpsh_acc", CompareOp.GT, 1.5, 1.4);
+        static readonly ICondition Gps2AccLow = Condition.Field("gpsh_acc2", CompareOp.GT, 1.5, 1.4);
 
         // Catch
         // PreArm: Rangefinder 1: not detected
@@ -81,10 +89,10 @@ namespace Carbonix.Warnings
                 .And(Condition.Field($"sensors_enabled.{sensor}", CompareOp.GT, 0))
                 .And(Condition.Field($"sensors_present.{sensor}", CompareOp.GT, 0));
 
+        static ICondition ConnectionEstablished = Connected.Sustain(riseMs: 15_000, fallMs: 0);
+
         static readonly ICondition PrearmsPassing = Armed.Or(
-            // Prearms initialize to passing during connection until the first SYS_STATUS comes in.
-            // We gate this on being connected for 10s to avoid false positives.
-            SensorUnhealthy("prearm").Not().And(Connected.Sustain(riseMs: 10_000, fallMs: 0))
+            SensorUnhealthy("prearm").Not().And(ConnectionEstablished)
         );
 
         static readonly ICondition RcLoss = SensorUnhealthy("rc_receiver").Sustain(riseMs: 2_000, fallMs: 0)
@@ -144,32 +152,56 @@ namespace Carbonix.Warnings
                     text: "GPS 1 low satellites",
                     severity: WarningSeverity.Caution,
                     subsystem: WarningSubsystem.GPS,
-                    trigger: Condition.Field("satcount", CompareOp.LT, 18, 22),
-                    gate: PrearmsPassing),
+                    trigger: Gps1SatcountLow,
+                    gate: Gps1Fix.And(PrearmsPassing)),
 
                 new WarningRule(
                     id: "gps1_low_acc",
                     text: "GPS 1 low accuracy",
                     severity: WarningSeverity.Caution,
                     subsystem: WarningSubsystem.GPS,
-                    trigger: Condition.Field("gpsh_acc", CompareOp.GT, 1.5, 1.4),
-                    gate: PrearmsPassing),
+                    trigger: Gps1AccLow,
+                    gate: Gps1Fix.And(PrearmsPassing)),
 
                 new WarningRule(
                     id: "gps2_low_sats",
                     text: "GPS 2 low satellites",
                     severity: WarningSeverity.Caution,
                     subsystem: WarningSubsystem.GPS,
-                    trigger: Condition.Field("satcount2", CompareOp.LT, 18, 22),
-                    gate: PrearmsPassing),
+                    trigger: Gps2SatcountLow,
+                    gate: Gps2Fix.And(PrearmsPassing)),
 
                 new WarningRule(
                     id: "gps2_low_acc",
                     text: "GPS 2 low accuracy",
                     severity: WarningSeverity.Caution,
                     subsystem: WarningSubsystem.GPS,
-                    trigger: Condition.Field("gpsh_acc2", CompareOp.GT, 1.5, 1.4),
-                    gate: PrearmsPassing),
+                    trigger: Gps2AccLow,
+                    gate: Gps2Fix.And(PrearmsPassing)),
+
+                new WarningRule(
+                    id: "gps1_no_fix",
+                    text: "GPS 1 lost",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.GPS,
+                    trigger: Gps1Fix.Not(),
+                    gate: Armed.Or(SafetyOff.And(ConnectionEstablished))),
+
+                new WarningRule(
+                    id: "gps2_no_fix",
+                    text: "GPS 2 lost",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.GPS,
+                    trigger: Gps2Fix.Not(),
+                    gate: Armed.Or(SafetyOff.And(ConnectionEstablished))),
+
+                new WarningRule(
+                    id: "gps_no_fix",
+                    text: "Total GPS loss",
+                    severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.GPS,
+                    trigger: Gps1Fix.Not().And(Gps2Fix.Not()),
+                    gate: Armed.Or(SafetyOff.And(ConnectionEstablished))),
 
                 new WarningRule(
                     id: "pusher_esc_temp",
@@ -248,6 +280,13 @@ namespace Carbonix.Warnings
                     trigger: EkfTerrainVariance,
                     gate: PrearmsPassing),
 
+                new WarningRule(
+                    id: "ekf_lane_switch",
+                    text: "EKF lane switch",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Navigation,
+                    trigger: EkfLaneSwitch),
+
                 // --- SYS_STATUS sensor health ---
 
                 new WarningRule(
@@ -258,7 +297,7 @@ namespace Carbonix.Warnings
                     // We need to debounce this a little. If the GPS has been unhealthy for 2s
                     // in the last 30 minutes or so, we warn about it. Otherwise we ignore it.
                     trigger: SensorUnhealthy("gps").Sustain(riseMs: 2_000, fallMs: 1_800_000, reset: PrearmsPassing.Not()),
-                    gate: Armed),
+                    gate: PrearmsPassing),
 
                 new WarningRule(
                     id: "health_imu",
