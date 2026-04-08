@@ -38,10 +38,12 @@ namespace Carbonix.Warnings
         static readonly ICondition AngleAssist = Condition.StatusText("Angle assist.*").Latch(VtolStateToFW.Not());
         static readonly ICondition AltAssist = Condition.StatusText("Alt assist.*").Latch(VtolStateToFW.Not());
         static readonly ICondition SpeedAssist = VtolStateToFW.Sustain(riseMs: 500, fallMs: 0).And(AltAssist.Not()).And(AngleAssist.Not());
-                static readonly ICondition OnGround = Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.ON_GROUND);
-        // IsLanding starts at the airbrake stage, or, if that gets skipped, as soon as landed_state is LANDING.
-        static readonly ICondition IsLanding = VtolStateToMC.Latch(VtolStateToFW.Or(VtolStateFW).Or(OnGround))
-            .Or(Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.LANDING));
+        static readonly ICondition LandStateGround = Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.ON_GROUND);
+        static readonly ICondition LandStateAir = Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.IN_AIR);
+        static readonly ICondition LandStateTakeoff = Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.TAKEOFF);
+        static readonly ICondition LandStateLanding = Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.LANDING);
+        static readonly ICondition LandDescent = LandStateLanding.Latch(LandStateAir.Or(LandStateTakeoff))
+            .Or(Condition.Field("_mode", CompareOp.EQ, (double)MAVLink.PLANE_MODE.QLAND));
         static readonly ICondition EngineOut = Condition.StatusText("Engine out", clearPattern: "Engine running")
             .Or(Condition.StatusText("Uncommanded engine stop", timeoutMs: 1_000))
             .Or(Condition.Field("efi_rpm", CompareOp.LT, 500));
@@ -182,7 +184,7 @@ namespace Carbonix.Warnings
                     severity: WarningSeverity.Warning,
                     subsystem: WarningSubsystem.Engine,
                     trigger: EngineOut,
-                    gate: Armed.And(OnGround.Not()).And(IsLanding.Not()),
+                    gate: Armed.And(LandDescent.Not()),
                     aircraft: Aircraft.Ottano),
 
                 new WarningRule(
