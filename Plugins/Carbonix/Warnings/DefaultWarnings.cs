@@ -142,9 +142,25 @@ namespace Carbonix.Warnings
 
         // List of status text patterns to simply catch and kill. We don't actually *use* this
         // condition anywhere, this just keeps them silenced.
-        static readonly ICondition IgnoreTheseMessages = Condition.StatusText("CX_BIT: Engine.*");
+        static readonly ICondition IgnoreTheseMessages = Condition.StatusText("CX_BIT: Engine.*")
+            .Or(Condition.StatusText("GCS failsafe off"))
+            // These three alerts come from engine-out.lua, and aren't really that helpful. They
+            // basically let you know that the script is working. I could make them advisory, but
+            // it's just too much noise/confusion during an emergency.
+            .Or(Condition.StatusText("Failsafe: Landing QLand"))
+            .Or(Condition.StatusText("Failsafe: Landing QRTL"))
+            .Or(Condition.StatusText("Failsafe: Engine Out"))            
             // This QASSIST message is being replaced by this plugin; it's simply not needed anymore.
             .Or(Condition.StatusText("QASSIST"))
+            // ArduPilot shouts this to warn GCSs not to use this message, but Planner has an
+            // occasional race where it can't tell what messages AP supports, so it tries the old
+            // one. Someday I'll strip it out of Planner, but for now it's totally harmless.
+            .Or(Condition.StatusText("got MISSION_REQUEST; use MISSION_REQUEST_INT!"))
+            // Our QLand fence script's message. The "fence breach" warning and the QLand callout
+            // already serve this purpose.
+            .Or(Condition.StatusText("Fence breach.*m from home, QLand"))
+            // INS calibration messages. These happen on reboot while connected
+            .Or(Condition.StatusText(".*INS calibration.*"));
 
         static readonly List<WarningRule> AllRules = new List<WarningRule>
             {
