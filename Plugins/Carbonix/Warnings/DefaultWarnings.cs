@@ -64,6 +64,7 @@ namespace Carbonix.Warnings
         static readonly ICondition EkfNavVariance = EkfVelocityVariance.Or(EkfPosHorizVariance).Or(EkfPosVertVariance).Or(EkfFailsafe);
         static readonly ICondition EkfLaneSwitch = Condition.StatusText("EK.*lane switch", timeoutMs: 5_000);
         static readonly ICondition InternalError = Condition.Field("errors_count1", CompareOp.GT, 0).Or(Condition.Field("errors_count2", CompareOp.GT, 0));
+        static readonly ICondition WatchdogReboot = Condition.StatusText("WDG:.*", timeoutMs: 300_000);
         static readonly ICondition Gps1Fix = Condition.Field("gpsstatus", CompareOp.GTEQ, 3);
         static readonly ICondition Gps2Fix = Condition.Field("gpsstatus2", CompareOp.GTEQ, 3);
         static readonly ICondition Gps1SatcountLow = Condition.Field("satcount", CompareOp.LT, 18, 22);
@@ -414,6 +415,13 @@ namespace Carbonix.Warnings
                     severity: WarningSeverity.Warning,
                     subsystem: WarningSubsystem.FlightControl,
                     trigger: InternalError),
+
+                new WarningRule(
+                    id: "watchdog_reboot",
+                    text: "Watchdog reboot",
+                    severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.FlightControl,
+                    trigger: WatchdogReboot),
 
                 // --- Data link ---
 
