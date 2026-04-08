@@ -35,13 +35,10 @@ namespace Carbonix.Warnings
         static readonly ICondition VtolStateMC = Condition.Field("vtol_state", CompareOp.EQ, (double)MAVLink.MAV_VTOL_STATE.MC);
         static readonly ICondition VtolStateFW = Condition.Field("vtol_state", CompareOp.EQ, (double)MAVLink.MAV_VTOL_STATE.FW);
         static readonly ICondition IntendedFixedWing = VtolStateFW.Latch(VtolStateMC.Or(VtolStateToMC));
-        static readonly ICondition QAssist = VtolStateToFW
-            // The StatusText rule does two things, it catches/kills the nuisance alert, and it also
-            // serves to catch blips brief enough that VtolStateToFW can't catch them. We slightly
-            // delay it to avoid the race where the message comes just before the intentional
-            // back-transition is detected with VtolStateToMC.
-            .Or(Condition.StatusText("QASSIST", timeoutMs: 1_500).Sustain(riseMs: 1_000, fallMs: 0).Edge());
-        static readonly ICondition OnGround = Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.ON_GROUND);
+        static readonly ICondition AngleAssist = Condition.StatusText("Angle assist.*").Latch(VtolStateToFW.Not());
+        static readonly ICondition AltAssist = Condition.StatusText("Alt assist.*").Latch(VtolStateToFW.Not());
+        static readonly ICondition SpeedAssist = VtolStateToFW.Sustain(riseMs: 500, fallMs: 0).And(AltAssist.Not()).And(AngleAssist.Not());
+                static readonly ICondition OnGround = Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.ON_GROUND);
         // IsLanding starts at the airbrake stage, or, if that gets skipped, as soon as landed_state is LANDING.
         static readonly ICondition IsLanding = VtolStateToMC.Latch(VtolStateToFW.Or(VtolStateFW).Or(OnGround))
             .Or(Condition.Field("landed_state", CompareOp.EQ, (double)MAVLink.MAV_LANDED_STATE.LANDING));
@@ -134,6 +131,8 @@ namespace Carbonix.Warnings
         // List of status text patterns to simply catch and kill. We don't actually *use* this
         // condition anywhere, this just keeps them silenced.
         static readonly ICondition IgnoreTheseMessages = Condition.StatusText("CX_BIT: Engine.*");
+            // This QASSIST message is being replaced by this plugin; it's simply not needed anymore.
+            .Or(Condition.StatusText("QASSIST"))
 
         static readonly List<WarningRule> AllRules = new List<WarningRule>
             {
@@ -191,7 +190,23 @@ namespace Carbonix.Warnings
                     text: "QAssist",
                     severity: WarningSeverity.Caution,
                     subsystem: WarningSubsystem.FlightControl,
-                    trigger: QAssist,
+                    trigger: SpeedAssist,
+                    gate: Armed.And(IntendedFixedWing)),
+
+                new WarningRule(
+                    id: "angle_assist",
+                    text: "QAssist angle",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.FlightControl,
+                    trigger: AngleAssist,
+                    gate: Armed.And(IntendedFixedWing)),
+
+                new WarningRule(
+                    id: "alt_assist",
+                    text: "QAssist alt",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.FlightControl,
+                    trigger: AltAssist,
                     gate: Armed.And(IntendedFixedWing)),
 
                 new WarningRule(
