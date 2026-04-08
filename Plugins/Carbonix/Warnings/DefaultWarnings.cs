@@ -52,8 +52,9 @@ namespace Carbonix.Warnings
         static readonly ICondition AirGroundSpeedDiff2 = Condition.StatusText("Airspeed 2.*air to gnd speed diff", timeoutMs: 0)
             .Or(Condition.Delta("AS2", ValueSource.NamedValue, "_groundspeed", ValueSource.StateField, CompareOp.GT, 25, clear: 20));
 
+        static readonly ICondition Airspeed1Disabling = Condition.StatusText("Airspeed sensor 1 failure. Disabling", timeoutMs: null, clearPattern: "Airspeed sensor 1 now OK. Re-enabled");
+        static readonly ICondition Airspeed2Disabling = Condition.StatusText("Airspeed sensor 2 failure. Disabling", timeoutMs: null, clearPattern: "Airspeed sensor 2 now OK. Re-enabled");
         static readonly ICondition Connected = Condition.Field("linkqualitygcs", CompareOp.GT, 0);
-
         static readonly ICondition EkfVelocityVariance = Condition.Field("ekfvelv", CompareOp.GTEQ, 1.0, clear: 0.8);
         static readonly ICondition EkfCompassVariance = Condition.Field("ekfcompv", CompareOp.GTEQ, 1.0, clear: 0.8);
         static readonly ICondition EkfPosHorizVariance = Condition.Field("ekfposhor", CompareOp.GTEQ, 1.0, clear: 0.8);
@@ -285,10 +286,44 @@ namespace Carbonix.Warnings
 
                 new WarningRule(
                     id: "health_airspeed",
-                    text: "Airspeed unhealthy",
+                    text: "Airspeed1 unhealthy",
                     severity: WarningSeverity.Caution,
                     subsystem: WarningSubsystem.Airspeed,
-                    trigger: SensorUnhealthy("differential_pressure"),
+                    trigger: Condition.Field("airspeed1_health", CompareOp.NEQ, 1),
+                    gate: Armed),
+
+                new WarningRule(
+                    id: "health_airspeed2",
+                    text: "Airspeed2 unhealthy",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Airspeed,
+                    trigger: Condition.Field("airspeed2_health", CompareOp.NEQ, 1),
+                    gate: Armed),
+
+                new WarningRule(
+                    id: "airspeed_disabled",
+                    text: "Airspeed disabled",
+                    severity: WarningSeverity.Warning,
+                    subsystem: WarningSubsystem.Airspeed,
+                    trigger: Condition.Field("airspeed1_using", CompareOp.NEQ, 1)
+                        .And(Condition.Field("airspeed2_using", CompareOp.NEQ, 1))
+                        .Sustain(riseMs: 2_000, fallMs: 0), // Brief drop during switch from one to another
+                    gate: Armed),
+
+                new WarningRule(
+                    id: "airspeed1_disabled",
+                    text: "Airspeed 1 failure",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Airspeed,
+                    trigger: Airspeed1Disabling,
+                    gate: Armed),
+
+                new WarningRule(
+                    id: "airspeed2_disabled",
+                    text: "Airspeed 2 failure",
+                    severity: WarningSeverity.Caution,
+                    subsystem: WarningSubsystem.Airspeed,
+                    trigger: Airspeed2Disabling,
                     gate: Armed),
 
                 new WarningRule(
@@ -415,16 +450,18 @@ namespace Carbonix.Warnings
                     text: "Airspeed 1 test success",
                     severity: WarningSeverity.Advisory,
                     subsystem: WarningSubsystem.Airspeed,
-                    trigger: AirGroundSpeedDiff1,
-                    gate: Armed.Not()),
+                    // Trigger on the falling edge after hitting 20m/s
+                    trigger: Condition.Field("_airspeed", CompareOp.LT, 5, 20).Edge(),
+                    gate: Armed.Not().Sustain(riseMs: 1_000, fallMs: 0).And(LandStateGround)),
 
                 new WarningRule(
                     id: "airspeed_test2",
                     text: "Airspeed 2 test success",
                     severity: WarningSeverity.Advisory,
                     subsystem: WarningSubsystem.Airspeed,
-                    trigger: AirGroundSpeedDiff2,
-                    gate: Armed.Not()),
+                    // Trigger on the falling edge after hitting 20m/s
+                    trigger: Condition.NamedValue("AS2", CompareOp.LT, 5, 20).Edge(),
+                    gate: Armed.Not().Sustain(riseMs: 1_000, fallMs: 0).And(LandStateGround)),
 
                 new WarningRule(
                     id: "airspeed_diff",
