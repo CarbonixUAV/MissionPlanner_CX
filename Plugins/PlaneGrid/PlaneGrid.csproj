@@ -1,0 +1,92 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net472</TargetFramework>
+		<UseWindowsForms>true</UseWindowsForms>
+		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+		<NoWarn>1701;1702;NU1605</NoWarn>
+		<DebugType>portable</DebugType>
+		<outputPath>..\..\bin\Debug\net461\plugins\</outputPath>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<NoWarn>1701;1702;NU1605</NoWarn>
+		<DebugType>portable</DebugType>
+		<outputPath>..\..\bin\Release\net461\plugins\</outputPath>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\ExtLibs\ArduPilot\MissionPlanner.ArduPilot.csproj">
+		  <Private>False</Private>
+		</ProjectReference>
+		<ProjectReference Include="..\..\ExtLibs\Maps\MissionPlanner.Maps.csproj">
+		  <Private>False</Private>
+		</ProjectReference>
+		<ProjectReference Include="..\..\ExtLibs\MissionPlanner.Drawing\MissionPlanner.Drawing.csproj">
+			<Aliases>Drawing</Aliases>
+			<Private>false</Private>
+		</ProjectReference>
+		<ProjectReference Include="..\..\ExtLibs\Utilities\MissionPlanner.Utilities.csproj">
+			<Private>false</Private>
+		</ProjectReference>
+		<ProjectReference Include="..\..\MissionPlanner.csproj">
+			<Private>false</Private>
+		</ProjectReference>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Reference Include="BSE.Windows.Forms">
+	    <HintPath>..\..\ExtLibs\BSE.Windows.Forms\bin\Debug\net472\BSE.Windows.Forms.dll</HintPath>
+	  </Reference>
+	  <Reference Include="GeoUtility">
+	    <HintPath>..\..\ExtLibs\GeoUtility\bin\Debug\netstandard2.0\GeoUtility.dll</HintPath>
+	  </Reference>
+	  <Reference Include="GMap.NET.Core">
+	    <HintPath>..\..\ExtLibs\GMap.NET.Core\bin\Debug\netstandard2.0\GMap.NET.Core.dll</HintPath>
+	  </Reference>
+	  <Reference Include="GMap.NET.Drawing">
+	    <HintPath>..\..\ExtLibs\GMap.NET.Drawing\bin\Debug\net461\GMap.NET.Drawing.dll</HintPath>
+	  </Reference>
+	  <Reference Include="GMap.NET.WindowsForms">
+	    <HintPath>..\..\ExtLibs\GMap.NET.WindowsForms\bin\Debug\net472\GMap.NET.WindowsForms.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Interfaces">
+	    <HintPath>..\..\ExtLibs\Interfaces\bin\Debug\netstandard2.0\Interfaces.dll</HintPath>
+	  </Reference>
+	  <Reference Include="log4net">
+	    <HintPath>C:\Users\lconn\.nuget\packages\log4net\2.0.13\lib\net45\log4net.dll</HintPath>
+	  </Reference>
+	  <Reference Include="MAVLink">
+	    <HintPath>..\..\ExtLibs\Mavlink\bin\Debug\netstandard2.0\MAVLink.dll</HintPath>
+	  </Reference>
+	  <Reference Include="Microsoft.CSharp" />
+	  <Reference Include="MissionPlanner.Controls">
+	    <HintPath>..\..\ExtLibs\Controls\obj\Debug\net472\MissionPlanner.Controls.dll</HintPath>
+	  </Reference>
+	  <Reference Include="OpenTK">
+	    <HintPath>C:\Users\lconn\.nuget\packages\opentk\3.1.0\lib\net20\OpenTK.dll</HintPath>
+	  </Reference>
+	  <Reference Include="OpenTK.GLControl">
+	    <HintPath>C:\Users\lconn\.nuget\packages\opentk.glcontrol\3.1.0\lib\net20\OpenTK.GLControl.dll</HintPath>
+	  </Reference>
+	  <Reference Include="SkiaSharp">
+	    <HintPath>C:\Users\lconn\.nuget\packages\skiasharp\2.80.2\lib\netstandard2.0\SkiaSharp.dll</HintPath>
+	  </Reference>
+	  <Reference Include="SkiaSharp.Views.Desktop.Common">
+	    <HintPath>C:\Users\lconn\.nuget\packages\skiasharp.views.desktop.common\2.80.2\lib\net462\SkiaSharp.Views.Desktop.Common.dll</HintPath>
+	  </Reference>
+	  <Reference Include="SvgNet">
+	    <HintPath>..\..\ExtLibs\SvgNet\bin\Debug\netstandard2.0\SvgNet.dll</HintPath>
+	  </Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Update="System.Windows.Forms">
+			<Private>False</Private>
+		</Reference>
+	</ItemGroup>
+
+</Project>
