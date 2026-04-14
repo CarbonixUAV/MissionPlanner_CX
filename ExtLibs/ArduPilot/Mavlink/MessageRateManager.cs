@@ -85,6 +85,7 @@ namespace MissionPlanner.ArduPilot.Mavlink
         private readonly CancellationTokenSource _cts = new CancellationTokenSource();
         private Task _loop;
         private bool _drainingRestores;
+        private int _disposed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MessageRateManager"/> class.
@@ -248,6 +249,9 @@ namespace MissionPlanner.ArduPilot.Mavlink
 
         public void Dispose()
         {
+            if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+                return;
+
             _cts.Cancel();
 
             lock (_lock)
