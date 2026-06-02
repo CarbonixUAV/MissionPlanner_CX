@@ -1467,12 +1467,22 @@ namespace MissionPlanner.GCSViews
 
                     activeOverlay.ForceUpdate();
 
-                    lbl_distance.Text = rm.GetString("lbl_distance.Text") + ": " +
-                                        FormatDistance((
-                                            activeOverlay.Routes.SelectMany(a => a.Points)
-                                                .Select(a => (PointLatLngAlt) a)
-                                                .Aggregate(0.0, (d, p1, p2) => d + p1.GetDistance(p2))
-                                        ) / 1000.0, false);
+                    if (useV2)
+                    {
+                        var stats = wpOverlay2.Stats;
+                        lbl_distance.Text = rm.GetString("lbl_distance.Text") + ": " +
+                                            FormatDistance(stats.TotalDistance / 1000.0, false) +
+                                            (stats.HasInfiniteLoop ? "+" : "");
+                    }
+                    else
+                    {
+                        lbl_distance.Text = rm.GetString("lbl_distance.Text") + ": " +
+                                            FormatDistance((
+                                                activeOverlay.Routes.SelectMany(a => a.Points)
+                                                    .Select(a => (PointLatLngAlt) a)
+                                                    .Aggregate(0.0, (d, p1, p2) => d + p1.GetDistance(p2))
+                                            ) / 1000.0, false);
+                    }
 
                     setgradanddistandaz(activePointlist, home);
 

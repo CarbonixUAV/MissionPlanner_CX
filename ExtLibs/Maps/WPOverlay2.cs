@@ -31,6 +31,11 @@ namespace MissionPlanner.Maps
         public bool ShowPlusMarkers = true;
 
         /// <summary>
+        /// Distance statistics from the most recent <see cref="CreateOverlay"/> call.
+        /// </summary>
+        public MissionStats Stats { get; private set; } = MissionStats.Empty;
+
+        /// <summary>
         /// Active style, loaded from settings at startup. Updated by the style editor.
         /// </summary>
         public static MissionStyle missionStyle = MissionStyle.LoadFromConfig(
@@ -66,6 +71,9 @@ namespace MissionPlanner.Maps
             // 4) Render markers and segments to overlay
             RenderMarkers(overlay, graph, missionitems, wpradius, loiterradius, altunitmultiplier);
             RenderSegments(overlay, segments, wpradius, loiterradius, ShowPlusMarkers);
+
+            // 5) Compute mission statistics from the same graph and segments
+            Stats = MissionStats.Compute(graph, segments, loiterradius);
         }
 
         public void RenderMarkers(
