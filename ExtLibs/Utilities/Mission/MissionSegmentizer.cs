@@ -74,28 +74,56 @@ namespace MissionPlanner.Utilities
             var landingEdges = new HashSet<MissionEdge>();
             var returnPathEdges = new HashSet<MissionEdge>();
 
+            // Nodes where a landing sequence / return path begins (the first node at
+            // or after each DO_LAND_START / DO_RETURN_PATH_START bookmark). The two
+            // traversals stop at each other's start node so neither path bleeds past
+            // the point where the other takes over.
+            var landStartTargets = new HashSet<MissionNode>();
+            var returnPathTargets = new HashSet<MissionNode>();
+            foreach (var bookmark in graph.Bookmarks)
+            {
+                if (bookmark.Target == null)
+                {
+                    continue;
+                }
+                if (bookmark.Command.id == (ushort)MAVLink.MAV_CMD.DO_LAND_START)
+                {
+                    landStartTargets.Add(bookmark.Target);
+                }
+                else if (bookmark.Command.id == (ushort)MAVLink.MAV_CMD.DO_RETURN_PATH_START)
+                {
+                    returnPathTargets.Add(bookmark.Target);
+                }
+            }
+
             // Construct bookmark segments and also traverse and record landing sequence edges
             foreach (var bookmark in graph.Bookmarks)
             {
                 // Find sequence edges for landing sequence bookmarks
                 HashSet<MissionEdge> outputEdges;
+                Func<MissionNode, bool> stopAtNode;
                 switch (bookmark.Command.id)
                 {
                     case (ushort)MAVLink.MAV_CMD.DO_LAND_START:
                         outputEdges = landingEdges;
+                        // Stop the landing sequence where a return path begins.
+                        stopAtNode = node => IsLand(node.Command.id) || returnPathTargets.Contains(node);
                         break;
                     case (ushort)MAVLink.MAV_CMD.DO_RETURN_PATH_START:
                         outputEdges = returnPathEdges;
+                        // Stop the return path where the landing sequence begins.
+                        stopAtNode = node => IsLand(node.Command.id) || landStartTargets.Contains(node);
                         break;
                     default:
                         outputEdges = null;
+                        stopAtNode = null;
                         break;
                 }
                 if (outputEdges != null && bookmark.Target != null)
                 {
                     CollectReachableEdges(
                         bookmark.Target,
-                        stopAtNode: node => IsLand(node.Command.id),
+                        stopAtNode: stopAtNode,
                         edges: outputEdges
                     );
                 }
@@ -186,12 +214,11 @@ namespace MissionPlanner.Utilities
                     flags |= SegmentFlags.FromTakeoff;
                 }
 
-                // Mark one (only one) of the landing/return/go-around flags
                 if (landingEdges.Contains(edge))
                 {
                     flags |= SegmentFlags.LandSequence;
                 }
-                else if (returnPathEdges.Contains(edge))
+                if (returnPathEdges.Contains(edge))
                 {
                     flags |= SegmentFlags.ReturnPath;
                 }
