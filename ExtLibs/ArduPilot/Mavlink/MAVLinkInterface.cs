@@ -3391,7 +3391,11 @@ Mission Planner waits for 2 valid heartbeat packets before connecting
             while (giveComport == true)
                 Thread.Sleep(10);
 
-            bool use_int = (MAVlist[sysid, compid].cs.capabilities & (uint) MAV_PROTOCOL_CAPABILITY.MISSION_INT) > 0;
+            // bool use_int = (MAVlist[sysid, compid].cs.capabilities & (uint) MAV_PROTOCOL_CAPABILITY.MISSION_INT) > 0;
+            // Carbonix: always use MISSION_REQUEST_INT. We always support it,
+            // and deriving this from capabilities raced the AUTOPILOT_VERSION
+            // read on connect.
+            bool use_int = true;
 
             object req;
 
