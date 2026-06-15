@@ -587,6 +587,10 @@ namespace Carbonix
         {
             // Write the landing pattern to the mission
             var sign = rad_loitcw.Checked ? 1 : -1;
+
+            // A DO_RETURN_PATH_START followed by a DO_LAND_START acts much like
+            // a DO_LAND_START did previously.
+            plugin.Host.AddWPtoList(MAVLink.MAV_CMD.DO_RETURN_PATH_START, 0, 0, 0, 0, loiter_point.Lng, loiter_point.Lat, (double)num_transit_alt.Value);
             plugin.Host.AddWPtoList(MAVLink.MAV_CMD.DO_LAND_START, 0, 0, 0, 0, loiter_point.Lng, loiter_point.Lat, (double)num_transit_alt.Value);
 
             //Turn off camera triggers
