@@ -52,7 +52,7 @@ namespace Carbonix.Warnings
             LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         internal const int EvalIntervalMs = 250;
-        static readonly TimeSpan UnclaimedAutoResolve = TimeSpan.FromSeconds(5);
+        static readonly TimeSpan UnclaimedAutoResolve = TimeSpan.FromSeconds(16);
         const byte VehicleSysId = 1;
         const byte VehicleCompId = 1;
         const int EXTENDED_SYS_STATE_RATE_HZ = 2;
