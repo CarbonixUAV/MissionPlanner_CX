@@ -151,7 +151,11 @@ namespace Carbonix
                 pilots = new List<string>()
                 {
                     "Lachlan Conn",
-                    "Isaac Straatemeier",
+                    "Dean Tetley",
+                    "Sheldon Finn",
+                    "Antony Sheehan",
+                    "Jeremy Innes",
+                    "Kieran Hagerty",
                     "Matt Sturdy",
                     "Yip Huang",
                     "Bob Long",
@@ -205,6 +209,11 @@ namespace Carbonix
                 pilots = new List<string>()
                 {
                     "Lachlan Conn",
+                    "Dean Tetley",
+                    "Sheldon Finn",
+                    "Antony Sheehan",
+                    "Jeremy Innes",
+                    "Kieran Hagerty",
                     "Matt Sturdy",
                     "Yip Huang",
                     "Bob Long",
