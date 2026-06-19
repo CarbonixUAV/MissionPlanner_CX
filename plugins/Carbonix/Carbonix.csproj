@@ -44,6 +44,9 @@
       <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\ExtLibs\Maps\MissionPlanner.Maps.csproj">
+      <!-- Maps multi-targets net472;netstandard2.0. Pin the TFM so command-line
+           MSBuild resolves the reference (VS resolves it implicitly). -->
+      <SetTargetFramework>TargetFramework=net472</SetTargetFramework>
       <Private>false</Private>
     </ProjectReference>
     <ProjectReference Include="..\..\ExtLibs\Utilities\MissionPlanner.Utilities.csproj">
