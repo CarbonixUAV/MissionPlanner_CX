@@ -341,32 +341,6 @@ namespace Carbonix.Warnings
                     gate: Armed),
 
                 new WarningRule(
-                    id: "health_airspeed",
-                    text: "Airspeed1 unhealthy",
-                    severity: WarningSeverity.Caution,
-                    subsystem: WarningSubsystem.Airspeed,
-                    trigger: Condition.Field("airspeed1_health", CompareOp.NEQ, 1),
-                    gate: Armed),
-
-                new WarningRule(
-                    id: "health_airspeed2",
-                    text: "Airspeed2 unhealthy",
-                    severity: WarningSeverity.Caution,
-                    subsystem: WarningSubsystem.Airspeed,
-                    trigger: Condition.Field("airspeed2_health", CompareOp.NEQ, 1),
-                    gate: Armed),
-
-                new WarningRule(
-                    id: "airspeed_disabled",
-                    text: "Airspeed disabled",
-                    severity: WarningSeverity.Warning,
-                    subsystem: WarningSubsystem.Airspeed,
-                    trigger: Condition.Field("airspeed1_using", CompareOp.NEQ, 1)
-                        .And(Condition.Field("airspeed2_using", CompareOp.NEQ, 1))
-                        .Sustain(riseMs: 2_000, fallMs: 0), // Brief drop during switch from one to another
-                    gate: Armed),
-
-                new WarningRule(
                     id: "airspeed1_disabled",
                     text: "Airspeed 1 failure",
                     severity: WarningSeverity.Caution,
