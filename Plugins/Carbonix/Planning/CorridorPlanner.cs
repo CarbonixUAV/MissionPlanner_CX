@@ -734,11 +734,19 @@ namespace Carbonix.Planning
             var commands = GenerateMissionCartesian(cartPts, meta, p, p.TurnRadiusM, p.CornerCutRadiusM);
 
             // 7. Project back to geo coordinates, look up terrain, compute altitudes.
+            //    Terrain is sampled on the CENTRELINE, not at each lane's offset position:
+            //    every parallel lane at a given station shares the centreline terrain, so
+            //    they fly a common altitude profile. The waypoint still keeps its offset
+            //    ground track (geo) — only the terrain query is moved to the centreline.
+            //    This keeps generation consistent with the centreline-only elevation
+            //    profile and its per-vertex altitude edits. Branch detours are not lanes,
+            //    so they keep their own terrain.
             double agl = Clamp(p.DefaultAGL, p.MinAGL, p.MaxAGL);
             foreach (var cmd in commands)
             {
-                var geo     = FromCart(cmd.Position);
-                double terr = GetTerrainAlt(geo.Lat, geo.Lng);
+                var geo       = FromCart(cmd.Position);
+                var terrQuery = cmd.IsBranchVertex ? geo : NearestPointOnPolyline(geo, centerLine).point;
+                double terr   = GetTerrainAlt(terrQuery.Lat, terrQuery.Lng);
 
                 result.Add(new CorridorWaypoint
                 {
