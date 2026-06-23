@@ -176,6 +176,52 @@ namespace Carbonix.Tests.Planning
             Assert.AreEqual(dist / p.SpeedMs, time, 1e-6);
         }
 
+        // ── Tour path equivalence ─────────────────────────────────────────────────
+
+        static void AssertWaypointsEqual(List<CorridorWaypoint> expected, List<CorridorWaypoint> actual)
+        {
+            Assert.AreEqual(expected.Count, actual.Count, "waypoint count");
+            for (int i = 0; i < expected.Count; i++)
+            {
+                var e = expected[i];
+                var a = actual[i];
+                Assert.AreEqual(e.Command, a.Command, $"command[{i}]");
+                Assert.AreEqual(e.Lat, a.Lat, 1e-9, $"lat[{i}]");
+                Assert.AreEqual(e.Lng, a.Lng, 1e-9, $"lng[{i}]");
+                Assert.AreEqual(e.AltRelM, a.AltRelM, 1e-6, $"altRelM[{i}]");
+                Assert.AreEqual(e.P1, a.P1, 1e-4, $"p1[{i}]");
+                Assert.AreEqual(e.P3, a.P3, 1e-4, $"p3[{i}]");
+                Assert.AreEqual(e.IsLineWaypoint, a.IsLineWaypoint, $"isLineWaypoint[{i}]");
+                Assert.AreEqual(e.CorridorVertexIndex, a.CorridorVertexIndex, $"corridorVertexIndex[{i}]");
+            }
+        }
+
+        [TestMethod]
+        public void TourPath_SinglePolyline_MatchesGenerateMission()
+        {
+            // A single Forward tour step over the centerline must reproduce GenerateMission
+            // exactly (no-branch case), including passes and a corner loiter.
+            var line = new List<PointLatLngAlt>
+            {
+                P(BaseLat, BaseLng),
+                P(BaseLat, BaseLng + 0.02),
+                P(BaseLat - 0.02, BaseLng + 0.02),
+            };
+            var p = Params(passes: 2, offset: 100);
+
+            var legacy = CorridorPlanner.GenerateMission(line, p, line[0]);
+
+            var poly = new Polyline { Id = VertexId.MainLine, Points = line };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+            };
+            var viaTour = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, p, line[0]);
+
+            AssertWaypointsEqual(legacy, viaTour);
+        }
+
         // ── Identity (VertexId) ───────────────────────────────────────────────────
 
         [TestMethod]
