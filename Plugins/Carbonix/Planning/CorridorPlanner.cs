@@ -990,23 +990,42 @@ namespace Carbonix.Planning
             return (lines, offsets);
         }
 
-        private static List<PointLatLngAlt> OffsetPolyline(
+        // Parallel (miter) offset. The offset direction at each vertex is perpendicular to
+        // the angle bisector; the distance is scaled by 1/cos(δ/2) (δ = heading change) so
+        // BOTH adjacent segments end up exactly offsetM away — i.e. a true parallel offset
+        // that preserves every corner angle. That keeps +offset and -offset lanes
+        // classifying turns identically (a plain perpendicular shift distorts corners
+        // asymmetrically and can flip the cut↔Dubins decision between lanes). Very sharp
+        // corners are capped by a miter limit so the vertex doesn't shoot to infinity.
+        internal static List<PointLatLngAlt> OffsetPolyline(
             List<PointLatLngAlt> pts, double offsetM)
         {
+            const double MaxMiterScale = 4.0;
+
             var result = new List<PointLatLngAlt>(pts.Count);
             for (int i = 0; i < pts.Count; i++)
             {
                 double bearing;
+                double scale = 1.0;
                 if (i == 0)
+                {
                     bearing = pts[0].GetBearing(pts[1]);
+                }
                 else if (i == pts.Count - 1)
+                {
                     bearing = pts[i - 1].GetBearing(pts[i]);
+                }
                 else
-                    bearing = AverageBearing(pts[i - 1].GetBearing(pts[i]),
-                                            pts[i].GetBearing(pts[i + 1]));
+                {
+                    double b1 = pts[i - 1].GetBearing(pts[i]);
+                    double b2 = pts[i].GetBearing(pts[i + 1]);
+                    bearing = AverageBearing(b1, b2);
+                    double cosHalf = Math.Cos(Math.Abs(NormalizeHeadingChange(b2 - b1)) * 0.5 * Deg2Rad);
+                    scale = cosHalf > 1e-6 ? Math.Min(1.0 / cosHalf, MaxMiterScale) : MaxMiterScale;
+                }
 
                 double perpBearing = WrapBearing(bearing + 90.0);
-                var newPt = pts[i].newpos(perpBearing, offsetM);
+                var newPt = pts[i].newpos(perpBearing, offsetM * scale);
                 newPt.Alt = pts[i].Alt;
                 result.Add(newPt);
             }
