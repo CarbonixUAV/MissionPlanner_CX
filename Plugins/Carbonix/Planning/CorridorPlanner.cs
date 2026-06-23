@@ -777,20 +777,25 @@ namespace Carbonix.Planning
             }
 
             // 5-7. Solve turns, project back to geo, sample terrain, build waypoints.
-            return SolveAndBuildWaypoints(combinedPts, combinedMeta, centerLine, p, homeTerrainAlt);
+            //      Lanes project onto the centreline; branch detours keep their own terrain.
+            return SolveAndBuildWaypoints(combinedPts, combinedMeta,
+                (cmd, geo) => cmd.IsBranchVertex ? geo : NearestPointOnPolyline(geo, centerLine).point,
+                p, homeTerrainAlt);
         }
 
         /// <summary>
         /// Shared tail of mission generation: take a combined geo polyline plus per-point
         /// metadata, solve the turns in cartesian space, project back to geo, sample
-        /// terrain (centreline for lanes; own position for branch detours), and build the
-        /// waypoint list. Used by <see cref="GenerateMission"/> today and by the
-        /// tour-based path (see .claude/corridor-tree-design.md).
+        /// terrain, and build the waypoint list. <paramref name="terrainQueryPoint"/> maps
+        /// each solved command + its geo position to the point whose terrain to sample, so
+        /// the caller decides the strategy (centreline projection for lanes;
+        /// per-polyline for tours). Used by <see cref="GenerateMission"/> and the tour path
+        /// (see .claude/corridor-tree-design.md).
         /// </summary>
         private static List<CorridorWaypoint> SolveAndBuildWaypoints(
             List<PointLatLngAlt> combinedPts,
             List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> combinedMeta,
-            List<PointLatLngAlt> centerLineForTerrain,
+            Func<CartCommand, PointLatLngAlt, PointLatLngAlt> terrainQueryPoint,
             CorridorParameters p,
             double homeTerrainAlt)
         {
@@ -815,15 +820,13 @@ namespace Carbonix.Planning
 
             var commands = GenerateMissionCartesian(cartPts, meta, p, p.TurnRadiusM, p.CornerCutRadiusM);
 
-            // Terrain is sampled on the CENTRELINE for lanes (every parallel lane at a
-            // station shares the centreline terrain → a common altitude profile), and at
-            // its own position for branch detours (not lanes). Waypoints keep their offset
-            // ground track; only the terrain query moves to the centreline.
+            // Terrain query point is chosen by the caller (centreline projection for
+            // lanes → all lanes of a polyline share one altitude profile).
             double agl = Clamp(p.DefaultAGL, p.MinAGL, p.MaxAGL);
             foreach (var cmd in commands)
             {
                 var geo       = FromCart(cmd.Position);
-                var terrQuery = cmd.IsBranchVertex ? geo : NearestPointOnPolyline(geo, centerLineForTerrain).point;
+                var terrQuery = terrainQueryPoint(cmd, geo);
                 double terr   = GetTerrainAlt(terrQuery.Lat, terrQuery.Lng);
 
                 result.Add(new CorridorWaypoint
@@ -853,15 +856,17 @@ namespace Carbonix.Planning
 
         /// <summary>
         /// Tour-based generation: plan each polyline's lanes independently, concatenate
-        /// them in tour order, then run the shared solve/terrain tail
+        /// them in tour order (dropping a duplicate point where consecutive steps share an
+        /// endpoint), then run the shared solve/terrain tail
         /// (<see cref="SolveAndBuildWaypoints"/>). A spur is just a polyline the tour
         /// visits — there is no separate branch concept. See
         /// .claude/corridor-tree-design.md.
         ///
-        /// In progress: this is exact for a single-polyline tour (it reproduces
-        /// <see cref="GenerateMission"/> for the no-branch case, covered by a strict
-        /// equivalence test). Multi-polyline per-lane terrain attribution and
-        /// inter-polyline join tuning land with the meta→polylineId change (Step 3).
+        /// Each waypoint's terrain is sampled on its own polyline's centreline, so every
+        /// lane of a polyline shares one altitude profile. Exact for a single-polyline
+        /// tour (reproduces <see cref="GenerateMission"/> for the no-branch case — strict
+        /// equivalence test). Inter-polyline join refinement (e.g. leaf-tip turnaround
+        /// direction) and UI wiring are the remaining Step-3 work.
         /// </summary>
         public static List<CorridorWaypoint> GenerateMissionFromTour(
             List<Polyline> polylines, List<TourStep> tour, CorridorParameters p, PointLatLngAlt homePoint)
@@ -875,6 +880,8 @@ namespace Carbonix.Planning
 
             double homeTerrainAlt = GetTerrainAlt(homePoint.Lat, homePoint.Lng);
 
+            const double JoinDedupM = 0.5;   // treat consecutive points this close as shared
+
             var combinedPts  = new List<PointLatLngAlt>();
             var combinedMeta = new List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)>();
 
@@ -882,24 +889,41 @@ namespace Carbonix.Planning
             {
                 if (!byId.TryGetValue(step.PolylineId, out var poly) || poly.Points == null || poly.Points.Count < 2)
                     continue;
-                AppendPolyline(combinedPts, combinedMeta, poly, step.Direction, p, homePoint);
+
+                var (pts, meta) = BuildPolylineContribution(poly, step.Direction, p, homePoint);
+
+                // Drop a leading point coincident with the previous step's end so a shared
+                // junction doesn't create a zero-length leg the turn solver can't handle.
+                int start = (combinedPts.Count > 0 && pts.Count > 0 &&
+                             combinedPts[combinedPts.Count - 1].GetDistance(pts[0]) < JoinDedupM) ? 1 : 0;
+
+                for (int k = start; k < pts.Count; k++)
+                {
+                    combinedPts.Add(pts[k]);
+                    combinedMeta.Add(meta[k]);
+                }
             }
 
             if (combinedPts.Count == 0) return empty;
 
-            // Terrain reference: the single planned polyline. Multi-polyline per-lane
-            // terrain attribution arrives with the Step-3 meta change.
-            var terrainRef = byId[tour[0].PolylineId].Points;
-            return SolveAndBuildWaypoints(combinedPts, combinedMeta, terrainRef, p, homeTerrainAlt);
+            // Sample terrain on each waypoint's own polyline centreline (polylineId
+            // recovered from the branch encoding); all lanes of a polyline thus share
+            // one altitude profile.
+            PointLatLngAlt TerrainPoint(CartCommand cmd, PointLatLngAlt geo)
+            {
+                int plId = cmd.IsBranchVertex ? cmd.BranchId : VertexId.MainLine;
+                var cl = byId.TryGetValue(plId, out var pl) ? pl.Points : byId[tour[0].PolylineId].Points;
+                return NearestPointOnPolyline(geo, cl).point;
+            }
+
+            return SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
         }
 
-        // Append one polyline's snake-ordered lanes (and per-point metadata) to the
-        // combined sequence. Forward reproduces GenerateMission's per-line ordering;
-        // Reverse flips this polyline's contribution.
-        private static void AppendPolyline(
-            List<PointLatLngAlt> combinedPts,
-            List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> combinedMeta,
-            Polyline poly, TraverseDir dir, CorridorParameters p, PointLatLngAlt home)
+        // Build one polyline's snake-ordered lanes (and per-point metadata) for the tour.
+        // Forward reproduces GenerateMission's per-line ordering; Reverse flips the whole
+        // contribution.
+        private static (List<PointLatLngAlt> pts, List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> meta)
+            BuildPolylineContribution(Polyline poly, TraverseDir dir, CorridorParameters p, PointLatLngAlt home)
         {
             var (lines, offsets) = GenerateFlightLines(poly.Points, p);
             OrderLines(lines, offsets, home, p.ReverseDirection);   // mutates lines/offsets in place
@@ -912,7 +936,7 @@ namespace Carbonix.Planning
             int branchId = isBranch ? poly.Id : -1;
 
             var pts  = new List<PointLatLngAlt>();
-            var meta = new List<(int, bool, int, bool, int, bool?)>();
+            var meta = new List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)>();
 
             for (int li = 0; li < lines.Count; li++)
             {
@@ -932,8 +956,7 @@ namespace Carbonix.Planning
                 meta.Reverse();
             }
 
-            combinedPts.AddRange(pts);
-            combinedMeta.AddRange(meta);
+            return (pts, meta);
         }
 
         // ════════════════════════════════════════════════════════════════════════

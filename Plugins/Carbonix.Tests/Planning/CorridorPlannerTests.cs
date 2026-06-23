@@ -222,6 +222,46 @@ namespace Carbonix.Tests.Planning
             AssertWaypointsEqual(legacy, viaTour);
         }
 
+        [TestMethod]
+        public void TourPath_MultiPolyline_SamplesTerrainPerPolyline()
+        {
+            // Terrain rises to the south (lower lat = higher). The main line runs east-west
+            // at the home latitude (terrain ~0); a spur runs south, so its terrain climbs.
+            // Each waypoint must sample ITS OWN polyline's terrain: if the spur sampled the
+            // main line instead, it would stay ~DefaultAGL.
+            CorridorPlanner.TerrainProvider = (lat, lng) => (BaseLat - lat) * MetresPerDegLat;
+
+            var main = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02) },
+            };
+            var spur = new Polyline
+            {
+                Id = 0,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng + 0.02), P(BaseLat - 0.01, BaseLng + 0.02) },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = 0, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = 0, Direction = TraverseDir.Reverse },
+            };
+
+            var wps = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { main, spur }, tour, Params(), main.Points[0]);
+
+            var mainWps = wps.Where(w => !w.IsBranchVertex).ToList();
+            var spurWps = wps.Where(w => w.IsBranchVertex).ToList();
+
+            Assert.IsTrue(mainWps.Count > 0 && spurWps.Count > 0, "both polylines contribute waypoints");
+            Assert.IsTrue(mainWps.All(w => Math.Abs(w.AltRelM - 80) < 5),
+                "main line sits at ~DefaultAGL over its flat home-latitude terrain");
+            Assert.IsTrue(spurWps.Max(w => w.AltRelM) > 300,
+                $"spur follows its own rising terrain (peak {spurWps.Max(w => w.AltRelM):F0} m); " +
+                "would stay ~80 if it sampled the main line");
+        }
+
         // ── Identity (VertexId) ───────────────────────────────────────────────────
 
         [TestMethod]
