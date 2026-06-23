@@ -851,6 +851,91 @@ namespace Carbonix.Planning
             return result;
         }
 
+        /// <summary>
+        /// Tour-based generation: plan each polyline's lanes independently, concatenate
+        /// them in tour order, then run the shared solve/terrain tail
+        /// (<see cref="SolveAndBuildWaypoints"/>). A spur is just a polyline the tour
+        /// visits — there is no separate branch concept. See
+        /// .claude/corridor-tree-design.md.
+        ///
+        /// In progress: this is exact for a single-polyline tour (it reproduces
+        /// <see cref="GenerateMission"/> for the no-branch case, covered by a strict
+        /// equivalence test). Multi-polyline per-lane terrain attribution and
+        /// inter-polyline join tuning land with the meta→polylineId change (Step 3).
+        /// </summary>
+        public static List<CorridorWaypoint> GenerateMissionFromTour(
+            List<Polyline> polylines, List<TourStep> tour, CorridorParameters p, PointLatLngAlt homePoint)
+        {
+            var empty = new List<CorridorWaypoint>();
+            if (polylines == null || polylines.Count == 0 || tour == null || tour.Count == 0)
+                return empty;
+
+            var byId = polylines.ToDictionary(pl => pl.Id);
+            if (homePoint == null) homePoint = byId[tour[0].PolylineId].Points.First();
+
+            double homeTerrainAlt = GetTerrainAlt(homePoint.Lat, homePoint.Lng);
+
+            var combinedPts  = new List<PointLatLngAlt>();
+            var combinedMeta = new List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)>();
+
+            foreach (var step in tour)
+            {
+                if (!byId.TryGetValue(step.PolylineId, out var poly) || poly.Points == null || poly.Points.Count < 2)
+                    continue;
+                AppendPolyline(combinedPts, combinedMeta, poly, step.Direction, p, homePoint);
+            }
+
+            if (combinedPts.Count == 0) return empty;
+
+            // Terrain reference: the single planned polyline. Multi-polyline per-lane
+            // terrain attribution arrives with the Step-3 meta change.
+            var terrainRef = byId[tour[0].PolylineId].Points;
+            return SolveAndBuildWaypoints(combinedPts, combinedMeta, terrainRef, p, homeTerrainAlt);
+        }
+
+        // Append one polyline's snake-ordered lanes (and per-point metadata) to the
+        // combined sequence. Forward reproduces GenerateMission's per-line ordering;
+        // Reverse flips this polyline's contribution.
+        private static void AppendPolyline(
+            List<PointLatLngAlt> combinedPts,
+            List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> combinedMeta,
+            Polyline poly, TraverseDir dir, CorridorParameters p, PointLatLngAlt home)
+        {
+            var (lines, offsets) = GenerateFlightLines(poly.Points, p);
+            OrderLines(lines, offsets, home, p.ReverseDirection);   // mutates lines/offsets in place
+
+            int M = poly.Points.Count;
+            var first = new PointLatLngAlt(poly.Points[0].Lat, poly.Points[0].Lng, 0);
+            var last  = new PointLatLngAlt(poly.Points[M - 1].Lat, poly.Points[M - 1].Lng, 0);
+
+            bool isBranch = poly.Id != VertexId.MainLine;
+            int branchId = isBranch ? poly.Id : -1;
+
+            var pts  = new List<PointLatLngAlt>();
+            var meta = new List<(int, bool, int, bool, int, bool?)>();
+
+            for (int li = 0; li < lines.Count; li++)
+            {
+                var lineStart = lines[li][0];
+                bool lineReversed = lineStart.GetDistance(last) < lineStart.GetDistance(first);
+                for (int vi = 0; vi < lines[li].Count; vi++)
+                {
+                    int vtx = lineReversed ? M - 1 - vi : vi;
+                    pts.Add(lines[li][vi]);
+                    meta.Add((li, true, vtx, isBranch, branchId, null));
+                }
+            }
+
+            if (dir == TraverseDir.Reverse)
+            {
+                pts.Reverse();
+                meta.Reverse();
+            }
+
+            combinedPts.AddRange(pts);
+            combinedMeta.AddRange(meta);
+        }
+
         // ════════════════════════════════════════════════════════════════════════
         // Flight line generation
         // ════════════════════════════════════════════════════════════════════════
