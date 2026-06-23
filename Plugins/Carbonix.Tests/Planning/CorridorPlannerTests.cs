@@ -115,6 +115,35 @@ namespace Carbonix.Tests.Planning
                 "expected a lane offset south of the centerline");
         }
 
+        [TestMethod]
+        public void OffsetPolyline_PreservesCornerAngle_BothSides()
+        {
+            // A ~90° corner: east, then south. A true parallel offset must keep the corner
+            // angle identical on both lanes — otherwise the cut↔Dubins decision can differ
+            // between the outbound and return passes.
+            var line = new List<PointLatLngAlt>
+            {
+                P(BaseLat, BaseLng),
+                P(BaseLat, BaseLng + 0.02),
+                P(BaseLat - 0.02, BaseLng + 0.02),
+            };
+            double orig = HeadingChangeAt(line);
+
+            foreach (double off in new[] { 120.0, -120.0 })
+            {
+                var lane = CorridorPlanner.OffsetPolyline(line, off);
+                Assert.AreEqual(orig, HeadingChangeAt(lane), 0.5,
+                    $"offset {off} m must preserve the corner's heading change");
+            }
+        }
+
+        static double HeadingChangeAt(List<PointLatLngAlt> p)
+        {
+            double b1 = p[0].GetBearing(p[1]);
+            double b2 = p[1].GetBearing(p[2]);
+            return CorridorPlanner.NormalizeHeadingChange(b2 - b1);
+        }
+
         // ── Altitude ──────────────────────────────────────────────────────────────
 
         [TestMethod]
