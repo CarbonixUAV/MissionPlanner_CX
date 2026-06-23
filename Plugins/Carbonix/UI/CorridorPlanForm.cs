@@ -28,39 +28,27 @@ namespace Carbonix
 
         private readonly CarbonixPlugin plugin;
 
-        // Loaded main-line segments and branch segments, in load order, plus the
-        // chained/attached results used for mission generation.
-        private List<string> mainLineSegmentFiles = new List<string>();
-        private List<string> branchSegmentFiles = new List<string>();
-        private List<List<PointLatLngAlt>> mainLineSegments = new List<List<PointLatLngAlt>>();
-        private List<List<PointLatLngAlt>> branchSegmentsRaw = new List<List<PointLatLngAlt>>();
+        // Loaded corridor features (every polyline from each loaded file) and the file
+        // names shown in the UI. Branches are detected automatically by exact shared
+        // vertices (CorridorTourBuilder) — no manual main/branch split.
+        private readonly List<string> featureFiles = new List<string>();
+        private readonly List<List<List<PointLatLngAlt>>> featuresByFile = new List<List<List<PointLatLngAlt>>>();
 
-        // Chained main line (auto-joined segments, with junction vertices inserted
-        // for branch attachments) and the branches snapped onto it.
-        private List<PointLatLngAlt> mainLine;
-        private List<BranchAttachment> branchAttachments = new List<BranchAttachment>();
+        private List<List<PointLatLngAlt>> AllFeatures() => featuresByFile.SelectMany(f => f).ToList();
+
+        // Built model: polyline edges + Euler tour (from CorridorTourBuilder).
+        private List<Carbonix.Planning.Polyline> polylines;
+        private List<TourStep> tour;
 
         // Last generated mission waypoints
         private List<CorridorWaypoint> generatedWps;
 
-        // Elevation profile data — drives the elevation chart.
-        // Contains waypoint anchors (dots/bars) and terrain fill points.
+        // Elevation profile data — read-only tour view (interactive editing returns in a
+        // follow-up). Contains waypoint anchors and terrain fill points.
         private List<ElevationPoint> elevationPoints;
 
         // Home terrain altitude (m) — computed once per generation
         private double homeTerrainAlt;
-
-        // Tracks which mainLine indices were added interactively (right-click insert).
-        // Indices are kept in sync when vertices are inserted or removed.
-        private readonly HashSet<int> _insertedVertexIndices = new HashSet<int>();
-
-        // View/alt-edit preservation across geometry-triggered regenerations.
-        // Set by the geometry-change handlers before calling BUT_generate_Click;
-        // consumed and cleared inside BUT_generate_Click.
-        private bool _preserveProfileView;
-        private bool _preserveAltEdits;
-        // key = (corridorVertexIndex, isLoiter), value = AltRelM (altitude relative to home, metres).
-        private Dictionary<(int idx, bool isLoiter), double> _savedAltEdits;
 
         // Map overlays
         private readonly GMapOverlay layer_corridor;
@@ -88,12 +76,6 @@ namespace Carbonix
             map.MouseMove += map_MouseMove;
             map.MouseUp   += map_MouseUp;
             map.OnMapZoomChanged += () => SyncProfileToMapExtent();
-
-            // Wire up the custom elevation profile control
-            elev_profile.AltitudeChanged         += ElevProfile_AltitudeChanged;
-            elev_profile.WaypointInsertRequested  += ElevProfile_WaypointInsertRequested;
-            elev_profile.InsertedWaypointMoved    += ElevProfile_InsertedWaypointMoved;
-            elev_profile.WaypointRemoveRequested  += ElevProfile_WaypointRemoveRequested;
         }
 
         // ─── Form load ────────────────────────────────────────────────────────────
@@ -102,6 +84,15 @@ namespace Carbonix
         {
             map.Position = plugin.Host.FPGMapControl.Position;
             map.Zoom = plugin.Host.FPGMapControl.Zoom;
+
+            // Single auto-detected feature set: the manual branch list and the
+            // return-path option are no longer used (branches are detected from the
+            // loaded features; the return leg is enumerated and DO_RETURN_PATH_START is
+            // added by hand afterward).
+            LST_branches.Visible = false;
+            BUT_branches_add.Visible = false;
+            BUT_branches_remove.Visible = false;
+            CHK_returnpath.Visible = false;
 
             SetAltUnits();
             RecalcCoverage();
@@ -129,7 +120,7 @@ namespace Carbonix
 
         // ─── File loading ─────────────────────────────────────────────────────────
 
-        private static List<PointLatLngAlt> LoadCorridorFile(string path)
+        private static List<List<PointLatLngAlt>> LoadCorridorFeatures(string path)
         {
             string ext = Path.GetExtension(path).ToLowerInvariant();
             if (ext == ".kml" || ext == ".kmz")
@@ -141,26 +132,6 @@ namespace Carbonix
 
         private void BUT_mainline_add_Click(object sender, EventArgs e)
         {
-            AddSegmentFiles(mainLineSegmentFiles, mainLineSegments, LST_mainline);
-        }
-
-        private void BUT_mainline_remove_Click(object sender, EventArgs e)
-        {
-            RemoveSelectedSegments(mainLineSegmentFiles, mainLineSegments, LST_mainline);
-        }
-
-        private void BUT_branches_add_Click(object sender, EventArgs e)
-        {
-            AddSegmentFiles(branchSegmentFiles, branchSegmentsRaw, LST_branches);
-        }
-
-        private void BUT_branches_remove_Click(object sender, EventArgs e)
-        {
-            RemoveSelectedSegments(branchSegmentFiles, branchSegmentsRaw, LST_branches);
-        }
-
-        private void AddSegmentFiles(List<string> files, List<List<PointLatLngAlt>> segments, ListBox listBox)
-        {
             using (var dlg = new OpenFileDialog())
             {
                 dlg.Title = "Open Corridor File(s)";
@@ -170,10 +141,10 @@ namespace Carbonix
 
                 foreach (var path in dlg.FileNames)
                 {
-                    List<PointLatLngAlt> pts;
+                    List<List<PointLatLngAlt>> feats;
                     try
                     {
-                        pts = LoadCorridorFile(path);
+                        feats = LoadCorridorFeatures(path);
                     }
                     catch (Exception ex)
                     {
@@ -181,87 +152,73 @@ namespace Carbonix
                         continue;
                     }
 
-                    if (pts == null || pts.Count < 2)
+                    feats = feats?.Where(f => f != null && f.Count >= 2).ToList();
+                    if (feats == null || feats.Count == 0)
                     {
                         CustomMessageBox.Show(
-                            "No line/polyline geometry found in " + Path.GetFileName(path) + ".\n" +
-                            "For KML: ensure the file contains a LineString.\n" +
-                            "For SHP: ensure the file contains line features.",
+                            "No line/polyline geometry found in " + Path.GetFileName(path) + ".",
                             "No Corridor Found");
                         continue;
                     }
 
-                    files.Add(path);
-                    segments.Add(pts);
-                    listBox.Items.Add(Path.GetFileName(path));
+                    featureFiles.Add(path);
+                    featuresByFile.Add(feats);
+                    LST_mainline.Items.Add(
+                        $"{Path.GetFileName(path)}  ({feats.Count} feature{(feats.Count == 1 ? "" : "s")})");
                 }
             }
 
-            RecomputeNetwork();
+            RebuildModel();
             DrawMap();
-            ZoomToFitMainLine();
+            ZoomToFitFeatures();
         }
 
-        private void RemoveSelectedSegments(List<string> files, List<List<PointLatLngAlt>> segments, ListBox listBox)
+        private void BUT_mainline_remove_Click(object sender, EventArgs e)
         {
-            var selected = listBox.SelectedIndices.Cast<int>().OrderByDescending(i => i).ToList();
+            var selected = LST_mainline.SelectedIndices.Cast<int>().OrderByDescending(i => i).ToList();
             if (selected.Count == 0) return;
 
             foreach (var i in selected)
             {
-                files.RemoveAt(i);
-                segments.RemoveAt(i);
-                listBox.Items.RemoveAt(i);
+                featureFiles.RemoveAt(i);
+                featuresByFile.RemoveAt(i);
+                LST_mainline.Items.RemoveAt(i);
             }
 
-            RecomputeNetwork();
+            RebuildModel();
             DrawMap();
         }
 
-        private void ZoomToFitMainLine()
+        // Branch list is hidden in the single-feature-set model; these remain as no-ops
+        // to satisfy the designer's event wiring.
+        private void BUT_branches_add_Click(object sender, EventArgs e) { }
+        private void BUT_branches_remove_Click(object sender, EventArgs e) { }
+
+        private void ZoomToFitFeatures()
         {
-            if (mainLine == null || mainLine.Count == 0) return;
-            double minLat = mainLine.Min(p => p.Lat), maxLat = mainLine.Max(p => p.Lat);
-            double minLng = mainLine.Min(p => p.Lng), maxLng = mainLine.Max(p => p.Lng);
+            var all = AllFeatures().SelectMany(f => f).ToList();
+            if (all.Count == 0) return;
+            double minLat = all.Min(p => p.Lat), maxLat = all.Max(p => p.Lat);
+            double minLng = all.Min(p => p.Lng), maxLng = all.Max(p => p.Lng);
             map.SetZoomToFitRect(new RectLatLng(maxLat, minLng, maxLng - minLng, maxLat - minLat));
         }
 
         /// <summary>
-        /// Rebuilds <c>mainLine</c> (chained main-line segments with junction vertices
-        /// inserted for branch attachments) and <c>branchAttachments</c>. Clears any
-        /// previously generated mission/profile data since the geometry has changed.
+        /// Clears any previously generated mission/profile data after the loaded feature
+        /// set changes. The polyline+tour model is built fresh at generation time.
         /// </summary>
-        private void RecomputeNetwork()
+        private void RebuildModel()
         {
             generatedWps = null;
             elevationPoints = null;
-            _insertedVertexIndices.Clear();
+            polylines = null;
+            tour = null;
             BUT_accept.Enabled = false;
-
-            if (mainLineSegments.Count == 0)
-            {
-                mainLine = null;
-                branchAttachments = new List<BranchAttachment>();
-                return;
-            }
-
-            var chained = CorridorPlanner.BuildMainLine(mainLineSegments, out var unconnected);
-            if (unconnected.Count > 0)
-            {
-                var names = unconnected.Select(i => Path.GetFileName(mainLineSegmentFiles[i]));
-                CustomMessageBox.Show(
-                    "The following main line segment(s) could not be connected to the main chain " +
-                    "(no endpoint within tolerance):\n\n" + string.Join("\n", names),
-                    "Unconnected Segments");
-            }
-
-            mainLine = chained;
-            branchAttachments = CorridorPlanner.AttachBranches(ref mainLine, branchSegmentsRaw);
         }
 
         // ── KML/KMZ loader ───────────────────────────────────────────────────────
 
-        private static List<PointLatLngAlt> LoadKml(string path)
+        private static List<List<PointLatLngAlt>> LoadKml(string path)
         {
             KmlFile kml;
             if (path.EndsWith(".kmz", StringComparison.OrdinalIgnoreCase))
@@ -275,31 +232,21 @@ namespace Carbonix
                     kml = KmlFile.Load(stream);
             }
 
-            var lineString = FindFirstLineString(kml.Root);
-            if (lineString == null) return null;
-
-            var result = new List<PointLatLngAlt>();
-            foreach (var coord in lineString.Coordinates)
+            var features = new List<List<PointLatLngAlt>>();
+            foreach (var ls in kml.Root.Flatten().OfType<LineString>())
             {
-                result.Add(new PointLatLngAlt(
-                    coord.Latitude,
-                    coord.Longitude,
-                    coord.Altitude.HasValue ? coord.Altitude.Value : 0));
+                if (ls.Coordinates == null) continue;
+                var pts = ls.Coordinates
+                    .Select(c => new PointLatLngAlt(c.Latitude, c.Longitude, c.Altitude ?? 0))
+                    .ToList();
+                if (pts.Count >= 2) features.Add(pts);
             }
-            return result;
-        }
-
-        private static LineString FindFirstLineString(Element element)
-        {
-            if (element is LineString ls) return ls;
-            foreach (var child in element.Flatten().OfType<LineString>())
-                return child;
-            return null;
+            return features;
         }
 
         // ── SHP loader ───────────────────────────────────────────────────────────
 
-        private static List<PointLatLngAlt> LoadShp(string path)
+        private static List<List<PointLatLngAlt>> LoadShp(string path)
         {
             var fs = DotSpatial.Data.FeatureSet.Open(path);
             if (fs == null || fs.Features.Count == 0)
@@ -312,6 +259,7 @@ namespace Carbonix
 
             var wgs84 = DotSpatial.Projections.KnownCoordinateSystems.Geographic.World.WGS1984;
 
+            var features = new List<List<PointLatLngAlt>>();
             foreach (var feature in fs.Features)
             {
                 var geom = feature.Geometry;
@@ -333,13 +281,13 @@ namespace Carbonix
                     for (int i = 0; i < xs.Length; i++) { xs[i] = xy[i * 2]; ys[i] = xy[i * 2 + 1]; }
                 }
 
-                var result = new List<PointLatLngAlt>(xs.Length);
+                var pts = new List<PointLatLngAlt>(xs.Length);
                 for (int i = 0; i < xs.Length; i++)
-                    result.Add(new PointLatLngAlt(ys[i], xs[i], double.IsNaN(zs[i]) ? 0 : zs[i]));
-                return result;
+                    pts.Add(new PointLatLngAlt(ys[i], xs[i], double.IsNaN(zs[i]) ? 0 : zs[i]));
+                features.Add(pts);
             }
 
-            return null;
+            return features;
         }
 
         // ─── Map drawing ──────────────────────────────────────────────────────────
@@ -349,34 +297,21 @@ namespace Carbonix
             layer_corridor.Routes.Clear();
             layer_corridor.Markers.Clear();
 
-            if (mainLine == null || mainLine.Count < 2)
+            var features = AllFeatures();
+            if (features.Count == 0)
             {
                 _missionOverlay.overlay.Clear();
                 map.Refresh();
                 return;
             }
 
-            layer_corridor.Routes.Add(new GMapRoute(
-                mainLine.Select(p => new PointLatLng(p.Lat, p.Lng)).ToList(),
-                "centerline")
-            {
-                Stroke = new Pen(Color.Yellow, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash }
-            });
-
-            foreach (var br in branchAttachments)
-            {
+            // Draw every loaded feature (the corridor + spurs) as a dashed reference line.
+            foreach (var feat in features)
                 layer_corridor.Routes.Add(new GMapRoute(
-                    br.Points.Select(p => new PointLatLng(p.Lat, p.Lng)).ToList(),
-                    "branch" + br.BranchId)
+                    feat.Select(p => new PointLatLng(p.Lat, p.Lng)).ToList(), "feature")
                 {
-                    Stroke = new Pen(Color.Cyan, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash }
+                    Stroke = new Pen(Color.Yellow, 2) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash }
                 });
-
-                var junction = mainLine[br.MainLineVertexIndex];
-                layer_corridor.Markers.Add(new GMarkerGoogle(
-                    new PointLatLng(junction.Lat, junction.Lng),
-                    GMarkerGoogleType.yellow_small));
-            }
 
             if (generatedWps == null)
             {
@@ -393,7 +328,7 @@ namespace Carbonix
             // Numbered WP markers are suppressed — there are too many in a corridor.
             var homePoint = plugin.Host.cs.PlannedHomeLocation.Lat != 0
                 ? plugin.Host.cs.PlannedHomeLocation
-                : mainLine.First();
+                : features[0].First();
             var home = new PointLatLngAlt(homePoint.Lat, homePoint.Lng, 0);
 
             var locationWps = generatedWps.Select(wp => new Locationwp
@@ -505,55 +440,60 @@ namespace Carbonix
 
         private async void BUT_generate_Click(object sender, EventArgs e)
         {
-            if (mainLine == null || mainLine.Count < 2)
+            if (AllFeatures().Count == 0)
             {
-                CustomMessageBox.Show("Please load at least one main line segment first.", "No Corridor");
+                CustomMessageBox.Show("Please load a corridor file first.", "No Corridor");
                 return;
             }
             await ExecuteGenerateAsync();
         }
 
         /// <summary>
-        /// Runs <see cref="CorridorPlanner.GenerateMission"/> and
-        /// <see cref="CorridorPlanner.BuildElevationProfile"/> on a background thread,
-        /// then updates the map and elevation profile.  Consumes and clears
-        /// <c>_preserveProfileView</c> and <c>_preserveAltEdits</c> if set.
+        /// Builds the polyline+tour model from the loaded features and the FlightPlanner
+        /// home point, then generates the mission and a read-only elevation profile on a
+        /// background thread and updates the map and profile.
         /// </summary>
         private async System.Threading.Tasks.Task ExecuteGenerateAsync()
         {
-            if (mainLine == null || mainLine.Count < 2) return;
+            var features = AllFeatures();
+            if (features.Count == 0) return;
 
             var p = BuildParameters();
             if (p == null) return;
 
             PointLatLngAlt homePoint = plugin.Host.cs.PlannedHomeLocation.Lat != 0
                 ? plugin.Host.cs.PlannedHomeLocation
-                : mainLine.First();
+                : features[0].First();
+            bool reverse = CHK_reverse.Checked;
 
             BUT_generate.Enabled = false;
             BUT_accept.Enabled = false;
             lbl_stats.Text = "Fetching terrain data and generating mission…";
 
+            List<Carbonix.Planning.Polyline> builtPolylines;
+            List<TourStep> builtTour;
             List<CorridorWaypoint> wps;
             List<ElevationPoint> profileSamples;
             double terrAlt;
             try
             {
-                var capturedLine     = mainLine;
-                var capturedBranches = branchAttachments;
+                var capturedFeatures = features;
                 var capturedP        = p;
                 var capturedHome     = homePoint;
-                (wps, profileSamples, terrAlt) = await System.Threading.Tasks.Task.Run(() =>
-                {
-                    double homeT  = CorridorPlanner.GetTerrainAlt(capturedHome.Lat, capturedHome.Lng);
-                    var generated = CorridorPlanner.GenerateMission(capturedLine, capturedP, capturedHome, capturedBranches);
-                    var profile   = CorridorPlanner.BuildElevationProfile(capturedLine, capturedHome, capturedP, capturedBranches);
-                    return (generated, profile, homeT);
-                });
+                (builtPolylines, builtTour, wps, profileSamples, terrAlt) =
+                    await System.Threading.Tasks.Task.Run(() =>
+                    {
+                        double homeT = CorridorPlanner.GetTerrainAlt(capturedHome.Lat, capturedHome.Lng);
+                        var (pls, tr) = CorridorTourBuilder.Build(
+                            capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
+                        var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome);
+                        var profile = BuildTourProfile(generated, homeT);
+                        return (pls, tr, generated, profile, homeT);
+                    });
             }
             catch (Exception ex)
             {
-                log.Error("CorridorPlanner.GenerateMission failed", ex);
+                log.Error("Corridor tour generation failed", ex);
                 CustomMessageBox.Show("Error generating mission:\n" + ex.Message, "Error");
                 BUT_generate.Enabled = true;
                 return;
@@ -565,32 +505,58 @@ namespace Carbonix
 
             if (wps.Count == 0)
             {
-                CustomMessageBox.Show("No waypoints were generated. Check parameters.", "No Waypoints");
+                CustomMessageBox.Show(
+                    "No waypoints were generated. Check the loaded features and parameters.", "No Waypoints");
                 return;
             }
 
-            generatedWps      = wps;
+            polylines       = builtPolylines;
+            tour            = builtTour;
+            generatedWps    = wps;
             elevationPoints = profileSamples;
-            homeTerrainAlt    = terrAlt;
-
-            // Mark any centreline samples whose corridor vertex was user-inserted.
-            foreach (var s in elevationPoints)
-                if (s.IsLineWaypoint && _insertedVertexIndices.Contains(s.WaypointIndex))
-                    s.IsInserted = true;
-
-            // Restore altitude edits that were saved before the geometry change.
-            if (_preserveAltEdits)
-                RestoreAltEdits();
-
-            bool preserveView = _preserveProfileView;
-            _preserveProfileView = false;
-            _preserveAltEdits    = false;
-            _savedAltEdits       = null;
+            homeTerrainAlt  = terrAlt;
 
             DrawMap();
-            UpdateElevationProfile(p, preserveView);
+            UpdateElevationProfile(p);
             UpdateStats(p);
             BUT_accept.Enabled = true;
+        }
+
+        /// <summary>
+        /// Read-only elevation profile of the flown mission: one sample per generated
+        /// waypoint (terrain from the waypoint, cumulative distance along the path).
+        /// Interactive editing and first-pass-per-leg de-duplication are a follow-up.
+        /// </summary>
+        private static List<ElevationPoint> BuildTourProfile(List<CorridorWaypoint> wps, double homeTerrainAlt)
+        {
+            var samples = new List<ElevationPoint>();
+            double cum = 0;
+            PointLatLngAlt prev = null;
+            foreach (var wp in wps)
+            {
+                var geo = new PointLatLngAlt(wp.Lat, wp.Lng, 0);
+                bool isLoiter = wp.Command == MAVLink.MAV_CMD.LOITER_TURNS && wp.LoiterRadiusM > 0;
+                if (prev != null) cum += prev.GetDistance(geo);
+
+                samples.Add(new ElevationPoint
+                {
+                    DistM            = cum,
+                    AltRelM          = wp.AltRelM,
+                    TerrainAlt       = wp.TerrainAltM,
+                    HomeTerrainAlt   = homeTerrainAlt,
+                    IsLineWaypoint   = !isLoiter,
+                    IsLoiterWaypoint = isLoiter,
+                    LoiterRadiusM    = wp.LoiterRadiusM,
+                    LoiterArcLengthM = isLoiter ? 2.0 * Math.PI * wp.LoiterRadiusM * wp.LoiterTurns : 0,
+                    WaypointIndex    = wp.CorridorVertexIndex,
+                    IsBranchVertex   = wp.IsBranchVertex,
+                    BranchId         = wp.BranchId,
+                    Lat              = wp.Lat,
+                    Lng              = wp.Lng,
+                });
+                prev = geo;
+            }
+            return samples;
         }
 
         private CorridorParameters BuildParameters()
@@ -650,457 +616,6 @@ namespace Carbonix
             elev_profile.SetData(elevationPoints, p.MinAGL, p.MaxAGL, preserveView);
         }
 
-        // ─── Alt-edit preservation helpers ───────────────────────────────────────
-
-        /// <summary>
-        /// Snapshots the current AGL for every line-WP and loiter-WP sample so it
-        /// can be reapplied after a geometry-triggered regeneration. Branch-vertex
-        /// samples are excluded — their altitude always recomputes fresh from terrain.
-        /// </summary>
-        private void CaptureAltEdits()
-        {
-            _savedAltEdits = new Dictionary<(int idx, bool isLoiter), double>();
-            if (elevationPoints == null) return;
-            foreach (var s in elevationPoints)
-            {
-                if (s.IsBranchVertex) continue;
-                if (s.IsLineWaypoint)
-                    _savedAltEdits[(s.WaypointIndex, false)] = s.AltRelM;
-                else if (s.IsLoiterWaypoint)
-                    _savedAltEdits[(s.WaypointIndex, true)] = s.AltRelM;
-            }
-        }
-
-        /// <summary>
-        /// Reapplies saved AGL values to the freshly-generated <c>elevationPoints</c>
-        /// and <c>generatedWps</c>.  Called inside BUT_generate_Click when
-        /// <c>_preserveAltEdits</c> is set.
-        /// </summary>
-        private void RestoreAltEdits()
-        {
-            if (_savedAltEdits == null) return;
-
-            if (elevationPoints != null)
-            {
-                foreach (var s in elevationPoints)
-                {
-                    if (s.IsBranchVertex) continue;
-
-                    double savedAltRelM;
-                    if (s.IsLineWaypoint)
-                    {
-                        if (_savedAltEdits.TryGetValue((s.WaypointIndex, false), out savedAltRelM))
-                            s.AltRelM = savedAltRelM;
-                    }
-                    else if (s.IsLoiterWaypoint)
-                    {
-                        if (_savedAltEdits.TryGetValue((s.WaypointIndex, true), out savedAltRelM))
-                            s.AltRelM = savedAltRelM;
-                    }
-                    else if (s.IsLoiterArcSample)
-                    {
-                        // Arc sub-samples share the same AltRelM as their loiter anchor.
-                        if (_savedAltEdits.TryGetValue((s.WaypointIndex, true), out savedAltRelM))
-                            s.AltRelM = savedAltRelM;
-                    }
-                }
-            }
-
-            // Propagate to generated waypoints so the accept export is also correct.
-            // Branch waypoints are skipped — their altitude always recomputes fresh from terrain.
-            if (generatedWps != null)
-            {
-                foreach (var wp in generatedWps)
-                {
-                    if (wp.IsBranchVertex) continue;
-                    bool isLoiterWp = wp.Command == MAVLink.MAV_CMD.LOITER_TURNS;
-                    if (!_savedAltEdits.TryGetValue((wp.CorridorVertexIndex, isLoiterWp), out double savedAltRelM))
-                        continue;
-                    wp.AltRelM = savedAltRelM;
-                    wp.AltAGL  = savedAltRelM - (wp.TerrainAltM - homeTerrainAlt);
-                }
-            }
-        }
-
-        // ─── Elevation profile altitude-change event ──────────────────────────────
-
-        private void ElevProfile_AltitudeChanged(object sender, AltChangeEventArgs e)
-        {
-            if (generatedWps == null) return;
-
-            double newAltRelM = e.NewAltRelM;  // unclamped — user can go above/below min/max guides
-
-            // e.WaypointIndex is the corridor vertex index (0..M-1). Branch vertices are
-            // never hit-tested by ElevationProfileControl, so e.WaypointIndex always
-            // refers to a mainLine vertex — exclude branch waypoints/samples here so a
-            // coincidentally-equal branch-internal index isn't matched too.
-            // e.IsLoiter distinguishes whether the user dragged a loiter bar or a line-WP dot.
-            // Only propagate to the matching type so lead-in WPs and loiters can have
-            // independent altitudes.
-            foreach (var wp in generatedWps)
-            {
-                if (wp.IsBranchVertex) continue;
-                if (wp.CorridorVertexIndex != e.WaypointIndex) continue;
-                bool isLoiterWp = wp.Command == MAVLink.MAV_CMD.LOITER_TURNS;
-                if (e.IsLoiter != isLoiterWp) continue;
-                wp.AltRelM = newAltRelM;
-                wp.AltAGL  = newAltRelM - (wp.TerrainAltM - homeTerrainAlt);
-            }
-
-            // Keep stored centreline samples in sync.
-            // ElevationProfileControl has already updated the anchor sample (IsLineWaypoint or
-            // IsLoiterWaypoint) and the arc sub-samples (via the loiter branch in HandleDrag).
-            // Sync the rest of elevationPoints here using the same loiter/non-loiter filter.
-            if (elevationPoints != null)
-            {
-                foreach (var s in elevationPoints)
-                {
-                    if (s.IsBranchVertex) continue;
-                    if (s.WaypointIndex != e.WaypointIndex) continue;
-                    if (e.IsLoiter)
-                    {
-                        // Loiter bar or arc sub-sample: all share the same AltRelM (constant height).
-                        if (s.IsLoiterWaypoint || s.IsLoiterArcSample)
-                            s.AltRelM = newAltRelM;
-                    }
-                    else
-                    {
-                        if (s.IsLineWaypoint)
-                            s.AltRelM = newAltRelM;
-                    }
-                }
-            }
-        }
-
-        // ─── Leg-fraction helper (loiter-arc corrected) ───────────────────────────
-
-        /// <summary>
-        /// Computes where <paramref name="distM"/> sits along the geographic leg
-        /// from <paramref name="before"/> to <paramref name="after"/> as a fraction [0,1].
-        ///
-        /// The raw profile spans between two consecutive line-WP samples can be
-        /// inflated by loiter arc lengths (which represent no geographic displacement).
-        /// This method subtracts those arc lengths so the fraction maps correctly
-        /// to a position on the straight corridor segment.
-        /// </summary>
-        private double ComputeLegFraction(double distM, ElevationPoint before, ElevationPoint after)
-        {
-            // When the preceding boundary is a loiter bar, the straight leg begins at
-            // the END of the arc (DistM + LoiterArcLengthM), not at the loiter centre.
-            // Using the centre would inflate both legSpan and legOffset by arcLen,
-            // making a click right after the bar resolve to a fraction well above 0.
-            double beforeEffDistM = before.IsLoiterWaypoint
-                ? before.DistM + before.LoiterArcLengthM
-                : before.DistM;
-
-            double loitersBefore = 0;
-            double loitersTotal  = 0;
-
-            foreach (var s in elevationPoints)
-            {
-                if (!s.IsLoiterWaypoint || s.LoiterArcLengthM <= 0) continue;
-                if (s.DistM < beforeEffDistM || s.DistM >= after.DistM) continue;
-
-                loitersTotal += s.LoiterArcLengthM;
-
-                double arcEnd = s.DistM + s.LoiterArcLengthM;
-                if (arcEnd <= distM)
-                    loitersBefore += s.LoiterArcLengthM;          // entire arc is before click
-                else if (s.DistM < distM)
-                    loitersBefore += distM - s.DistM;             // click is inside the arc
-            }
-
-            double legSpan   = (after.DistM - beforeEffDistM) - loitersTotal;
-            double legOffset = (distM - beforeEffDistM)        - loitersBefore;
-
-            if (legSpan <= 0) return 0.5;
-            return Math.Max(0.01, Math.Min(0.99, legOffset / legSpan));
-        }
-
-        // ─── Elevation profile insert-waypoint event ──────────────────────────────
-
-        private async void ElevProfile_WaypointInsertRequested(object sender, WaypointInsertEventArgs e)
-        {
-            if (elevationPoints == null || mainLine == null || mainLine.Count < 2) return;
-
-            _preserveProfileView = true;
-
-            // Find the two adjacent vertex samples that bracket the requested DistM.
-            // Include both IsLineWaypoint and IsLoiterWaypoint so that loiter-turn
-            // vertices (which have no dot, only a bar) still act as segment boundaries.
-            // Branch-vertex samples index into a branch's own point list (not mainLine)
-            // and are excluded — they can't act as insertion boundaries.
-            var vtxSamples = elevationPoints
-                .Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsBranchVertex)
-                .OrderBy(s => s.DistM)
-                .ToList();
-
-            if (vtxSamples.Count < 2) return;
-
-            ElevationPoint before = null, after = null;
-            for (int i = 0; i < vtxSamples.Count - 1; i++)
-            {
-                if (vtxSamples[i].DistM <= e.DistM && vtxSamples[i + 1].DistM >= e.DistM)
-                {
-                    before = vtxSamples[i];
-                    after  = vtxSamples[i + 1];
-                    break;
-                }
-            }
-            if (before == null)
-            {
-                before = vtxSamples[vtxSamples.Count - 2];
-                after  = vtxSamples[vtxSamples.Count - 1];
-            }
-
-            double t = ComputeLegFraction(e.DistM, before, after);
-
-            int vA = Math.Min(before.WaypointIndex, mainLine.Count - 1);
-            int vB = Math.Min(after.WaypointIndex,  mainLine.Count - 1);
-            var ptA = mainLine[vA];
-            var ptB = mainLine[vB];
-            double newLat = ptA.Lat + t * (ptB.Lat - ptA.Lat);
-            double newLng = ptA.Lng + t * (ptB.Lng - ptA.Lng);
-
-            int insertIdx = Math.Min(vA, vB) + 1;
-            mainLine.Insert(insertIdx, new PointLatLngAlt(newLat, newLng, 0));
-
-            // Keep _insertedVertexIndices in sync.
-            var toShift = new List<int>();
-            foreach (var i in _insertedVertexIndices)
-                if (i >= insertIdx) toShift.Add(i);
-            foreach (var i in toShift) { _insertedVertexIndices.Remove(i); _insertedVertexIndices.Add(i + 1); }
-            _insertedVertexIndices.Add(insertIdx);
-
-            // Keep branch attachment junction indices in sync with the inserted vertex.
-            foreach (var br in branchAttachments)
-                if (br.MainLineVertexIndex >= insertIdx) br.MainLineVertexIndex++;
-
-            // Patch elevationPoints in-place — do NOT re-sample terrain.
-            // Shift WaypointIndex for every mainLine sample whose corridor vertex moved up.
-            // Branch-vertex samples index into their branch's own point list and are unaffected.
-            foreach (var s in elevationPoints)
-                if (!s.IsBranchVertex && s.WaypointIndex >= insertIdx) s.WaypointIndex++;
-
-            // Interpolate terrain linearly between the bracketing vertex samples.
-            double span = after.DistM - before.DistM;
-            double tTerr = span > 0 ? (e.DistM - before.DistM) / span : 0.5;
-            double newTerrAlt = before.TerrainAlt + tTerr * (after.TerrainAlt - before.TerrainAlt);
-
-            // Insert the new ElevationPoint after the last existing sample with DistM ≤ e.DistM.
-            int insertPos = elevationPoints.FindLastIndex(s => s.DistM <= e.DistM) + 1;
-            elevationPoints.Insert(insertPos, new ElevationPoint
-            {
-                DistM          = e.DistM,
-                AltRelM        = e.AltRelM,
-                TerrainAlt     = newTerrAlt,
-                HomeTerrainAlt = before.HomeTerrainAlt,
-                IsLineWaypoint = true,
-                IsInserted     = true,
-                WaypointIndex  = insertIdx,
-                Lat            = newLat,
-                Lng            = newLng,
-            });
-
-            DrawMap();
-
-            // Regenerate mission geometry only — no terrain re-sampling.
-            var p = BuildParameters();
-            if (p == null) return;
-
-            PointLatLngAlt homePoint = plugin.Host.cs.PlannedHomeLocation.Lat != 0
-                ? plugin.Host.cs.PlannedHomeLocation
-                : mainLine.First();
-
-            BUT_generate.Enabled = false;
-            BUT_accept.Enabled   = false;
-
-            List<CorridorWaypoint> wps;
-            try
-            {
-                var capturedLine     = mainLine;
-                var capturedBranches = branchAttachments;
-                var capturedP        = p;
-                wps = await System.Threading.Tasks.Task.Run(() =>
-                    CorridorPlanner.GenerateMission(capturedLine, capturedP, homePoint, capturedBranches));
-            }
-            catch (Exception ex)
-            {
-                log.Error("CorridorPlanner.GenerateMission failed on WP insert", ex);
-                CustomMessageBox.Show("Error generating mission:\n" + ex.Message, "Error");
-                BUT_generate.Enabled = true;
-                return;
-            }
-            finally
-            {
-                BUT_generate.Enabled = true;
-            }
-
-            if (wps.Count == 0) return;
-
-            generatedWps = wps;
-
-            // Restore AltRelM from the patched elevationPoints to the new generatedWps.
-            // Branch waypoints are skipped — their altitude is computed fresh from
-            // terrain by GenerateMission and isn't tracked in elevationPoints here.
-            foreach (var wp in generatedWps)
-            {
-                if (wp.CorridorVertexIndex < 0 || wp.IsBranchVertex) continue;
-                bool isLoiterWp = wp.Command == MAVLink.MAV_CMD.LOITER_TURNS;
-                var matching = elevationPoints.FirstOrDefault(s =>
-                    !s.IsBranchVertex && s.WaypointIndex == wp.CorridorVertexIndex &&
-                    (isLoiterWp ? s.IsLoiterWaypoint : s.IsLineWaypoint));
-                if (matching == null) continue;
-                wp.AltRelM = matching.AltRelM;
-                wp.AltAGL  = matching.AltRelM - (wp.TerrainAltM - homeTerrainAlt);
-            }
-
-            // Re-mark inserted vertices.
-            foreach (var s in elevationPoints)
-                if (s.IsLineWaypoint && !s.IsBranchVertex && _insertedVertexIndices.Contains(s.WaypointIndex))
-                    s.IsInserted = true;
-
-            bool preserveView = _preserveProfileView;
-            _preserveProfileView = false;
-
-            UpdateElevationProfile(p, preserveView);
-            UpdateStats(p);
-            BUT_accept.Enabled = true;
-        }
-
-        // ─── Inserted waypoint XY move ────────────────────────────────────────────
-
-        private async void ElevProfile_InsertedWaypointMoved(object sender, InsertedWaypointMoveEventArgs e)
-        {
-            if (mainLine == null || elevationPoints == null) return;
-
-            _preserveProfileView = true;
-
-            int vIdx = e.WaypointIndex;
-            if (vIdx < 0 || vIdx >= mainLine.Count) return;
-
-            // Include IsLoiterWaypoint so loiter-turn vertices act as movement
-            // boundaries — same fix as ElevProfile_WaypointInsertRequested.
-            // Branch-vertex samples are excluded — see ElevProfile_WaypointInsertRequested.
-            var lineWps = elevationPoints
-                .Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsBranchVertex)
-                .OrderBy(s => s.WaypointIndex)
-                .ToList();
-
-            var prevS = lineWps.LastOrDefault(s => s.WaypointIndex < vIdx);
-            var nextS = lineWps.FirstOrDefault(s => s.WaypointIndex > vIdx);
-            if (prevS == null || nextS == null) return;
-
-            int vA = Math.Min(prevS.WaypointIndex, mainLine.Count - 1);
-            int vB = Math.Min(nextS.WaypointIndex, mainLine.Count - 1);
-            double t = ComputeLegFraction(e.NewDistM, prevS, nextS);
-
-            var ptA = mainLine[vA];
-            var ptB = mainLine[vB];
-            mainLine[vIdx] = new PointLatLngAlt(
-                ptA.Lat + t * (ptB.Lat - ptA.Lat),
-                ptA.Lng + t * (ptB.Lng - ptA.Lng),
-                0);
-
-            // Regenerate mission geometry only — do NOT re-sample the terrain profile.
-            // Re-sampling would shift the terrain bands (the new WP geographic position
-            // has slightly different terrain, and cumulative distances shift downstream).
-            // The elevationPoints already have the correct AltRelM and DistM for the
-            // dragged WP (set during the drag), so we keep them in place.
-            var p = BuildParameters();
-            if (p == null) return;
-
-            PointLatLngAlt homePoint = plugin.Host.cs.PlannedHomeLocation.Lat != 0
-                ? plugin.Host.cs.PlannedHomeLocation
-                : mainLine.First();
-
-            BUT_generate.Enabled = false;
-            BUT_accept.Enabled   = false;
-
-            List<CorridorWaypoint> wps;
-            try
-            {
-                var capturedLine     = mainLine;
-                var capturedBranches = branchAttachments;
-                var capturedP        = p;
-                wps = await System.Threading.Tasks.Task.Run(() =>
-                    CorridorPlanner.GenerateMission(capturedLine, capturedP, homePoint, capturedBranches));
-            }
-            catch (Exception ex)
-            {
-                log.Error("CorridorPlanner.GenerateMission failed on WP move", ex);
-                CustomMessageBox.Show("Error generating mission:\n" + ex.Message, "Error");
-                BUT_generate.Enabled = true;
-                return;
-            }
-            finally
-            {
-                BUT_generate.Enabled = true;
-            }
-
-            if (wps.Count == 0) return;
-
-            generatedWps = wps;
-
-            // Restore AltRelM from the live elevationPoints (which carry the user's
-            // drag-adjusted values) to the freshly generated waypoints. Branch waypoints
-            // are skipped — their altitude is computed fresh from terrain by GenerateMission.
-            foreach (var wp in generatedWps)
-            {
-                if (wp.CorridorVertexIndex < 0 || wp.IsBranchVertex) continue;
-                bool isLoiterWp = wp.Command == MAVLink.MAV_CMD.LOITER_TURNS;
-                var matching = elevationPoints.FirstOrDefault(s =>
-                    !s.IsBranchVertex && s.WaypointIndex == wp.CorridorVertexIndex &&
-                    (isLoiterWp ? s.IsLoiterWaypoint : s.IsLineWaypoint));
-                if (matching == null) continue;
-                wp.AltRelM = matching.AltRelM;
-                wp.AltAGL  = matching.AltRelM - (wp.TerrainAltM - homeTerrainAlt);
-            }
-
-            // Re-mark inserted vertices (centreline samples unchanged, just refresh flag).
-            foreach (var s in elevationPoints)
-                if (s.IsLineWaypoint && !s.IsBranchVertex && _insertedVertexIndices.Contains(s.WaypointIndex))
-                    s.IsInserted = true;
-
-            bool preserveView = _preserveProfileView;
-            _preserveProfileView = false;
-
-            DrawMap();
-            UpdateElevationProfile(p, preserveView);
-            UpdateStats(p);
-            BUT_accept.Enabled = true;
-        }
-
-        // ─── Inserted waypoint remove ─────────────────────────────────────────────
-
-        private async void ElevProfile_WaypointRemoveRequested(object sender, WaypointRemoveEventArgs e)
-        {
-            int removeIdx = e.WaypointIndex;
-            if (mainLine == null || removeIdx < 0 || removeIdx >= mainLine.Count) return;
-            if (mainLine.Count <= 2) return;
-
-            // Preserve the current profile view so removal doesn't jump the pan/zoom.
-            _preserveProfileView = true;
-
-            mainLine.RemoveAt(removeIdx);
-
-            // Shift _insertedVertexIndices.
-            var updated = new List<int>();
-            foreach (var i in _insertedVertexIndices)
-            {
-                if (i == removeIdx) continue;
-                updated.Add(i > removeIdx ? i - 1 : i);
-            }
-            _insertedVertexIndices.Clear();
-            foreach (var i in updated) _insertedVertexIndices.Add(i);
-
-            // Shift branch attachment junction indices.
-            foreach (var br in branchAttachments)
-                if (br.MainLineVertexIndex > removeIdx) br.MainLineVertexIndex--;
-
-            DrawMap();
-            await ExecuteGenerateAsync();
-        }
 
         // ─── Map→profile zoom sync ────────────────────────────────────────────────
 
@@ -1192,25 +707,12 @@ namespace Carbonix
             var fp = MainV2.instance.FlightPlanner;
             int frameColIndex = fp.Commands.Columns["Frame"]?.Index ?? -1;
 
-            // If requested and there's a return leg, mark its start with a single
-            // DO_RETURN_PATH_START so the autopilot flies the return leg backwards
-            // along the main line.
-            bool insertReturnPath = CHK_returnpath.Checked && generatedWps.Max(w => w.LineIndex) >= 1;
-
+            // The tour enumerates the return leg as explicit waypoints; a
+            // DO_RETURN_PATH_START marker, if wanted, is added by hand afterward.
             int exportedCount = 0;
             for (int i = 0; i < generatedWps.Count; i++)
             {
                 var wp = generatedWps[i];
-
-                if (insertReturnPath && i > 0 &&
-                    generatedWps[i - 1].LineIndex == 0 && wp.LineIndex == 1)
-                {
-                    plugin.Host.AddWPtoList(
-                        MAVLink.MAV_CMD.DO_RETURN_PATH_START,
-                        0, 0, 0, 0, 0, 0, 0);
-                    exportedCount++;
-                    insertReturnPath = false;
-                }
 
                 int rowIdx = plugin.Host.AddWPtoList(
                     wp.Command,
