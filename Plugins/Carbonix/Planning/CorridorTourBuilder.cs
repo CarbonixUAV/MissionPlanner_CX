@@ -28,7 +28,7 @@ namespace Carbonix.Planning
 
         public static (List<Polyline> polylines, List<TourStep> tour) Build(
             List<List<PointLatLngAlt>> features, PointLatLngAlt home,
-            double passOffsetM, int numberOfPasses)
+            double passOffsetM, int numberOfPasses, bool reverse = false)
         {
             var polylines = new List<Polyline>();
             var tour = new List<TourStep>();
@@ -121,6 +121,17 @@ namespace Carbonix.Planning
             }
 
             Dfs(startNode, -1);
+
+            // Reverse option: fly the whole tour in the opposite order/sense. Still starts
+            // and ends at the home-nearest endpoint (it's a circuit), just walked the other
+            // way — reverse the step order and flip each step's direction.
+            if (reverse)
+            {
+                tour.Reverse();
+                foreach (var s in tour)
+                    s.Direction = s.Direction == TraverseDir.Forward ? TraverseDir.Reverse : TraverseDir.Forward;
+            }
+
             return (polylines, tour);
         }
 
