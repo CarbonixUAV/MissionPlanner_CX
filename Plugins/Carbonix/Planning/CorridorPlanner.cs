@@ -93,11 +93,17 @@ namespace Carbonix.Planning
         public List<PointLatLngAlt> Points { get; set; }
     }
 
-    /// <summary>One step of a tour: traverse a polyline in a given direction.</summary>
+    /// <summary>
+    /// One step of a tour: traverse a polyline in a direction on a single offset lane.
+    /// The out/back traversals of the tour, at opposite offsets, ARE the passes — flying
+    /// a polyline Forward at +offset then Reverse at −offset is a 2-pass there-and-back
+    /// (see .claude/corridor-tree-design.md).
+    /// </summary>
     public class TourStep
     {
         public int PolylineId { get; set; }
         public TraverseDir Direction { get; set; }
+        public double LaneOffsetM { get; set; }   // lateral offset of this lane (0 = centreline)
     }
 
     public class CorridorWaypoint
@@ -862,11 +868,11 @@ namespace Carbonix.Planning
         /// visits — there is no separate branch concept. See
         /// .claude/corridor-tree-design.md.
         ///
-        /// Each waypoint's terrain is sampled on its own polyline's centreline, so every
-        /// lane of a polyline shares one altitude profile. Exact for a single-polyline
-        /// tour (reproduces <see cref="GenerateMission"/> for the no-branch case — strict
-        /// equivalence test). Inter-polyline join refinement (e.g. leaf-tip turnaround
-        /// direction) and UI wiring are the remaining Step-3 work.
+        /// Each step flies one offset lane; the out/back traversals at opposite offsets are
+        /// the passes. Each waypoint's terrain is sampled on its own polyline's centreline,
+        /// so both passes of a polyline share one altitude profile. Inter-polyline join
+        /// refinement (e.g. leaf-tip turnaround direction) and UI wiring are the remaining
+        /// Step-3 work.
         /// </summary>
         public static List<CorridorWaypoint> GenerateMissionFromTour(
             List<Polyline> polylines, List<TourStep> tour, CorridorParameters p, PointLatLngAlt homePoint)
@@ -885,23 +891,25 @@ namespace Carbonix.Planning
             var combinedPts  = new List<PointLatLngAlt>();
             var combinedMeta = new List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)>();
 
+            int stepIndex = 0;
             foreach (var step in tour)
             {
-                if (!byId.TryGetValue(step.PolylineId, out var poly) || poly.Points == null || poly.Points.Count < 2)
-                    continue;
-
-                var (pts, meta) = BuildPolylineContribution(poly, step.Direction, p, homePoint);
-
-                // Drop a leading point coincident with the previous step's end so a shared
-                // junction doesn't create a zero-length leg the turn solver can't handle.
-                int start = (combinedPts.Count > 0 && pts.Count > 0 &&
-                             combinedPts[combinedPts.Count - 1].GetDistance(pts[0]) < JoinDedupM) ? 1 : 0;
-
-                for (int k = start; k < pts.Count; k++)
+                if (byId.TryGetValue(step.PolylineId, out var poly) && poly.Points != null && poly.Points.Count >= 2)
                 {
-                    combinedPts.Add(pts[k]);
-                    combinedMeta.Add(meta[k]);
+                    var (pts, meta) = BuildPolylineContribution(poly, step, stepIndex);
+
+                    // Drop a leading point coincident with the previous step's end so a
+                    // shared junction doesn't create a zero-length leg the solver can't handle.
+                    int start = (combinedPts.Count > 0 && pts.Count > 0 &&
+                                 combinedPts[combinedPts.Count - 1].GetDistance(pts[0]) < JoinDedupM) ? 1 : 0;
+
+                    for (int k = start; k < pts.Count; k++)
+                    {
+                        combinedPts.Add(pts[k]);
+                        combinedMeta.Add(meta[k]);
+                    }
                 }
+                stepIndex++;
             }
 
             if (combinedPts.Count == 0) return empty;
@@ -919,41 +927,30 @@ namespace Carbonix.Planning
             return SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
         }
 
-        // Build one polyline's snake-ordered lanes (and per-point metadata) for the tour.
-        // Forward reproduces GenerateMission's per-line ordering; Reverse flips the whole
-        // contribution.
+        // Build one tour step's contribution: a SINGLE offset lane of the polyline, walked
+        // in the step's direction. The out/back traversals (opposite offsets) are the
+        // passes — there is no per-step snake. corridorVtxIdx is the polyline's own vertex
+        // index (direction-independent, so a vertex has one identity across both passes).
         private static (List<PointLatLngAlt> pts, List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> meta)
-            BuildPolylineContribution(Polyline poly, TraverseDir dir, CorridorParameters p, PointLatLngAlt home)
+            BuildPolylineContribution(Polyline poly, TourStep step, int stepIndex)
         {
-            var (lines, offsets) = GenerateFlightLines(poly.Points, p);
-            OrderLines(lines, offsets, home, p.ReverseDirection);   // mutates lines/offsets in place
-
-            int M = poly.Points.Count;
-            var first = new PointLatLngAlt(poly.Points[0].Lat, poly.Points[0].Lng, 0);
-            var last  = new PointLatLngAlt(poly.Points[M - 1].Lat, poly.Points[M - 1].Lng, 0);
+            var lane = Math.Abs(step.LaneOffsetM) > 1e-9
+                ? OffsetPolyline(poly.Points, step.LaneOffsetM)
+                : poly.Points.Select(pt => new PointLatLngAlt(pt.Lat, pt.Lng, pt.Alt)).ToList();
 
             bool isBranch = poly.Id != VertexId.MainLine;
             int branchId = isBranch ? poly.Id : -1;
+            bool forward = step.Direction == TraverseDir.Forward;
+            int n = lane.Count;
 
             var pts  = new List<PointLatLngAlt>();
             var meta = new List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)>();
 
-            for (int li = 0; li < lines.Count; li++)
+            for (int k = 0; k < n; k++)
             {
-                var lineStart = lines[li][0];
-                bool lineReversed = lineStart.GetDistance(last) < lineStart.GetDistance(first);
-                for (int vi = 0; vi < lines[li].Count; vi++)
-                {
-                    int vtx = lineReversed ? M - 1 - vi : vi;
-                    pts.Add(lines[li][vi]);
-                    meta.Add((li, true, vtx, isBranch, branchId, null));
-                }
-            }
-
-            if (dir == TraverseDir.Reverse)
-            {
-                pts.Reverse();
-                meta.Reverse();
+                int vi = forward ? k : n - 1 - k;   // walk in step direction; vi = true vertex index
+                pts.Add(lane[vi]);
+                meta.Add((stepIndex, true, vi, isBranch, branchId, null));
             }
 
             return (pts, meta);
