@@ -529,6 +529,8 @@ namespace Carbonix
         /// </summary>
         private static List<ElevationPoint> BuildTourProfile(List<CorridorWaypoint> wps, double homeTerrainAlt)
         {
+            const double SampleSpacingM = 25.0;
+
             var samples = new List<ElevationPoint>();
             double cum = 0;
             PointLatLngAlt prev = null;
@@ -536,24 +538,73 @@ namespace Carbonix
             {
                 var geo = new PointLatLngAlt(wp.Lat, wp.Lng, 0);
                 bool isLoiter = wp.Command == MAVLink.MAV_CMD.LOITER_TURNS && wp.LoiterRadiusM > 0;
-                if (prev != null) cum += prev.GetDistance(geo);
 
-                samples.Add(new ElevationPoint
+                // The loiter command sits at the circle CENTRE (off the flown line), so
+                // don't count a straight leg into it — the X-axis advances by the arc the
+                // aircraft actually flies (added after the anchor below).
+                if (prev != null && !isLoiter) cum += prev.GetDistance(geo);
+
+                if (isLoiter)
                 {
-                    DistM            = cum,
-                    AltRelM          = wp.AltRelM,
-                    TerrainAlt       = wp.TerrainAltM,
-                    HomeTerrainAlt   = homeTerrainAlt,
-                    IsLineWaypoint   = !isLoiter,
-                    IsLoiterWaypoint = isLoiter,
-                    LoiterRadiusM    = wp.LoiterRadiusM,
-                    LoiterArcLengthM = isLoiter ? 2.0 * Math.PI * wp.LoiterRadiusM * wp.LoiterTurns : 0,
-                    WaypointIndex    = wp.CorridorVertexIndex,
-                    IsBranchVertex   = wp.IsBranchVertex,
-                    BranchId         = wp.BranchId,
-                    Lat              = wp.Lat,
-                    Lng              = wp.Lng,
-                });
+                    double arcLen = 2.0 * Math.PI * wp.LoiterRadiusM * wp.LoiterTurns;
+
+                    samples.Add(new ElevationPoint
+                    {
+                        DistM            = cum,
+                        AltRelM          = wp.AltRelM,
+                        TerrainAlt       = wp.TerrainAltM,
+                        HomeTerrainAlt   = homeTerrainAlt,
+                        IsLoiterWaypoint = true,
+                        LoiterRadiusM    = wp.LoiterRadiusM,
+                        LoiterArcLengthM = arcLen,
+                        WaypointIndex    = wp.CorridorVertexIndex,
+                        IsBranchVertex   = wp.IsBranchVertex,
+                        BranchId         = wp.BranchId,
+                        Lat              = wp.Lat,
+                        Lng              = wp.Lng,
+                    });
+
+                    // Terrain fill points around the flown arc so the loiter isn't a flat
+                    // gap. (Full-circle worst-case sampling is a separate punch-list item.)
+                    int nSub = Math.Max(4, (int)(arcLen / SampleSpacingM));
+                    double arcSpan = 360.0 * wp.LoiterTurns;
+                    for (int k = 1; k <= nSub; k++)
+                    {
+                        var circ = geo.newpos(k * arcSpan / nSub, wp.LoiterRadiusM);
+                        samples.Add(new ElevationPoint
+                        {
+                            DistM             = cum + arcLen * k / nSub,
+                            AltRelM           = wp.AltRelM,
+                            TerrainAlt        = CorridorPlanner.GetTerrainAlt(circ.Lat, circ.Lng),
+                            HomeTerrainAlt    = homeTerrainAlt,
+                            IsLoiterArcSample = true,
+                            WaypointIndex     = wp.CorridorVertexIndex,
+                            IsBranchVertex    = wp.IsBranchVertex,
+                            BranchId          = wp.BranchId,
+                            Lat               = circ.Lat,
+                            Lng               = circ.Lng,
+                        });
+                    }
+
+                    cum += arcLen;
+                }
+                else
+                {
+                    samples.Add(new ElevationPoint
+                    {
+                        DistM          = cum,
+                        AltRelM        = wp.AltRelM,
+                        TerrainAlt     = wp.TerrainAltM,
+                        HomeTerrainAlt = homeTerrainAlt,
+                        IsLineWaypoint = true,
+                        WaypointIndex  = wp.CorridorVertexIndex,
+                        IsBranchVertex = wp.IsBranchVertex,
+                        BranchId       = wp.BranchId,
+                        Lat            = wp.Lat,
+                        Lng            = wp.Lng,
+                    });
+                }
+
                 prev = geo;
             }
             return samples;
