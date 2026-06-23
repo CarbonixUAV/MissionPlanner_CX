@@ -203,7 +203,8 @@ namespace Carbonix.Planning
 
         // Loiter arc visualisation
         public bool IsLoiterWaypoint { get; set; }
-        public double LoiterArcLengthM { get; set; } // 2π × r × turns
+        public double LoiterArcLengthM { get; set; } // full unwrapped span (primary + alt + primary)
+        public double LoiterPrimaryLenM { get; set; } // one primary (flown) arc portion's length
         public double LoiterRadiusM { get; set; }
 
         // Terrain fill points distributed around the loiter circumference.
