@@ -10,6 +10,7 @@ using GMap.NET.WindowsForms.Markers;
 using MissionPlanner;
 using MissionPlanner.Maps;
 using MissionPlanner.Utilities;
+using MissionPlanner.Utilities.Mission;
 using Carbonix.Planning;
 using Carbonix.UI;
 using log4net;
@@ -487,7 +488,7 @@ namespace Carbonix
                         var (pls, tr) = CorridorTourBuilder.Build(
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
                         var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome);
-                        var profile = BuildTourProfile(generated, homeT);
+                        var profile = BuildTourProfile(generated, capturedHome, homeT);
                         return (pls, tr, generated, profile, homeT);
                     });
             }
@@ -523,31 +524,123 @@ namespace Carbonix
         }
 
         /// <summary>
-        /// Read-only elevation profile of the flown mission: one sample per generated
-        /// waypoint (terrain from the waypoint, cumulative distance along the path).
-        /// Interactive editing and first-pass-per-leg de-duplication are a follow-up.
+        /// Read-only elevation profile of the flown mission. Straight legs come from the
+        /// same <see cref="MissionSegmentizer"/> the map uses (exact tangent entry/exit),
+        /// so the profile matches the map. Each loiter is unwrapped over the FULL circle
+        /// (entry → full turn → exit) so an errant extra turn can't hide unvetted terrain.
+        /// Interactive editing and first-pass-per-leg de-dup are a follow-up.
         /// </summary>
-        private static List<ElevationPoint> BuildTourProfile(List<CorridorWaypoint> wps, double homeTerrainAlt)
+        private static List<ElevationPoint> BuildTourProfile(
+            List<CorridorWaypoint> wps, PointLatLngAlt home, double homeTerrainAlt)
         {
             const double SampleSpacingM = 25.0;
-
             var samples = new List<ElevationPoint>();
-            double cum = 0;
-            PointLatLngAlt prev = null;
-            foreach (var wp in wps)
+            if (wps == null || wps.Count == 0) return samples;
+
+            // Run the waypoints through the same segmentizer the map uses, so the profile's
+            // ground track is identical to what's drawn.
+            var locationWps = wps.Select(wp => new Locationwp
             {
-                var geo = new PointLatLngAlt(wp.Lat, wp.Lng, 0);
-                bool isLoiter = wp.Command == MAVLink.MAV_CMD.LOITER_TURNS && wp.LoiterRadiusM > 0;
+                id = (ushort)wp.Command, p1 = wp.P1, p2 = wp.P2, p3 = wp.P3, p4 = wp.P4,
+                lat = wp.Lat, lng = wp.Lng, alt = (float)wp.AltRelM,
+            }).ToList();
+            var graph = MissionGraph.Create(new PointLatLngAlt(home.Lat, home.Lng, 0), locationWps);
+            var segments = MissionSegmentizer.BuildSegments(graph, VehicleClass.Plane, 0);
 
-                // The loiter command sits at the circle CENTRE (off the flown line), so
-                // don't count a straight leg into it — the X-axis advances by the arc the
-                // aircraft actually flies (added after the anchor below).
-                if (prev != null && !isLoiter) cum += prev.GetDistance(geo);
-
-                if (isLoiter)
+            // Index primary (flown) segments by their start node (= index into wps).
+            var straightByFrom = new Dictionary<int, MissionSegmentizer.Segment>();
+            var loiterByNode   = new Dictionary<int, MissionSegmentizer.Segment>();
+            foreach (var s in segments)
+            {
+                if (s.StartNode == null || (s.Flags & SegmentFlags.Alternate) != 0) continue;
+                if (s.Kind == SegmentKind.LoiterArc)
                 {
-                    double arcLen = 2.0 * Math.PI * wp.LoiterRadiusM * wp.LoiterTurns;
+                    if (!loiterByNode.ContainsKey(s.StartNode.MissionIndex))
+                        loiterByNode[s.StartNode.MissionIndex] = s;
+                }
+                else if (s.EndNode != null && !straightByFrom.ContainsKey(s.StartNode.MissionIndex))
+                {
+                    straightByFrom[s.StartNode.MissionIndex] = s;
+                }
+            }
 
+            double cum = 0;
+
+            double AngleDiffDeg(double a, double b, bool clockwise)
+            {
+                double sgn = clockwise ? 1.0 : -1.0;
+                while (sgn * b < sgn * a) b += sgn * 360.0;
+                return Math.Abs(b - a);
+            }
+
+            void SampleArc(PointLatLngAlt center, double radius, double startBearing, double sweepDeg, CorridorWaypoint owner)
+            {
+                double arcLen = 2.0 * Math.PI * radius * Math.Abs(sweepDeg) / 360.0;
+                int n = Math.Max(2, (int)(arcLen / SampleSpacingM));
+                for (int k = 1; k <= n; k++)
+                {
+                    var pt = center.newpos(startBearing + sweepDeg * k / n, radius);
+                    samples.Add(new ElevationPoint
+                    {
+                        DistM             = cum + arcLen * k / n,
+                        AltRelM           = owner.AltRelM,
+                        TerrainAlt        = CorridorPlanner.GetTerrainAlt(pt.Lat, pt.Lng),
+                        HomeTerrainAlt    = homeTerrainAlt,
+                        IsLoiterArcSample = true,
+                        WaypointIndex     = owner.CorridorVertexIndex,
+                        IsBranchVertex    = owner.IsBranchVertex,
+                        BranchId          = owner.BranchId,
+                        Lat               = pt.Lat,
+                        Lng               = pt.Lng,
+                    });
+                }
+                cum += arcLen;
+            }
+
+            void SampleStraight(PointLatLngAlt a, PointLatLngAlt b, CorridorWaypoint owner)
+            {
+                double dist = a.GetDistance(b);
+                int n = Math.Max(1, (int)(dist / SampleSpacingM));
+                for (int k = 1; k <= n; k++)
+                {
+                    double t = (double)k / n;
+                    var pt = new PointLatLngAlt(a.Lat + t * (b.Lat - a.Lat), a.Lng + t * (b.Lng - a.Lng), 0);
+                    samples.Add(new ElevationPoint
+                    {
+                        DistM              = cum + dist * t,
+                        AltRelM            = owner.AltRelM,
+                        TerrainAlt         = CorridorPlanner.GetTerrainAlt(pt.Lat, pt.Lng),
+                        HomeTerrainAlt     = homeTerrainAlt,
+                        IsLegTerrainSample = true,
+                        WaypointIndex      = owner.CorridorVertexIndex,
+                        IsBranchVertex     = owner.IsBranchVertex,
+                        BranchId           = owner.BranchId,
+                        Lat                = pt.Lat,
+                        Lng                = pt.Lng,
+                    });
+                }
+                cum += dist;
+            }
+
+            foreach (var node in graph.Nodes)
+            {
+                int idx = node.MissionIndex;
+                if (idx < 0 || idx >= wps.Count) continue;
+                var wp = wps[idx];
+
+                if (loiterByNode.TryGetValue(idx, out var arc) && arc.Path != null && arc.Path.Count >= 2)
+                {
+                    var center = new PointLatLngAlt(wp.Lat, wp.Lng, 0);
+                    double radius = wp.LoiterRadiusM > 0 ? wp.LoiterRadiusM : Math.Abs(wp.P3);
+                    bool cw = wp.P3 >= 0;
+                    double entry = center.GetBearing(arc.Path[0]);
+                    double exit  = center.GetBearing(arc.Path[arc.Path.Count - 1]);
+                    double sign = cw ? 1.0 : -1.0;
+                    double primary = AngleDiffDeg(entry, exit, cw);   // flown arc, [0,360)
+                    double altSweep = 360.0 - primary;
+                    double totalLen = 2.0 * Math.PI * radius * (2.0 * primary + altSweep) / 360.0;
+
+                    // Loiter bar anchor spanning the full unwrap (primary + alt + primary).
                     samples.Add(new ElevationPoint
                     {
                         DistM            = cum,
@@ -555,8 +648,8 @@ namespace Carbonix
                         TerrainAlt       = wp.TerrainAltM,
                         HomeTerrainAlt   = homeTerrainAlt,
                         IsLoiterWaypoint = true,
-                        LoiterRadiusM    = wp.LoiterRadiusM,
-                        LoiterArcLengthM = arcLen,
+                        LoiterRadiusM    = radius,
+                        LoiterArcLengthM = totalLen,
                         WaypointIndex    = wp.CorridorVertexIndex,
                         IsBranchVertex   = wp.IsBranchVertex,
                         BranchId         = wp.BranchId,
@@ -564,29 +657,11 @@ namespace Carbonix
                         Lng              = wp.Lng,
                     });
 
-                    // Terrain fill points around the flown arc so the loiter isn't a flat
-                    // gap. (Full-circle worst-case sampling is a separate punch-list item.)
-                    int nSub = Math.Max(4, (int)(arcLen / SampleSpacingM));
-                    double arcSpan = 360.0 * wp.LoiterTurns;
-                    for (int k = 1; k <= nSub; k++)
-                    {
-                        var circ = geo.newpos(k * arcSpan / nSub, wp.LoiterRadiusM);
-                        samples.Add(new ElevationPoint
-                        {
-                            DistM             = cum + arcLen * k / nSub,
-                            AltRelM           = wp.AltRelM,
-                            TerrainAlt        = CorridorPlanner.GetTerrainAlt(circ.Lat, circ.Lng),
-                            HomeTerrainAlt    = homeTerrainAlt,
-                            IsLoiterArcSample = true,
-                            WaypointIndex     = wp.CorridorVertexIndex,
-                            IsBranchVertex    = wp.IsBranchVertex,
-                            BranchId          = wp.BranchId,
-                            Lat               = circ.Lat,
-                            Lng               = circ.Lng,
-                        });
-                    }
-
-                    cum += arcLen;
+                    // Full circle for worst-case terrain (primary + alt) then a trailing
+                    // primary so the unwrap ends at the exit tangent (stays contiguous).
+                    SampleArc(center, radius, entry, sign * primary,  wp);
+                    SampleArc(center, radius, exit,  sign * altSweep, wp);
+                    SampleArc(center, radius, entry, sign * primary,  wp);
                 }
                 else
                 {
@@ -605,8 +680,11 @@ namespace Carbonix
                     });
                 }
 
-                prev = geo;
+                // Outgoing straight leg to the next node (tangent-to-tangent ground track).
+                if (straightByFrom.TryGetValue(idx, out var seg) && seg.Path != null && seg.Path.Count >= 2)
+                    SampleStraight(seg.Path[0], seg.Path[seg.Path.Count - 1], wp);
             }
+
             return samples;
         }
 
