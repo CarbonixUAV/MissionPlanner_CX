@@ -85,6 +85,21 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void Build_Reverse_FlipsOrderAndDirections()
+        {
+            var fwd = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, 2);
+            var rev = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, 2, reverse: true);
+
+            Assert.AreEqual(fwd.tour.Count, rev.tour.Count);
+            int n = fwd.tour.Count;
+            for (int i = 0; i < n; i++)
+            {
+                Assert.AreEqual(fwd.tour[n - 1 - i].PolylineId, rev.tour[i].PolylineId, $"order[{i}]");
+                Assert.AreNotEqual(fwd.tour[n - 1 - i].Direction, rev.tour[i].Direction, $"direction[{i}]");
+            }
+        }
+
+        [TestMethod]
         public void Build_FeedsGenerateMissionFromTour()
         {
             var orig = CorridorPlanner.TerrainProvider;
