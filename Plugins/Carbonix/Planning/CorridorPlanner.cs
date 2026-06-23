@@ -46,6 +46,40 @@ namespace Carbonix.Planning
         public double CornerCutRadiusM { get; set; } = 150;
     }
 
+    /// <summary>
+    /// Stable identity for a planned vertex: which polyline it belongs to, and its
+    /// index within that polyline's own vertex space. Replaces the overloaded
+    /// CorridorVertexIndex + IsBranchVertex + BranchId trio (see
+    /// .claude/corridor-tree-design.md).
+    ///
+    /// Pre-Tour-refactor, PolylineId is encoded from the legacy fields: the main
+    /// line is <see cref="MainLine"/> (-1); each branch uses its BranchId. Each
+    /// polyline owns its index space, so (PolylineId, Index) never collides — which
+    /// is the whole point (it lets spur vertices be addressed without the
+    /// main-line/branch index clash the legacy scheme had).
+    /// </summary>
+    public readonly struct VertexId : IEquatable<VertexId>
+    {
+        public const int MainLine = -1;
+
+        public readonly int PolylineId;
+        public readonly int Index;
+
+        public VertexId(int polylineId, int index)
+        {
+            PolylineId = polylineId;
+            Index = index;
+        }
+
+        public bool Equals(VertexId other) => PolylineId == other.PolylineId && Index == other.Index;
+        public override bool Equals(object obj) => obj is VertexId other && Equals(other);
+        public override int GetHashCode() => unchecked((PolylineId * 397) ^ Index);
+        public static bool operator ==(VertexId a, VertexId b) => a.Equals(b);
+        public static bool operator !=(VertexId a, VertexId b) => !a.Equals(b);
+        public override string ToString() =>
+            $"({(PolylineId == MainLine ? "main" : "branch" + PolylineId)}, {Index})";
+    }
+
     public class CorridorWaypoint
     {
         public MAVLink.MAV_CMD Command { get; set; }
@@ -83,6 +117,11 @@ namespace Carbonix.Planning
         // (BranchAttachment.Points), not the main line.
         public bool IsBranchVertex { get; set; }
         public int BranchId { get; set; } = -1;
+
+        // Stable identity, derived from the legacy fields for now (behaviour-neutral).
+        // Later steps make this the stored identity and retire the three fields above.
+        public VertexId Vertex =>
+            new VertexId(IsBranchVertex ? BranchId : VertexId.MainLine, CorridorVertexIndex);
     }
 
     /// <summary>
@@ -159,6 +198,10 @@ namespace Carbonix.Planning
         // insert/move/remove handlers.
         public bool IsBranchVertex { get; set; }
         public int BranchId { get; set; } = -1;
+
+        // Stable identity, derived from the legacy fields for now (behaviour-neutral).
+        public VertexId Vertex =>
+            new VertexId(IsBranchVertex ? BranchId : VertexId.MainLine, WaypointIndex);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -1272,7 +1315,14 @@ namespace Carbonix.Planning
         // Utility
         // ════════════════════════════════════════════════════════════════════════
 
-        public static double GetTerrainAlt(double lat, double lng)
+        // Terrain source: absolute terrain altitude (metres) at lat/lng. Defaults to
+        // SRTM; overridable so generation can be driven deterministically (tests, or
+        // an alternate terrain source). Production behaviour is unchanged.
+        public static Func<double, double, double> TerrainProvider { get; set; } = SrtmTerrainAlt;
+
+        public static double GetTerrainAlt(double lat, double lng) => TerrainProvider(lat, lng);
+
+        private static double SrtmTerrainAlt(double lat, double lng)
         {
             var r = srtm.getAltitude(lat, lng);
             if (r.currenttype == srtm.tiletype.valid) return r.alt;
