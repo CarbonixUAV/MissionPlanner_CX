@@ -80,6 +80,26 @@ namespace Carbonix.Planning
             $"({(PolylineId == MainLine ? "main" : "branch" + PolylineId)}, {Index})";
     }
 
+    public enum TraverseDir { Forward, Reverse }
+
+    /// <summary>
+    /// An independently-planned path. A spur is just a Polyline like any other; the
+    /// <see cref="TourStep"/> list decides ordering and direction. See
+    /// .claude/corridor-tree-design.md.
+    /// </summary>
+    public class Polyline
+    {
+        public int Id { get; set; }
+        public List<PointLatLngAlt> Points { get; set; }
+    }
+
+    /// <summary>One step of a tour: traverse a polyline in a given direction.</summary>
+    public class TourStep
+    {
+        public int PolylineId { get; set; }
+        public TraverseDir Direction { get; set; }
+    }
+
     public class CorridorWaypoint
     {
         public MAVLink.MAV_CMD Command { get; set; }
@@ -756,9 +776,29 @@ namespace Carbonix.Planning
                 }
             }
 
-            // 5. Flat-earth projection: lon/lat → local cartesian metres.
-            //    Reference = first point of the combined polyline.
-            var refPt   = combinedPts[0];
+            // 5-7. Solve turns, project back to geo, sample terrain, build waypoints.
+            return SolveAndBuildWaypoints(combinedPts, combinedMeta, centerLine, p, homeTerrainAlt);
+        }
+
+        /// <summary>
+        /// Shared tail of mission generation: take a combined geo polyline plus per-point
+        /// metadata, solve the turns in cartesian space, project back to geo, sample
+        /// terrain (centreline for lanes; own position for branch detours), and build the
+        /// waypoint list. Used by <see cref="GenerateMission"/> today and by the
+        /// tour-based path (see .claude/corridor-tree-design.md).
+        /// </summary>
+        private static List<CorridorWaypoint> SolveAndBuildWaypoints(
+            List<PointLatLngAlt> combinedPts,
+            List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> combinedMeta,
+            List<PointLatLngAlt> centerLineForTerrain,
+            CorridorParameters p,
+            double homeTerrainAlt)
+        {
+            var result = new List<CorridorWaypoint>();
+            if (combinedPts.Count == 0) return result;
+
+            // Flat-earth projection: lon/lat → local cartesian metres. Ref = first point.
+            var refPt = combinedPts[0];
             double cosLat = Math.Cos(refPt.Lat * Deg2Rad);
 
             Vec2 ToCart(PointLatLngAlt geo) => new Vec2(
@@ -773,22 +813,17 @@ namespace Carbonix.Planning
             Vec2[] cartPts = combinedPts.Select(ToCart).ToArray();
             var    meta    = combinedMeta.ToArray();
 
-            // 6. Generate the mission command sequence in cartesian space.
             var commands = GenerateMissionCartesian(cartPts, meta, p, p.TurnRadiusM, p.CornerCutRadiusM);
 
-            // 7. Project back to geo coordinates, look up terrain, compute altitudes.
-            //    Terrain is sampled on the CENTRELINE, not at each lane's offset position:
-            //    every parallel lane at a given station shares the centreline terrain, so
-            //    they fly a common altitude profile. The waypoint still keeps its offset
-            //    ground track (geo) — only the terrain query is moved to the centreline.
-            //    This keeps generation consistent with the centreline-only elevation
-            //    profile and its per-vertex altitude edits. Branch detours are not lanes,
-            //    so they keep their own terrain.
+            // Terrain is sampled on the CENTRELINE for lanes (every parallel lane at a
+            // station shares the centreline terrain → a common altitude profile), and at
+            // its own position for branch detours (not lanes). Waypoints keep their offset
+            // ground track; only the terrain query moves to the centreline.
             double agl = Clamp(p.DefaultAGL, p.MinAGL, p.MaxAGL);
             foreach (var cmd in commands)
             {
                 var geo       = FromCart(cmd.Position);
-                var terrQuery = cmd.IsBranchVertex ? geo : NearestPointOnPolyline(geo, centerLine).point;
+                var terrQuery = cmd.IsBranchVertex ? geo : NearestPointOnPolyline(geo, centerLineForTerrain).point;
                 double terr   = GetTerrainAlt(terrQuery.Lat, terrQuery.Lng);
 
                 result.Add(new CorridorWaypoint
