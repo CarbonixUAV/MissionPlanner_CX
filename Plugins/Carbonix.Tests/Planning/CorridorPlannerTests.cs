@@ -176,50 +176,55 @@ namespace Carbonix.Tests.Planning
             Assert.AreEqual(dist / p.SpeedMs, time, 1e-6);
         }
 
-        // ── Tour path equivalence ─────────────────────────────────────────────────
+        // ── Tour path: single-lane-per-step pass model ────────────────────────────
 
-        static void AssertWaypointsEqual(List<CorridorWaypoint> expected, List<CorridorWaypoint> actual)
+        [TestMethod]
+        public void TourStep_FliesSingleOffsetLane()
         {
-            Assert.AreEqual(expected.Count, actual.Count, "waypoint count");
-            for (int i = 0; i < expected.Count; i++)
+            // A single Forward step at +offset shifts the whole lane to one side of the
+            // centerline — one pass, not a snake of all lanes.
+            var poly = new Polyline
             {
-                var e = expected[i];
-                var a = actual[i];
-                Assert.AreEqual(e.Command, a.Command, $"command[{i}]");
-                Assert.AreEqual(e.Lat, a.Lat, 1e-9, $"lat[{i}]");
-                Assert.AreEqual(e.Lng, a.Lng, 1e-9, $"lng[{i}]");
-                Assert.AreEqual(e.AltRelM, a.AltRelM, 1e-6, $"altRelM[{i}]");
-                Assert.AreEqual(e.P1, a.P1, 1e-4, $"p1[{i}]");
-                Assert.AreEqual(e.P3, a.P3, 1e-4, $"p3[{i}]");
-                Assert.AreEqual(e.IsLineWaypoint, a.IsLineWaypoint, $"isLineWaypoint[{i}]");
-                Assert.AreEqual(e.CorridorVertexIndex, a.CorridorVertexIndex, $"corridorVertexIndex[{i}]");
-            }
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02) },
+            };
+            const double offset = 60;
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward, LaneOffsetM = offset },
+            };
+
+            var wps = CorridorPlanner.GenerateMissionFromTour(new List<Polyline> { poly }, tour, Params(), poly.Points[0]);
+
+            var lineWps = wps.Where(w => w.IsLineWaypoint).ToList();
+            Assert.AreEqual(2, lineWps.Count, "single lane over a 2-point line → 2 waypoints");
+            double shiftM = Math.Abs(lineWps[0].Lat - BaseLat) * MetresPerDegLat;
+            Assert.AreEqual(offset, shiftM, 5, "lane offset from the centerline");
+            Assert.IsTrue(lineWps.All(w => Math.Sign(w.Lat - BaseLat) == Math.Sign(lineWps[0].Lat - BaseLat)),
+                "all waypoints on the same side (one lane)");
         }
 
         [TestMethod]
-        public void TourPath_SinglePolyline_MatchesGenerateMission()
+        public void OutAndBackTour_FliesBothOffsetLanes()
         {
-            // A single Forward tour step over the centerline must reproduce GenerateMission
-            // exactly (no-branch case), including passes and a corner loiter.
-            var line = new List<PointLatLngAlt>
+            // The two passes: Forward at +offset, Reverse at -offset → lanes on both sides.
+            var poly = new Polyline
             {
-                P(BaseLat, BaseLng),
-                P(BaseLat, BaseLng + 0.02),
-                P(BaseLat - 0.02, BaseLng + 0.02),
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02) },
             };
-            var p = Params(passes: 2, offset: 100);
-
-            var legacy = CorridorPlanner.GenerateMission(line, p, line[0]);
-
-            var poly = new Polyline { Id = VertexId.MainLine, Points = line };
+            const double off = 50;
             var tour = new List<TourStep>
             {
-                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward, LaneOffsetM = off },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Reverse, LaneOffsetM = -off },
             };
-            var viaTour = CorridorPlanner.GenerateMissionFromTour(
-                new List<Polyline> { poly }, tour, p, line[0]);
 
-            AssertWaypointsEqual(legacy, viaTour);
+            var wps = CorridorPlanner.GenerateMissionFromTour(new List<Polyline> { poly }, tour, Params(), poly.Points[0]);
+
+            var lats = wps.Where(w => w.IsLineWaypoint).Select(w => w.Lat).ToList();
+            Assert.IsTrue(lats.Any(l => l > BaseLat + 0.0002), "a lane on one side of the centerline");
+            Assert.IsTrue(lats.Any(l => l < BaseLat - 0.0002), "a lane on the other side");
         }
 
         [TestMethod]
