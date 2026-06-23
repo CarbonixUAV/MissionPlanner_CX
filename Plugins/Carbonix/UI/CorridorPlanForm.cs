@@ -77,6 +77,48 @@ namespace Carbonix
             map.MouseMove += map_MouseMove;
             map.MouseUp   += map_MouseUp;
             map.OnMapZoomChanged += () => SyncProfileToMapExtent();
+
+            elev_profile.AltitudeChanged += ElevProfile_AltitudeChanged;
+        }
+
+        /// <summary>
+        /// Apply a profile altitude drag to every waypoint/sample sharing the dragged
+        /// vertex. Keyed on VertexId, so a polyline flown out-and-back (and any spur) is
+        /// edited consistently across all its occurrences.
+        /// </summary>
+        private void ElevProfile_AltitudeChanged(object sender, AltChangeEventArgs e)
+        {
+            if (generatedWps != null)
+            {
+                foreach (var wp in generatedWps)
+                {
+                    if (wp.Vertex != e.Vertex) continue;
+                    bool isLoiterWp = wp.Command == MAVLink.MAV_CMD.LOITER_TURNS;
+                    if (e.IsLoiter != isLoiterWp) continue;
+                    wp.AltRelM = e.NewAltRelM;
+                    wp.AltAGL  = e.NewAltRelM - (wp.TerrainAltM - homeTerrainAlt);
+                }
+            }
+
+            // Keep the other profile samples of the same vertex in sync (the control has
+            // already updated the dragged sample + its loiter arc sub-samples).
+            if (elevationPoints != null)
+            {
+                foreach (var s in elevationPoints)
+                {
+                    if (s.Vertex != e.Vertex) continue;
+                    if (e.IsLoiter)
+                    {
+                        if (s.IsLoiterWaypoint || s.IsLoiterArcSample) s.AltRelM = e.NewAltRelM;
+                    }
+                    else if (s.IsLineWaypoint)
+                    {
+                        s.AltRelM = e.NewAltRelM;
+                    }
+                }
+            }
+
+            DrawMap();
         }
 
         // ─── Form load ────────────────────────────────────────────────────────────
@@ -638,18 +680,21 @@ namespace Carbonix
                     double sign = cw ? 1.0 : -1.0;
                     double primary = AngleDiffDeg(entry, exit, cw);   // flown arc, [0,360)
                     double altSweep = 360.0 - primary;
-                    double totalLen = 2.0 * Math.PI * radius * (2.0 * primary + altSweep) / 360.0;
+                    double circumference = 2.0 * Math.PI * radius;
+                    double primaryLen = circumference * primary / 360.0;
+                    double totalLen = circumference * (2.0 * primary + altSweep) / 360.0;
 
                     // Loiter bar anchor spanning the full unwrap (primary + alt + primary).
                     samples.Add(new ElevationPoint
                     {
-                        DistM            = cum,
-                        AltRelM          = wp.AltRelM,
-                        TerrainAlt       = wp.TerrainAltM,
-                        HomeTerrainAlt   = homeTerrainAlt,
-                        IsLoiterWaypoint = true,
-                        LoiterRadiusM    = radius,
-                        LoiterArcLengthM = totalLen,
+                        DistM             = cum,
+                        AltRelM           = wp.AltRelM,
+                        TerrainAlt        = wp.TerrainAltM,
+                        HomeTerrainAlt    = homeTerrainAlt,
+                        IsLoiterWaypoint  = true,
+                        LoiterRadiusM     = radius,
+                        LoiterArcLengthM  = totalLen,
+                        LoiterPrimaryLenM = primaryLen,
                         WaypointIndex    = wp.CorridorVertexIndex,
                         IsBranchVertex   = wp.IsBranchVertex,
                         BranchId         = wp.BranchId,

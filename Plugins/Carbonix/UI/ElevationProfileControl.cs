@@ -151,43 +151,38 @@ namespace Carbonix.UI
         private const float DotSnap = 13f;
         private const float BarSnap = 8f;
 
-        private (int idx, bool isLoiter) HitTest(int ex, int ey)
+        // Returns the hit dot/bar sample, or null. All vertices (incl. spurs) are
+        // editable; identity is the sample's VertexId.
+        private ElevationPoint HitTest(int ex, int ey)
         {
-            if (Points == null) return (-1, false);
-            if (!PlotArea.Contains(ex, ey)) return (-1, false);
+            if (Points == null || !PlotArea.Contains(ex, ey)) return null;
 
-            // Line waypoint dots. Branch-vertex dots are excluded — they're read-only
-            // (always recomputed fresh from terrain) and not draggable/removable.
             foreach (var s in Points)
             {
-                if (!s.IsLineWaypoint || s.IsBranchVertex) continue;
+                if (!s.IsLineWaypoint) continue;
                 PointF sp = D2S(s.DistM * DistMultiplier, s.AltRelM * AltMultiplier);
                 if (Math.Sqrt(Math.Pow(ex - sp.X, 2) + Math.Pow(ey - sp.Y, 2)) <= DotSnap)
-                    return (s.WaypointIndex, false);
+                    return s;
             }
 
-            // Loiter arc bars. Branch-tip turnaround loiters are excluded — read-only.
             foreach (var s in Points)
             {
-                if (!s.IsLoiterWaypoint || s.IsBranchVertex || s.LoiterArcLengthM <= 0) continue;
+                if (!s.IsLoiterWaypoint || s.LoiterArcLengthM <= 0) continue;
                 double altRel = s.AltRelM * AltMultiplier;
                 PointF p0 = D2S(s.DistM * DistMultiplier, altRel);
                 PointF p1 = D2S((s.DistM + s.LoiterArcLengthM) * DistMultiplier, altRel);
                 if (Math.Abs(ey - p0.Y) <= BarSnap && ex >= p0.X - 4 && ex <= p1.X + 4)
-                    return (s.WaypointIndex, true);
+                    return s;
             }
 
-            return (-1, false);
+            return null;
         }
 
         // ── Interaction state ─────────────────────────────────────────────────────
 
-        private int hoveredIdx = -1;
-        private bool hoveredIsLoiter;
-        private int draggedIdx = -1;
-        private bool draggedIsLoiter;
+        private ElevationPoint hoveredSample;
+        private ElevationPoint draggedSample;
         private bool isDragging;
-        private bool _isDraggingXY;   // true when the dragged dot is an inserted (XY-movable) WP
         private bool isPanning;
         private float panStartX;
         private float panStartY;
@@ -210,20 +205,11 @@ namespace Carbonix.UI
                 return;
             }
 
-            var (idx, isLoiter) = HitTest(e.X, e.Y);
-            if (idx != hoveredIdx || isLoiter != hoveredIsLoiter)
+            var hit = HitTest(e.X, e.Y);
+            if (!ReferenceEquals(hit, hoveredSample))
             {
-                hoveredIdx = idx;
-                hoveredIsLoiter = isLoiter;
-                if (idx >= 0 && !isLoiter)
-                {
-                    var hs = Points?.FirstOrDefault(s => s.WaypointIndex == idx && s.IsLineWaypoint);
-                    Cursor = hs?.IsInserted == true ? Cursors.SizeAll : Cursors.SizeNS;
-                }
-                else
-                {
-                    Cursor = idx >= 0 ? Cursors.SizeNS : Cursors.Default;
-                }
+                hoveredSample = hit;
+                Cursor = hit != null ? Cursors.SizeNS : Cursors.Default;
                 Invalidate();
             }
         }
@@ -235,40 +221,14 @@ namespace Carbonix.UI
         {
             base.OnMouseDown(e);
 
-            if (e.Button == MouseButtons.Right)
-            {
-                if (PlotArea.Contains(e.X, e.Y))
-                {
-                    // If right-clicking on an inserted WP dot, offer removal instead.
-                    var (hitIdx, hitIsLoiter) = HitTest(e.X, e.Y);
-                    if (hitIdx >= 0 && !hitIsLoiter)
-                    {
-                        var hs = Points?.FirstOrDefault(s => s.WaypointIndex == hitIdx && s.IsLineWaypoint);
-                        if (hs?.IsInserted == true)
-                        {
-                            ShowRemoveMenu(hitIdx, e.Location);
-                            return;
-                        }
-                    }
-                    var (distX, altY) = S2D(e.X, e.Y);
-                    _pendingInsertDistM   = distX / DistMultiplier;
-                    _pendingInsertAltRelM = altY  / AltMultiplier;
-                    ShowInsertMenu(e.Location);
-                }
-                return;
-            }
-
+            // Right-click insert/remove is deferred in the tour model.
             if (e.Button != MouseButtons.Left) return;
 
-            var (idx, isLoiter) = HitTest(e.X, e.Y);
-            if (idx >= 0)
+            var hit = HitTest(e.X, e.Y);
+            if (hit != null)
             {
-                draggedIdx = idx;
-                draggedIsLoiter = isLoiter;
+                draggedSample = hit;
                 isDragging = true;
-                // Inserted (user-added) line-WP dots support XY dragging.
-                var ds = Points?.FirstOrDefault(s => s.WaypointIndex == idx && s.IsLineWaypoint);
-                _isDraggingXY = !isLoiter && ds?.IsInserted == true;
                 Capture = true;
             }
             else if (PlotArea.Contains(e.X, e.Y))
@@ -288,17 +248,9 @@ namespace Carbonix.UI
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
-            // Commit an XY drag before clearing state.
-            if (_isDraggingXY && isDragging && draggedIdx >= 0)
-            {
-                var ms = Points?.FirstOrDefault(s => s.WaypointIndex == draggedIdx && s.IsLineWaypoint);
-                if (ms != null)
-                    InsertedWaypointMoved?.Invoke(this, new InsertedWaypointMoveEventArgs(draggedIdx, ms.DistM, ms.AltRelM));
-            }
             isDragging = false;
-            _isDraggingXY = false;
             isPanning = false;
-            draggedIdx = -1;
+            draggedSample = null;
             Capture = false;
             Cursor = Cursors.Default;
         }
@@ -337,63 +289,25 @@ namespace Carbonix.UI
 
         private void HandleDrag(int screenX, int screenY)
         {
-            if (Points == null || draggedIdx < 0) return;
+            if (Points == null || draggedSample == null) return;
 
             var (_, newYData) = S2D(0, screenY);
-            // Y axis is AltRelM (altitude relative to home) — no terrain subtraction needed.
+            // Y axis IS AltRelM (altitude relative to home) — no terrain subtraction.
             double newAltRelM = newYData / AltMultiplier;
 
-            // Match by type so a dot drag finds the line-WP sample and a bar drag
-            // finds the loiter-anchor sample — they can have independent altitudes.
-            var sample = draggedIsLoiter
-                ? Points.FirstOrDefault(s => s.WaypointIndex == draggedIdx && s.IsLoiterWaypoint)
-                : Points.FirstOrDefault(s => s.WaypointIndex == draggedIdx && s.IsLineWaypoint);
-            if (sample == null) return;
+            draggedSample.AltRelM = newAltRelM;
 
-            // Update the sample's AltRelM directly — the Y axis IS AltRelM.
-            sample.AltRelM = newAltRelM;
-
-            if (_isDraggingXY)
+            bool isLoiter = draggedSample.IsLoiterWaypoint;
+            if (isLoiter)
             {
-                // XY drag: both X (position along corridor) and Y (altitude) are live.
-                // Move the dot along X.  Clamp to stay between neighbouring vertex
-                // samples, including loiter bars.  For a preceding loiter the lower
-                // bound is the ARC END (DistM + LoiterArcLengthM), not the arc start —
-                // dragging into the arc's DistM range would make ComputeLegFraction
-                // return a negative offset, snapping the geographic position to nearly
-                // the loiter vertex and causing a large Y jump on mouse-up.
-                var (newDistX, _) = S2D(screenX, 0);
-                double newDistM = newDistX / DistMultiplier;
-
-                var vtxWps = Points
-                    .Where(s => s.IsLineWaypoint || s.IsLoiterWaypoint)
-                    .OrderBy(s => s.WaypointIndex)
-                    .ToList();
-                var prevWp = vtxWps.LastOrDefault(s => s.WaypointIndex < draggedIdx);
-                var nextWp = vtxWps.FirstOrDefault(s => s.WaypointIndex > draggedIdx);
-
-                double prevBound = prevWp == null ? double.MinValue
-                    : prevWp.IsLoiterWaypoint ? prevWp.DistM + prevWp.LoiterArcLengthM + 0.5
-                    : prevWp.DistM + 0.5;
-                double nextBound = nextWp == null ? double.MaxValue
-                    : nextWp.DistM - 0.5;
-
-                newDistM = Math.Max(newDistM, prevBound);
-                newDistM = Math.Min(newDistM, nextBound);
-                sample.DistM = newDistM;
-                // AltitudeChanged not fired during XY drag — the move event on MouseUp handles it.
+                // Keep the loiter's arc sub-samples at the same (constant) altitude.
+                foreach (var arc in Points.Where(s => s.IsLoiterArcSample && s.Vertex == draggedSample.Vertex))
+                    arc.AltRelM = newAltRelM;
             }
-            else
-            {
-                // Y-only drag: fire AltitudeChanged so the form updates generatedWps immediately.
-                // For a loiter bar also update arc sub-samples to keep them at constant AltRelM.
-                if (draggedIsLoiter)
-                {
-                    foreach (var arc in Points.Where(s => s.IsLoiterArcSample && s.WaypointIndex == draggedIdx))
-                        arc.AltRelM = newAltRelM;
-                }
-                AltitudeChanged?.Invoke(this, new AltChangeEventArgs(draggedIdx, draggedIsLoiter, newAltRelM));
-            }
+
+            // Fire so the form updates every generatedWp / sample sharing this VertexId
+            // (a polyline flown out-and-back shares one altitude).
+            AltitudeChanged?.Invoke(this, new AltChangeEventArgs(draggedSample.Vertex, isLoiter, newAltRelM));
             Invalidate();
         }
 
@@ -502,12 +416,10 @@ namespace Carbonix.UI
 
         private void DrawTerrainFill(Graphics g, RectangleF r)
         {
-            // Exclude: (a) the XY-dragged sample (stale terrain at old position),
-            //          (b) user-inserted WP samples (TerrainAlt is a rough interpolation,
-            //              not an actual SRTM query — including them creates spikes).
+            // Exclude user-inserted WP samples (their TerrainAlt is a rough interpolation,
+            // not an actual SRTM query — including them creates spikes).
             var terrPts = Points
                 .Where(s => !s.IsInserted)
-                .Where(s => !(_isDraggingXY && s.WaypointIndex == draggedIdx && s.IsLineWaypoint))
                 .OrderBy(s => s.DistM)
                 .ToList();
 
@@ -541,11 +453,9 @@ namespace Carbonix.UI
 
         private void DrawMinMaxBands(Graphics g, RectangleF r)
         {
-            // Same exclusion as DrawTerrainFill: skip the XY-dragged sample and
-            // user-inserted WP samples (approximate terrain → would distort the bands).
+            // Skip user-inserted WP samples (approximate terrain → would distort the bands).
             var ordered = Points
                 .Where(s => !s.IsInserted)
-                .Where(s => !(_isDraggingXY && s.WaypointIndex == draggedIdx && s.IsLineWaypoint))
                 .OrderBy(s => s.DistM)
                 .ToList();
 
@@ -580,21 +490,45 @@ namespace Carbonix.UI
             foreach (var s in Points)
             {
                 if (!s.IsLoiterWaypoint || s.LoiterArcLengthM <= 0) continue;
-                bool active = !s.IsBranchVertex &&
-                    (s.WaypointIndex == hoveredIdx || s.WaypointIndex == draggedIdx);
+                bool active = ReferenceEquals(s, hoveredSample) || ReferenceEquals(s, draggedSample);
                 double altDisp = s.AltRelM * AltMultiplier;
-                PointF p0 = D2S(s.DistM * DistMultiplier, altDisp);
-                PointF p1 = D2S((s.DistM + s.LoiterArcLengthM) * DistMultiplier, altDisp);
+                Color col = active ? Color.Yellow : Color.DarkOrange;
+                float thick = active ? 9f : 6f;
+                float thin  = active ? 5f : 3f;
 
-                using (var pen = new Pen(active ? Color.Yellow : Color.DarkOrange, active ? 9f : 6f)
-                { StartCap = LineCap.Round, EndCap = LineCap.Round })
-                    g.DrawLine(pen, p0, p1);
+                double d0 = s.DistM;
+                double total = s.LoiterArcLengthM;
+                double prim = s.LoiterPrimaryLenM;
+
+                void Seg(double a, double b, float w)
+                {
+                    PointF pa = D2S(a * DistMultiplier, altDisp);
+                    PointF pb = D2S(b * DistMultiplier, altDisp);
+                    using (var pen = new Pen(col, w) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                        g.DrawLine(pen, pa, pb);
+                }
+
+                // The unwrap is primary (flown) + alternate (the unlikely remainder) +
+                // primary. Draw the flown primary portions thick and the alternate thin,
+                // so the part that matters most is visually emphasised.
+                if (prim > 0 && 2.0 * prim < total)
+                {
+                    Seg(d0, d0 + prim, thick);                       // primary out
+                    Seg(d0 + prim, d0 + total - prim, thin);         // alternate remainder
+                    Seg(d0 + total - prim, d0 + total, thick);       // primary (contiguity tail)
+                }
+                else
+                {
+                    Seg(d0, d0 + total, thick);
+                }
 
                 // Endpoint markers
-                using (var b = new SolidBrush(active ? Color.Yellow : Color.DarkOrange))
+                PointF e0 = D2S(d0 * DistMultiplier, altDisp);
+                PointF e1 = D2S((d0 + total) * DistMultiplier, altDisp);
+                using (var b = new SolidBrush(col))
                 {
-                    g.FillEllipse(b, p0.X - 4, p0.Y - 4, 8, 8);
-                    g.FillEllipse(b, p1.X - 4, p1.Y - 4, 8, 8);
+                    g.FillEllipse(b, e0.X - 4, e0.Y - 4, 8, 8);
+                    g.FillEllipse(b, e1.X - 4, e1.Y - 4, 8, 8);
                 }
             }
         }
@@ -603,13 +537,9 @@ namespace Carbonix.UI
         {
             if (Points == null) return;
 
-            // The aircraft flies at constant altitude (AltRelM) between waypoints —
-            // it does NOT terrain-follow along straight legs.  Intermediate leg terrain
-            // samples are therefore excluded so the path is straight lines between
-            // actual waypoints.  Loiter arc sub-samples carry adjusted AltAGL to keep
-            // the plotted altitude constant through the arc, which is correct.
+            // The aircraft flies at constant altitude (AltRelM) between waypoints — leg
+            // terrain samples are excluded so the path is straight between actual waypoints.
             var pts = new List<PointF>();
-
             foreach (var s in Points.OrderBy(s => s.DistM))
             {
                 if (s.IsLegTerrainSample) continue;
@@ -629,17 +559,11 @@ namespace Carbonix.UI
             foreach (var s in Points)
             {
                 if (!s.IsLineWaypoint) continue;
-                // hoveredIdx/draggedIdx are always mainLine indices (branch vertices are
-                // excluded from hit-testing) — don't let a coincidentally-equal
-                // branch-internal index highlight a branch dot.
-                bool active = !s.IsBranchVertex &&
-                           ((s.WaypointIndex == hoveredIdx && !hoveredIsLoiter)
-                           || (s.WaypointIndex == draggedIdx && !draggedIsLoiter));
+                bool active = ReferenceEquals(s, hoveredSample) || ReferenceEquals(s, draggedSample);
 
                 PointF cp = D2S(s.DistM * DistMultiplier, s.AltRelM * AltMultiplier);
                 float rr = active ? 8f : 5f;
-                // Inserted (user-added) WPs are lime green; original WPs are blue.
-                Color fill = active ? Color.Yellow : (s.IsInserted ? Color.LimeGreen : Color.DodgerBlue);
+                Color fill = active ? Color.Yellow : Color.DodgerBlue;
 
                 using (var b = new SolidBrush(fill))
                     g.FillEllipse(b, cp.X - rr, cp.Y - rr, rr * 2, rr * 2);
@@ -757,14 +681,14 @@ namespace Carbonix.UI
 
     internal class AltChangeEventArgs : EventArgs
     {
-        public int WaypointIndex { get; }
+        public VertexId Vertex { get; }
         public bool IsLoiter { get; }
         /// <summary>New altitude relative to home (metres).</summary>
         public double NewAltRelM { get; }
 
-        public AltChangeEventArgs(int idx, bool isLoiter, double altRelM)
+        public AltChangeEventArgs(VertexId vertex, bool isLoiter, double altRelM)
         {
-            WaypointIndex = idx;
+            Vertex = vertex;
             IsLoiter = isLoiter;
             NewAltRelM = altRelM;
         }
