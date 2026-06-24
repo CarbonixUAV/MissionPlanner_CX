@@ -477,8 +477,8 @@ namespace Carbonix
             double cornerRadius = (double)NUM_cornerradius.Value;
 
             lbl_turninfo.Text =
-                $"<{lowThresh}\u00b0: straight | {lowThresh}\u00b0\u2013{highThresh}\u00b0: corner cut | \u2265{highThresh}\u00b0: Dubins S-turn\n" +
-                $"S-turn radius: {turnRadius:F0} m  |  Corner radius: {cornerRadius:F0} m";
+                $"<{lowThresh}\u00b0: straight | {lowThresh}\u00b0\u2013{highThresh}\u00b0: corner cut | \u2265{highThresh}\u00b0: sharp turn\n" +
+                $"Turn radius: {turnRadius:F0} m  |  Corner radius: {cornerRadius:F0} m";
         }
 
         // ─── Generate ─────────────────────────────────────────────────────────────
