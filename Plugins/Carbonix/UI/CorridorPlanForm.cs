@@ -73,9 +73,12 @@ namespace Carbonix
             map.Overlays.Add(layer_corridor);
 
             map.MapProvider = plugin.Host.FDMapType;
-            map.MouseDown += map_MouseDown;
-            map.MouseMove += map_MouseMove;
-            map.MouseUp   += map_MouseUp;
+            // Pan with the control's built-in (buffer-offset) drag on the left button —
+            // GMap.NET defaults DragButton to Right. The old manual MouseDown/Move pan
+            // reset map.Position every mouse-move, forcing a full tile reload + overlay
+            // re-render each time (a multi-second hitch with a 600-WP corridor overlay).
+            map.DragButton = System.Windows.Forms.MouseButtons.Left;
+            map.MouseUp += map_MouseUp;   // re-sync the profile X-range after a pan
             map.OnMapZoomChanged += () => SyncProfileToMapExtent();
 
             elev_profile.AltitudeChanged += ElevProfile_AltitudeChanged;
@@ -397,33 +400,11 @@ namespace Carbonix
         }
 
         // ─── Map pan/drag ─────────────────────────────────────────────────────────
-
-        private PointLatLng mouseDownStart;
-        private bool isMouseDown;
-
-        private void map_MouseDown(object sender, MouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Left)
-            {
-                mouseDownStart = map.FromLocalToLatLng(e.X, e.Y);
-                isMouseDown = true;
-            }
-        }
-
-        private void map_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Left && isMouseDown)
-            {
-                PointLatLng cur = map.FromLocalToLatLng(e.X, e.Y);
-                map.Position = new PointLatLng(
-                    map.Position.Lat + mouseDownStart.Lat - cur.Lat,
-                    map.Position.Lng + mouseDownStart.Lng - cur.Lng);
-            }
-        }
+        // Panning is the control's built-in left-button drag (configured in the ctor);
+        // we only re-sync the elevation profile's X-range to the new extent on mouse-up.
 
         private void map_MouseUp(object sender, MouseEventArgs e)
         {
-            isMouseDown = false;
             SyncProfileToMapExtent();
         }
 
@@ -901,22 +882,35 @@ namespace Carbonix
 
             // The tour enumerates the return leg as explicit waypoints; a
             // DO_RETURN_PATH_START marker, if wanted, is added by hand afterward.
+            //
+            // AddWPtoList -> AddCommand calls writeKML() per waypoint, which rebuilds the
+            // whole mission each time — O(n²), ~a minute for a 600-WP corridor. quickadd
+            // suppresses that (MP's own bulk-load guard); rebuild once at the end.
             int exportedCount = 0;
-            for (int i = 0; i < generatedWps.Count; i++)
+            fp.quickadd = true;
+            try
             {
-                var wp = generatedWps[i];
+                for (int i = 0; i < generatedWps.Count; i++)
+                {
+                    var wp = generatedWps[i];
 
-                int rowIdx = plugin.Host.AddWPtoList(
-                    wp.Command,
-                    wp.P1, wp.P2, wp.P3, wp.P4,
-                    wp.Lng, wp.Lat,
-                    (wp.AltRelM + homeTerrainAlt) * aGLMult);
+                    int rowIdx = plugin.Host.AddWPtoList(
+                        wp.Command,
+                        wp.P1, wp.P2, wp.P3, wp.P4,
+                        wp.Lng, wp.Lat,
+                        (wp.AltRelM + homeTerrainAlt) * aGLMult);
 
-                if (frameColIndex >= 0 && rowIdx >= 0 && rowIdx < fp.Commands.Rows.Count)
-                    fp.Commands.Rows[rowIdx].Cells[frameColIndex].Value = (int)MAVLink.MAV_FRAME.GLOBAL;
+                    if (frameColIndex >= 0 && rowIdx >= 0 && rowIdx < fp.Commands.Rows.Count)
+                        fp.Commands.Rows[rowIdx].Cells[frameColIndex].Value = (int)MAVLink.MAV_FRAME.GLOBAL;
 
-                exportedCount++;
+                    exportedCount++;
+                }
             }
+            finally
+            {
+                fp.quickadd = false;
+            }
+            fp.writeKML();
 
             log.Info($"CorridorPlanForm: appended {exportedCount} waypoints to mission (absolute AMSL frame).");
             this.Close();
