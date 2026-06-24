@@ -54,6 +54,10 @@ namespace Carbonix
         // Map overlays
         private readonly GMapOverlay layer_corridor;
 
+        // Hover cross-link: a single marker on the map mirroring the elevation-profile cursor.
+        private readonly GMapOverlay layer_hover;
+        private GMapMarker hoverMarker;
+
         // Mission path overlay: full waypoint path with proper loiter arcs, drawn underneath
         // the per-line colour overlay so transitions and circles are visible at all zoom levels.
         private readonly WPOverlay2 _missionOverlay;
@@ -69,8 +73,10 @@ namespace Carbonix
 
             _missionOverlay = new WPOverlay2 { ShowPlusMarkers = false };
             layer_corridor = new GMapOverlay("corridor");
+            layer_hover = new GMapOverlay("hover");
             map.Overlays.Add(_missionOverlay.overlay);
             map.Overlays.Add(layer_corridor);
+            map.Overlays.Add(layer_hover);
 
             map.MapProvider = plugin.Host.FDMapType;
             // Pan with the control's built-in (buffer-offset) drag on the left button —
@@ -78,8 +84,12 @@ namespace Carbonix
             // reset map.Position every mouse-move, forcing a full tile reload + overlay
             // re-render each time (a multi-second hitch with a 600-WP corridor overlay).
             map.DragButton = System.Windows.Forms.MouseButtons.Left;
-            map.MouseUp += map_MouseUp;   // re-sync the profile X-range after a pan
-            map.OnMapZoomChanged += () => SyncProfileToMapExtent();
+
+            // Hover cross-link between the map and the elevation profile (each cursor
+            // marks the matching point on the other).
+            map.MouseMove += map_HoverMove;
+            map.MouseLeave += (s, ev) => elev_profile.SetExternalHover(null, null);
+            elev_profile.HoverChanged += ElevProfile_HoverChanged;
 
             elev_profile.AltitudeChanged += ElevProfile_AltitudeChanged;
         }
@@ -344,6 +354,8 @@ namespace Carbonix
         {
             layer_corridor.Routes.Clear();
             layer_corridor.Markers.Clear();
+            layer_hover.Markers.Clear();
+            hoverMarker = null;
 
             var features = AllFeatures();
             if (features.Count == 0)
@@ -399,13 +411,42 @@ namespace Carbonix
             map.Refresh();
         }
 
-        // ─── Map pan/drag ─────────────────────────────────────────────────────────
-        // Panning is the control's built-in left-button drag (configured in the ctor);
-        // we only re-sync the elevation profile's X-range to the new extent on mouse-up.
-
-        private void map_MouseUp(object sender, MouseEventArgs e)
+        // ─── Hover cross-link ───────────────────────────────────────────────────────
+        // Map cursor → profile cursor line.
+        private void map_HoverMove(object sender, MouseEventArgs e)
         {
-            SyncProfileToMapExtent();
+            if (e.Button != MouseButtons.None) return;   // ignore while dragging the map
+            if (elevationPoints == null || elevationPoints.Count == 0) return;
+            var ll = map.FromLocalToLatLng(e.X, e.Y);
+            elev_profile.SetExternalHover(ll.Lat, ll.Lng);
+        }
+
+        // Profile cursor → map marker. Fires only when the nearest sample changes, so the
+        // map.Invalidate (async repaint, coalesced) stays cheap.
+        private void ElevProfile_HoverChanged(object sender, ProfileHoverEventArgs e)
+        {
+            if (e.Lat == null || e.Lng == null)
+            {
+                if (hoverMarker != null)
+                {
+                    layer_hover.Markers.Clear();
+                    hoverMarker = null;
+                    map.Invalidate();
+                }
+                return;
+            }
+
+            var pt = new PointLatLng(e.Lat.Value, e.Lng.Value);
+            if (hoverMarker == null)
+            {
+                hoverMarker = new GMarkerGoogle(pt, GMarkerGoogleType.yellow_dot);
+                layer_hover.Markers.Add(hoverMarker);
+            }
+            else
+            {
+                hoverMarker.Position = pt;
+            }
+            map.Invalidate();
         }
 
         // ─── Parameter change handlers ────────────────────────────────────────────
@@ -787,54 +828,6 @@ namespace Carbonix
             elev_profile.DistUnit = CurrentState.DistanceUnit;
 
             elev_profile.SetData(elevationPoints, p.MinAGL, p.MaxAGL, preserveView);
-        }
-
-
-        // ─── Map→profile zoom sync ────────────────────────────────────────────────
-
-        private void SyncProfileToMapExtent()
-        {
-            if (elevationPoints == null || elevationPoints.Count == 0) return;
-
-            var area = map.ViewArea; // RectLatLng (Top = maxLat, Bottom = minLat)
-
-            // Find the DistM range of all samples (including intermediate terrain
-            // samples) that fall within the current map viewport.
-            double dMin = double.MaxValue;
-            double dMax = double.MinValue;
-
-            foreach (var s in elevationPoints)
-            {
-                if (s.Lat < area.Bottom || s.Lat > area.Top) continue;
-                if (s.Lng < area.Left   || s.Lng > area.Right) continue;
-                if (s.DistM < dMin) dMin = s.DistM;
-                if (s.DistM > dMax) dMax = s.DistM;
-            }
-
-            if (dMin >= dMax) return;   // nothing visible
-
-            // Snap the extent to the main-line corridor-vertex samples that bracket the
-            // visible range, so the profile always starts/ends at a clean waypoint
-            // rather than mid-leg. Branch vertices are excluded so the view doesn't
-            // snap to a point mid-way through a branch detour.
-            var vtxDists = elevationPoints
-                .Where(s => s.IsLineWaypoint && !s.IsBranchVertex)
-                .Select(s => s.DistM)
-                .OrderBy(d => d)
-                .ToList();
-
-            if (vtxDists.Count > 0)
-            {
-                var below = vtxDists.Where(d => d <= dMin).ToList();
-                var above = vtxDists.Where(d => d >= dMax).ToList();
-                dMin = below.Count > 0 ? below.Max() : vtxDists.First();
-                dMax = above.Count > 0 ? above.Min() : vtxDists.Last();
-            }
-
-            // Add a small buffer so the bounding vertices aren't right at the edge.
-            const double bufferM = 100.0;
-            double mult = CurrentState.multiplierdist;
-            elev_profile.SetXRange((dMin - bufferM) * mult, (dMax + bufferM) * mult);
         }
 
         // ─── Statistics ───────────────────────────────────────────────────────────

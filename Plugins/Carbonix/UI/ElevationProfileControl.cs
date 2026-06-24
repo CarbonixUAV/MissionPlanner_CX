@@ -44,6 +44,11 @@ namespace Carbonix.UI
         /// <summary>Fired when the user selects "Remove waypoint" from the context menu.</summary>
         public event EventHandler<WaypointRemoveEventArgs> WaypointRemoveRequested;
 
+        /// <summary>Raised as the cursor moves over the plot, carrying the geographic
+        /// position of the nearest profile sample so the map can mark it (null on leave).
+        /// Only fires when the nearest sample changes, so it's cheap to handle.</summary>
+        public event EventHandler<ProfileHoverEventArgs> HoverChanged;
+
         public void SetData(List<ElevationPoint> samples, double minAGLMetres, double maxAGLMetres, bool preserveView = false)
         {
             Points = samples;
@@ -182,6 +187,8 @@ namespace Carbonix.UI
 
         private ElevationPoint hoveredSample;
         private ElevationPoint draggedSample;
+        private ElevationPoint hoverPosSample;   // nearest sample to the cursor (cross-link)
+        private double? hoverDistM;              // X of the cross-link cursor line (this control or the map)
         private bool isDragging;
         private bool isPanning;
         private float panStartX;
@@ -212,6 +219,89 @@ namespace Carbonix.UI
                 Cursor = hit != null ? Cursors.SizeNS : Cursors.Default;
                 Invalidate();
             }
+
+            UpdateHoverFromScreen(e.X, e.Y);
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            if (hoverPosSample != null || hoverDistM != null)
+            {
+                hoverPosSample = null;
+                hoverDistM = null;
+                Invalidate();
+            }
+            HoverChanged?.Invoke(this, ProfileHoverEventArgs.None);
+        }
+
+        // Cross-link to the map: track which sample the cursor is over and raise
+        // HoverChanged when it changes (cheap — fires per sample crossing, not per pixel).
+        private void UpdateHoverFromScreen(int ex, int ey)
+        {
+            ElevationPoint near = null;
+            if (Points != null && Points.Count > 0 && PlotArea.Contains(ex, ey))
+            {
+                var (xData, _) = S2D(ex, ey);
+                double distM = xData / (DistMultiplier <= 0 ? 1 : DistMultiplier);
+                near = NearestByDist(distM);
+            }
+
+            if (ReferenceEquals(near, hoverPosSample)) return;
+            hoverPosSample = near;
+            hoverDistM = near?.DistM;
+            Invalidate();
+            HoverChanged?.Invoke(this, near != null
+                ? new ProfileHoverEventArgs(near.Lat, near.Lng)
+                : ProfileHoverEventArgs.None);
+        }
+
+        /// <summary>Show the cursor line at the sample nearest a geographic point (driven by
+        /// the map cursor). Pass null to clear. Does not raise HoverChanged.</summary>
+        public void SetExternalHover(double? lat, double? lng)
+        {
+            double? newDist = null;
+            if (lat.HasValue && lng.HasValue && Points != null && Points.Count > 0)
+                newDist = NearestByLatLng(lat.Value, lng.Value)?.DistM;
+
+            if (Nullable.Equals(newDist, hoverDistM)) return;
+            hoverDistM = newDist;
+            Invalidate();
+        }
+
+        private ElevationPoint NearestByDist(double distM)
+        {
+            ElevationPoint best = null;
+            double bestD = double.MaxValue;
+            foreach (var s in Points)
+            {
+                double d = Math.Abs(s.DistM - distM);
+                if (d < bestD) { bestD = d; best = s; }
+            }
+            return best;
+        }
+
+        private ElevationPoint NearestByLatLng(double lat, double lng)
+        {
+            ElevationPoint best = null;
+            double bestD = double.MaxValue;
+            foreach (var s in Points)
+            {
+                double dlat = s.Lat - lat, dlng = s.Lng - lng;
+                double d = dlat * dlat + dlng * dlng;
+                if (d < bestD) { bestD = d; best = s; }
+            }
+            return best;
+        }
+
+        // Vertical line marking the cursor position shared with the map.
+        private void DrawHoverCursor(Graphics g, RectangleF r)
+        {
+            if (hoverDistM == null) return;
+            float x = D2S(hoverDistM.Value * DistMultiplier, 0).X;
+            if (x < r.Left || x > r.Right) return;
+            using (var pen = new Pen(Color.FromArgb(180, 255, 210, 80), 1f) { DashStyle = DashStyle.Dash })
+                g.DrawLine(pen, x, r.Top, x, r.Bottom);
         }
 
         private double _pendingInsertDistM;
@@ -375,6 +465,7 @@ namespace Carbonix.UI
                 DrawLoiterArcs(g);
                 DrawPlannedPath(g);
                 DrawWaypointDots(g);
+                DrawHoverCursor(g, r);
             }
             else
             {
@@ -691,6 +782,18 @@ namespace Carbonix.UI
             IsLoiter = isLoiter;
             NewAltRelM = altRelM;
         }
+    }
+
+    internal class ProfileHoverEventArgs : EventArgs
+    {
+        /// <summary>Geographic position of the hovered sample, or null when the cursor
+        /// has left the plot.</summary>
+        public double? Lat { get; }
+        public double? Lng { get; }
+
+        public ProfileHoverEventArgs(double? lat, double? lng) { Lat = lat; Lng = lng; }
+
+        public static readonly ProfileHoverEventArgs None = new ProfileHoverEventArgs(null, null);
     }
 
     internal class WaypointInsertEventArgs : EventArgs
