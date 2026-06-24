@@ -898,16 +898,37 @@ namespace Carbonix.Planning
                 if (byId.TryGetValue(step.PolylineId, out var poly) && poly.Points != null && poly.Points.Count >= 2)
                 {
                     var (pts, meta) = BuildPolylineContribution(poly, step, stepIndex);
-
-                    // Drop a leading point coincident with the previous step's end so a
-                    // shared junction doesn't create a zero-length leg the solver can't handle.
-                    int start = (combinedPts.Count > 0 && pts.Count > 0 &&
-                                 combinedPts[combinedPts.Count - 1].GetDistance(pts[0]) < JoinDedupM) ? 1 : 0;
-
-                    for (int k = start; k < pts.Count; k++)
+                    if (pts.Count > 0)
                     {
-                        combinedPts.Add(pts[k]);
-                        combinedMeta.Add(meta[k]);
+                        int start = 0;
+                        int n = combinedPts.Count;
+                        if (n >= 2 && pts.Count >= 2)
+                        {
+                            // Each edge is offset to its lane independently, so at a fork the
+                            // two lanes meet the junction offset to different sides. Miter the
+                            // join — collapse them to the single corner where the incoming and
+                            // outgoing lanes intersect — so the solver makes ONE turn there,
+                            // not two stacked Dubins turns (the "flower" at branch forks).
+                            var miter = TryMiterJoin(combinedPts[n - 2], combinedPts[n - 1], pts[0], pts[1],
+                                                     p.FullOrbitThresholdDeg * Deg2Rad);
+                            if (miter != null)
+                            {
+                                combinedPts[n - 1] = miter;
+                                start = 1;   // the miter replaces both lane endpoints
+                            }
+                            else if (combinedPts[n - 1].GetDistance(pts[0]) < JoinDedupM)
+                            {
+                                start = 1;   // coincident continuation — drop the duplicate
+                            }
+                            // else: near-parallel (e.g. a spur-tip U-turn) — keep both points
+                            // and let the solver make the turn.
+                        }
+
+                        for (int k = start; k < pts.Count; k++)
+                        {
+                            combinedPts.Add(pts[k]);
+                            combinedMeta.Add(meta[k]);
+                        }
                     }
                 }
                 stepIndex++;
@@ -926,6 +947,43 @@ namespace Carbonix.Planning
             }
 
             return SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
+        }
+
+        // Intersect the incoming lane (a0→a1) with the outgoing lane (b0→b1) and return the
+        // miter corner where they cross — the single junction point both lanes should share.
+        // Only sharp (Dubins-range) joins are mitered: that's where the un-mitered transition
+        // leg produces the overlapping-circle "flower". Corner-cut and gentle joins are left
+        // alone (mitering distorts the local inscribed-circle cut). Also returns null for
+        // near-parallel joins (e.g. spur-tip U-turns) or implausibly far miters.
+        private static PointLatLngAlt TryMiterJoin(
+            PointLatLngAlt a0, PointLatLngAlt a1, PointLatLngAlt b0, PointLatLngAlt b1, double minTurnRad)
+        {
+            double cosLat = Math.Cos(a1.Lat * Deg2Rad);
+            Vec2 ToCart(PointLatLngAlt p) => new Vec2(
+                (p.Lng - a1.Lng) * cosLat * 111319.5,
+                (p.Lat - a1.Lat) * 111319.5);
+            PointLatLngAlt FromCart(Vec2 v) => new PointLatLngAlt(
+                a1.Lat + v.Y / 111319.5,
+                a1.Lng + v.X / (cosLat * 111319.5),
+                0);
+
+            Vec2 u1 = Geom.Direction(ToCart(a0), ToCart(a1));   // incoming unit direction
+            Vec2 u2 = Geom.Direction(ToCart(b0), ToCart(b1));   // outgoing unit direction
+            if (Geom.AngleBetween(u1, u2) < minTurnRad) return null;   // not a Dubins-range turn
+            double denom = Geom.Cross(u1, u2);                  // sin(angle between lanes)
+            if (Math.Abs(denom) < 0.05) return null;            // within ~3° of parallel
+
+            Vec2 p1 = ToCart(a1);
+            Vec2 p2 = ToCart(b0);
+            double t = Geom.Cross(Geom.Sub(p2, p1), u2) / denom;   // p1 + t*u1 = intersection
+            var m = Geom.Add(p1, Geom.Scale(u1, t));
+
+            const double MaxJoinMiterM = 1000.0;   // miter limit: bail on glancing joins
+            double Len(Vec2 v) => Math.Sqrt(Geom.Dot(v, v));
+            if (Len(Geom.Sub(m, p1)) > MaxJoinMiterM || Len(Geom.Sub(m, p2)) > MaxJoinMiterM)
+                return null;
+
+            return FromCart(m);
         }
 
         // Build one tour step's contribution: a SINGLE offset lane of the polyline, walked
