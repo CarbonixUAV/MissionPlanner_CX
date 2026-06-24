@@ -118,7 +118,9 @@ namespace Carbonix
                 }
             }
 
-            DrawMap();
+            // No DrawMap here: an altitude change doesn't move the ground track, and
+            // rebuilding the map overlay every mouse-move made dragging crawl. The profile
+            // control repaints itself; the map refreshes on the next generate/accept.
         }
 
         // ─── Form load ────────────────────────────────────────────────────────────
@@ -664,11 +666,23 @@ namespace Carbonix
                 cum += dist;
             }
 
+            // First pass per leg: every polyline edge is flown twice (out + back); show only
+            // its first traversal. Identity is the edge's PolylineId; LineIndex is the tour
+            // step, so the lowest LineIndex for a polyline is its first pass.
+            var firstStep = new Dictionary<int, int>();
+            foreach (var w in wps)
+            {
+                int pl = w.Vertex.PolylineId;
+                if (!firstStep.TryGetValue(pl, out var st) || w.LineIndex < st) firstStep[pl] = w.LineIndex;
+            }
+            bool Keep(CorridorWaypoint w) => w.LineIndex == firstStep[w.Vertex.PolylineId];
+
             foreach (var node in graph.Nodes)
             {
                 int idx = node.MissionIndex;
                 if (idx < 0 || idx >= wps.Count) continue;
                 var wp = wps[idx];
+                if (!Keep(wp)) continue;   // skip repeat (back-pass) traversals
 
                 if (loiterByNode.TryGetValue(idx, out var arc) && arc.Path != null && arc.Path.Count >= 2)
                 {
@@ -682,9 +696,9 @@ namespace Carbonix
                     double altSweep = 360.0 - primary;
                     double circumference = 2.0 * Math.PI * radius;
                     double primaryLen = circumference * primary / 360.0;
-                    double totalLen = circumference * (2.0 * primary + altSweep) / 360.0;
+                    double totalLen = circumference;   // full circle (primary + alternate)
 
-                    // Loiter bar anchor spanning the full unwrap (primary + alt + primary).
+                    // Loiter bar anchor spanning the full circle.
                     samples.Add(new ElevationPoint
                     {
                         DistM             = cum,
@@ -702,11 +716,11 @@ namespace Carbonix
                         Lng              = wp.Lng,
                     });
 
-                    // Full circle for worst-case terrain (primary + alt) then a trailing
-                    // primary so the unwrap ends at the exit tangent (stays contiguous).
+                    // Full circle for worst-case terrain: primary (flown) + alternate
+                    // (remainder). Ends at the entry tangent; the discontinuity to the
+                    // exit leg is accepted.
                     SampleArc(center, radius, entry, sign * primary,  wp);
                     SampleArc(center, radius, exit,  sign * altSweep, wp);
-                    SampleArc(center, radius, entry, sign * primary,  wp);
                 }
                 else
                 {
@@ -725,8 +739,12 @@ namespace Carbonix
                     });
                 }
 
-                // Outgoing straight leg to the next node (tangent-to-tangent ground track).
-                if (straightByFrom.TryGetValue(idx, out var seg) && seg.Path != null && seg.Path.Count >= 2)
+                // Outgoing straight leg — only when the destination is also a first-pass
+                // node, so we don't draw a leg into a dropped back-pass (a clean break).
+                if (straightByFrom.TryGetValue(idx, out var seg) && seg.Path != null && seg.Path.Count >= 2
+                    && seg.EndNode != null
+                    && seg.EndNode.MissionIndex >= 0 && seg.EndNode.MissionIndex < wps.Count
+                    && Keep(wps[seg.EndNode.MissionIndex]))
                     SampleStraight(seg.Path[0], seg.Path[seg.Path.Count - 1], wp);
             }
 
