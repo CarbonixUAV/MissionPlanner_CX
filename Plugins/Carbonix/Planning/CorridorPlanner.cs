@@ -420,11 +420,16 @@ namespace Carbonix.Planning
         ///   |c1 – c2| = 2R (externally tangent).
         ///
         /// If circle 1's sweep &lt; minArcDeg the entry arc is replaced with a straight leg.
+        /// <paramref name="forceStraightEntry"/> forces that straight-secant entry
+        /// regardless of sweep — used for dead-end 180° U-turns, where the full S
+        /// (two opposite arcs) reads as an overlapping-circle "flower"; a dumb secant
+        /// into a single exit orbit is cleaner (and good enough for a turnaround).
         /// overflyDist is automatically clamped to the geometrically valid maximum.
         /// </summary>
         private static TurnResult SolveDubinsSTurn(
             Vec2 vertex, Vec2 dirIn, Vec2 dirOut,
-            bool turnsLeft, double radius, double overflyDist, double minArcDeg)
+            bool turnsLeft, double radius, double overflyDist, double minArcDeg,
+            bool forceStraightEntry = false)
         {
             bool c1CW = !turnsLeft;
             bool c2CW = turnsLeft;
@@ -482,7 +487,7 @@ namespace Carbonix.Planning
             // Check circle 1 sweep — skip it if too small.
             double a1Start = Math.Atan2(entryPoint.Y - c1r.Y, entryPoint.X - c1r.X);
             double a1End   = Math.Atan2(transferPoint.Y - c1r.Y, transferPoint.X - c1r.X);
-            bool skipC1    = Math.Abs(Geom.ArcSweep(a1Start, a1End, c1CW)) < minArcRad;
+            bool skipC1    = forceStraightEntry || Math.Abs(Geom.ArcSweep(a1Start, a1End, c1CW)) < minArcRad;
 
             if (skipC1)
             {
@@ -624,8 +629,11 @@ namespace Carbonix.Planning
 
                 // ── SHARP: Dubins S-turn ──────────────────────────────────────
                 {
+                    // Dead-end caps (the only vertices carrying a turn override) are 180°
+                    // U-turns — force the straight-secant entry instead of the full S.
                     var turn = SolveDubinsSTurn(poly[i], dirIn, dirOut, turnsLeft,
-                        turnRadius, p.OverflyDistM, p.MinDubinsArcDeg);
+                        turnRadius, p.OverflyDistM, p.MinDubinsArcDeg,
+                        forceStraightEntry: meta[i].turnLeftOverride.HasValue);
 
                     if (turn == null) { AddWP(poly[i], i, true); continue; }
 
