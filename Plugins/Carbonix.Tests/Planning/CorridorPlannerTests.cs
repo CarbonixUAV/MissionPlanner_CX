@@ -210,25 +210,24 @@ namespace Carbonix.Tests.Planning
         [TestMethod]
         public void TourStep_FliesSingleOffsetLane()
         {
-            // A single Forward step at +offset shifts the whole lane to one side of the
-            // centerline — one pass, not a snake of all lanes.
+            // A single Forward step → one offset lane (offset = PassOffsetM/2, one side).
             var poly = new Polyline
             {
                 Id = VertexId.MainLine,
                 Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02) },
             };
-            const double offset = 60;
             var tour = new List<TourStep>
             {
-                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward, LaneOffsetM = offset },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
             };
 
-            var wps = CorridorPlanner.GenerateMissionFromTour(new List<Polyline> { poly }, tour, Params(), poly.Points[0]);
+            var wps = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(passes: 2, offset: 120), poly.Points[0]);
 
             var lineWps = wps.Where(w => w.IsLineWaypoint).ToList();
             Assert.AreEqual(2, lineWps.Count, "single lane over a 2-point line → 2 waypoints");
             double shiftM = Math.Abs(lineWps[0].Lat - BaseLat) * MetresPerDegLat;
-            Assert.AreEqual(offset, shiftM, 5, "lane offset from the centerline");
+            Assert.AreEqual(60, shiftM, 5, "lane offset = PassOffsetM/2 from the centerline");
             Assert.IsTrue(lineWps.All(w => Math.Sign(w.Lat - BaseLat) == Math.Sign(lineWps[0].Lat - BaseLat)),
                 "all waypoints on the same side (one lane)");
         }
@@ -236,20 +235,21 @@ namespace Carbonix.Tests.Planning
         [TestMethod]
         public void OutAndBackTour_FliesBothOffsetLanes()
         {
-            // The two passes: Forward at +offset, Reverse at -offset → lanes on both sides.
+            // Flying a polyline Forward then Reverse → out and back land on opposite sides
+            // (the two passes), at ±PassOffsetM/2.
             var poly = new Polyline
             {
                 Id = VertexId.MainLine,
                 Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02) },
             };
-            const double off = 50;
             var tour = new List<TourStep>
             {
-                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward, LaneOffsetM = off },
-                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Reverse, LaneOffsetM = -off },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Reverse },
             };
 
-            var wps = CorridorPlanner.GenerateMissionFromTour(new List<Polyline> { poly }, tour, Params(), poly.Points[0]);
+            var wps = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(passes: 2, offset: 100), poly.Points[0]);
 
             var lats = wps.Where(w => w.IsLineWaypoint).Select(w => w.Lat).ToList();
             Assert.IsTrue(lats.Any(l => l > BaseLat + 0.0002), "a lane on one side of the centerline");

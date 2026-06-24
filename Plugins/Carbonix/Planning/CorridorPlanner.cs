@@ -862,18 +862,17 @@ namespace Carbonix.Planning
         }
 
         /// <summary>
-        /// Tour-based generation: plan each polyline's lanes independently, concatenate
-        /// them in tour order (dropping a duplicate point where consecutive steps share an
-        /// endpoint), then run the shared solve/terrain tail
-        /// (<see cref="SolveAndBuildWaypoints"/>). A spur is just a polyline the tour
-        /// visits — there is no separate branch concept. See
-        /// .claude/corridor-tree-design.md.
+        /// Tour-based generation. Builds the tour as ONE continuous centreline polyline,
+        /// offsets the whole thing to a constant side, then runs the shared solve/terrain
+        /// tail (<see cref="SolveAndBuildWaypoints"/>). A spur is just a polyline the tour
+        /// visits — there is no separate branch concept. See .claude/corridor-tree-design.md.
         ///
-        /// Each step flies one offset lane; the out/back traversals at opposite offsets are
-        /// the passes. Each waypoint's terrain is sampled on its own polyline's centreline,
-        /// so both passes of a polyline share one altitude profile. Inter-polyline join
-        /// refinement (e.g. leaf-tip turnaround direction) and UI wiring are the remaining
-        /// Step-3 work.
+        /// Offsetting a continuous centreline (rather than each edge separately) makes every
+        /// junction a clean mitered corner automatically, and the out/back passes fall out
+        /// of the constant-side offset: the path reverses at each dead-end, flipping the
+        /// offset side. Dead-ends are capped as a single U-turn vertex for the solver.
+        /// Terrain is sampled on each waypoint's own polyline centreline, so both passes
+        /// share one altitude profile.
         /// </summary>
         public static List<CorridorWaypoint> GenerateMissionFromTour(
             List<Polyline> polylines, List<TourStep> tour, CorridorParameters p, PointLatLngAlt homePoint)
@@ -887,58 +886,16 @@ namespace Carbonix.Planning
 
             double homeTerrainAlt = GetTerrainAlt(homePoint.Lat, homePoint.Lng);
 
-            const double JoinDedupM = 0.5;   // treat consecutive points this close as shared
+            // 1. The tour as one continuous centreline polyline (junctions shared, doubles
+            //    back at dead-ends). 2. Offset the whole path at once.
+            var centre = BuildCenterlineTour(byId, tour);
+            if (centre.Count < 2) return empty;
 
-            var combinedPts  = new List<PointLatLngAlt>();
-            var combinedMeta = new List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)>();
-
-            int stepIndex = 0;
-            foreach (var step in tour)
-            {
-                if (byId.TryGetValue(step.PolylineId, out var poly) && poly.Points != null && poly.Points.Count >= 2)
-                {
-                    var (pts, meta) = BuildPolylineContribution(poly, step, stepIndex);
-                    if (pts.Count > 0)
-                    {
-                        int start = 0;
-                        int n = combinedPts.Count;
-                        if (n >= 2 && pts.Count >= 2)
-                        {
-                            // Each edge is offset to its lane independently, so at a fork the
-                            // two lanes meet the junction offset to different sides. Miter the
-                            // join — collapse them to the single corner where the incoming and
-                            // outgoing lanes intersect — so the solver makes ONE turn there,
-                            // not two stacked Dubins turns (the "flower" at branch forks).
-                            var miter = TryMiterJoin(combinedPts[n - 2], combinedPts[n - 1], pts[0], pts[1],
-                                                     p.FullOrbitThresholdDeg * Deg2Rad);
-                            if (miter != null)
-                            {
-                                combinedPts[n - 1] = miter;
-                                start = 1;   // the miter replaces both lane endpoints
-                            }
-                            else if (combinedPts[n - 1].GetDistance(pts[0]) < JoinDedupM)
-                            {
-                                start = 1;   // coincident continuation — drop the duplicate
-                            }
-                            // else: near-parallel (e.g. a spur-tip U-turn) — keep both points
-                            // and let the solver make the turn.
-                        }
-
-                        for (int k = start; k < pts.Count; k++)
-                        {
-                            combinedPts.Add(pts[k]);
-                            combinedMeta.Add(meta[k]);
-                        }
-                    }
-                }
-                stepIndex++;
-            }
-
+            double off = (p.NumberOfPasses >= 2) ? p.PassOffsetM / 2.0 : 0.0;
+            var (combinedPts, combinedMeta) = OffsetTourPath(centre, off);
             if (combinedPts.Count == 0) return empty;
 
-            // Sample terrain on each waypoint's own polyline centreline (polylineId
-            // recovered from the branch encoding); all lanes of a polyline thus share
-            // one altitude profile.
+            // 3. Terrain on each waypoint's own polyline centreline.
             PointLatLngAlt TerrainPoint(CartCommand cmd, PointLatLngAlt geo)
             {
                 int plId = cmd.IsBranchVertex ? cmd.BranchId : VertexId.MainLine;
@@ -949,67 +906,94 @@ namespace Carbonix.Planning
             return SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
         }
 
-        // Intersect the incoming lane (a0→a1) with the outgoing lane (b0→b1) and return the
-        // miter corner where they cross — the single junction point both lanes should share.
-        // Only sharp (Dubins-range) joins are mitered: that's where the un-mitered transition
-        // leg produces the overlapping-circle "flower". Corner-cut and gentle joins are left
-        // alone (mitering distorts the local inscribed-circle cut). Also returns null for
-        // near-parallel joins (e.g. spur-tip U-turns) or implausibly far miters.
-        private static PointLatLngAlt TryMiterJoin(
-            PointLatLngAlt a0, PointLatLngAlt a1, PointLatLngAlt b0, PointLatLngAlt b1, double minTurnRad)
+        // Walk the tour into one continuous centreline polyline. Each point carries its
+        // VertexId (polyline + vertex index) and the tour-step it came from; a vertex is
+        // flagged a dead-end when the next step reverses back along the same edge (a leaf
+        // tip). Coincident junction points between steps are de-duplicated to one vertex.
+        private static List<(PointLatLngAlt pt, VertexId vid, bool deadEnd, int step)> BuildCenterlineTour(
+            Dictionary<int, Polyline> byId, List<TourStep> tour)
         {
-            double cosLat = Math.Cos(a1.Lat * Deg2Rad);
-            Vec2 ToCart(PointLatLngAlt p) => new Vec2(
-                (p.Lng - a1.Lng) * cosLat * 111319.5,
-                (p.Lat - a1.Lat) * 111319.5);
-            PointLatLngAlt FromCart(Vec2 v) => new PointLatLngAlt(
-                a1.Lat + v.Y / 111319.5,
-                a1.Lng + v.X / (cosLat * 111319.5),
-                0);
+            const double JoinDedupM = 0.5;
+            var path = new List<(PointLatLngAlt pt, VertexId vid, bool deadEnd, int step)>();
 
-            Vec2 u1 = Geom.Direction(ToCart(a0), ToCart(a1));   // incoming unit direction
-            Vec2 u2 = Geom.Direction(ToCart(b0), ToCart(b1));   // outgoing unit direction
-            if (Geom.AngleBetween(u1, u2) < minTurnRad) return null;   // not a Dubins-range turn
-            double denom = Geom.Cross(u1, u2);                  // sin(angle between lanes)
-            if (Math.Abs(denom) < 0.05) return null;            // within ~3° of parallel
+            for (int s = 0; s < tour.Count; s++)
+            {
+                var step = tour[s];
+                if (!byId.TryGetValue(step.PolylineId, out var poly) || poly.Points == null || poly.Points.Count < 2)
+                    continue;
 
-            Vec2 p1 = ToCart(a1);
-            Vec2 p2 = ToCart(b0);
-            double t = Geom.Cross(Geom.Sub(p2, p1), u2) / denom;   // p1 + t*u1 = intersection
-            var m = Geom.Add(p1, Geom.Scale(u1, t));
+                int m = poly.Points.Count;
+                bool fwd = step.Direction == TraverseDir.Forward;
+                bool nextReversesSameEdge = s + 1 < tour.Count
+                    && tour[s + 1].PolylineId == step.PolylineId
+                    && tour[s + 1].Direction != step.Direction;
 
-            const double MaxJoinMiterM = 1000.0;   // miter limit: bail on glancing joins
-            double Len(Vec2 v) => Math.Sqrt(Geom.Dot(v, v));
-            if (Len(Geom.Sub(m, p1)) > MaxJoinMiterM || Len(Geom.Sub(m, p2)) > MaxJoinMiterM)
-                return null;
-
-            return FromCart(m);
+                for (int k = 0; k < m; k++)
+                {
+                    int vi = fwd ? k : m - 1 - k;
+                    var src = poly.Points[vi];
+                    if (k == 0 && path.Count > 0 && path[path.Count - 1].pt.GetDistance(src) < JoinDedupM)
+                        continue;   // shared junction with the previous step
+                    bool deadEnd = (k == m - 1) && nextReversesSameEdge;   // leaf tip
+                    path.Add((new PointLatLngAlt(src.Lat, src.Lng, src.Alt),
+                              new VertexId(poly.Id, vi), deadEnd, s));
+                }
+            }
+            return path;
         }
 
-        // Build one tour step's contribution: a SINGLE offset lane of the polyline, walked
-        // in the step's direction. The out/back traversals (opposite offsets) are the
-        // passes — there is no per-step snake. corridorVtxIdx is the polyline's own vertex
-        // index (direction-independent, so a vertex has one identity across both passes).
+        // Offset the continuous centreline to one constant side (right of travel) by `off`,
+        // mitering every corner. The path reverses at each dead-end, so out and back land on
+        // opposite sides. A dead-end can't be mitered (180° reversal): it's emitted at the
+        // centreline as a single U-turn vertex with a direction override, and the solver
+        // makes the racetrack at the real turn radius.
         private static (List<PointLatLngAlt> pts, List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> meta)
-            BuildPolylineContribution(Polyline poly, TourStep step, int stepIndex)
+            OffsetTourPath(List<(PointLatLngAlt pt, VertexId vid, bool deadEnd, int step)> path, double off)
         {
-            var lane = Math.Abs(step.LaneOffsetM) > 1e-9
-                ? OffsetPolyline(poly.Points, step.LaneOffsetM)
-                : poly.Points.Select(pt => new PointLatLngAlt(pt.Lat, pt.Lng, pt.Alt)).ToList();
-
-            bool isBranch = poly.Id != VertexId.MainLine;
-            int branchId = isBranch ? poly.Id : -1;
-            bool forward = step.Direction == TraverseDir.Forward;
-            int n = lane.Count;
-
+            const double MaxMiterScale = 4.0;
             var pts  = new List<PointLatLngAlt>();
             var meta = new List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)>();
 
-            for (int k = 0; k < n; k++)
+            int n = path.Count;
+            for (int i = 0; i < n; i++)
             {
-                int vi = forward ? k : n - 1 - k;   // walk in step direction; vi = true vertex index
-                pts.Add(lane[vi]);
-                meta.Add((stepIndex, true, vi, isBranch, branchId, null));
+                var node = path[i];
+                bool isBranch = node.vid.PolylineId != VertexId.MainLine;
+                int branchId = isBranch ? node.vid.PolylineId : -1;
+
+                if (node.deadEnd)
+                {
+                    // U-turn cap: tip at the centreline as a single ~180° turn. The out lane
+                    // is on the right of the approach and the back lane on the left, so the
+                    // racetrack is a left turn bulging past the tip.
+                    pts.Add(new PointLatLngAlt(node.pt.Lat, node.pt.Lng, node.pt.Alt));
+                    meta.Add((node.step, true, node.vid.Index, isBranch, branchId, true));
+                    continue;
+                }
+
+                double offDir, scale = 1.0;
+                if (i == 0)
+                {
+                    offDir = WrapBearing(node.pt.GetBearing(path[i + 1].pt) + 90.0);
+                }
+                else if (i == n - 1)
+                {
+                    offDir = WrapBearing(path[i - 1].pt.GetBearing(node.pt) + 90.0);
+                }
+                else
+                {
+                    double b1 = path[i - 1].pt.GetBearing(node.pt);
+                    double b2 = node.pt.GetBearing(path[i + 1].pt);
+                    offDir = WrapBearing(AverageBearing(b1, b2) + 90.0);
+                    double cosHalf = Math.Cos(Math.Abs(NormalizeHeadingChange(b2 - b1)) * 0.5 * Deg2Rad);
+                    scale = cosHalf > 1e-6 ? Math.Min(1.0 / cosHalf, MaxMiterScale) : MaxMiterScale;
+                }
+
+                var op = off > 1e-9 ? node.pt.newpos(offDir, off * scale)
+                                    : new PointLatLngAlt(node.pt.Lat, node.pt.Lng, node.pt.Alt);
+                op.Alt = node.pt.Alt;
+                pts.Add(op);
+                meta.Add((node.step, true, node.vid.Index, isBranch, branchId, null));
             }
 
             return (pts, meta);
