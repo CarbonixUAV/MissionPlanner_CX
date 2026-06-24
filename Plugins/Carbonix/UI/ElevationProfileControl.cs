@@ -508,14 +508,13 @@ namespace Carbonix.UI
                         g.DrawLine(pen, pa, pb);
                 }
 
-                // The unwrap is primary (flown) + alternate (the unlikely remainder) +
-                // primary. Draw the flown primary portions thick and the alternate thin,
-                // so the part that matters most is visually emphasised.
-                if (prim > 0 && 2.0 * prim < total)
+                // The unwrap is primary (flown) + alternate (the unlikely remainder). Draw
+                // the flown primary thick and the alternate thin, so the part that matters
+                // most is visually emphasised.
+                if (prim > 0 && prim < total)
                 {
-                    Seg(d0, d0 + prim, thick);                       // primary out
-                    Seg(d0 + prim, d0 + total - prim, thin);         // alternate remainder
-                    Seg(d0 + total - prim, d0 + total, thick);       // primary (contiguity tail)
+                    Seg(d0, d0 + prim, thick);          // primary (flown) arc
+                    Seg(d0 + prim, d0 + total, thin);   // alternate remainder
                 }
                 else
                 {
