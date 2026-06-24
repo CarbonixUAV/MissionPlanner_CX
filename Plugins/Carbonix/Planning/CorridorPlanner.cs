@@ -37,7 +37,6 @@ namespace Carbonix.Planning
         public double OverflyDistM { get; set; } = 100;
 
         // If the Dubins entry-circle sweep is below this, replace it with a straight leg.
-        public double MinDubinsArcDeg { get; set; } = 30;
 
         // Loiter radius for Dubins S-turns (sharp turns, two tangent circles).
         public double TurnRadiusM { get; set; } = 300;
@@ -298,7 +297,7 @@ namespace Carbonix.Planning
         // Port of the JS solveTangentCircle / solveCornerCut / solveDubinsSTurn.
         // ════════════════════════════════════════════════════════════════════════
 
-        private enum TurnKind { CornerCut, DubinsSTurn, DubinsStraightToOrbit }
+        private enum TurnKind { CornerCut, DubinsStraightToOrbit }
 
         private struct LoiterInfo
         {
@@ -414,33 +413,29 @@ namespace Carbonix.Planning
         }
 
         /// <summary>
-        /// DUBINS S-TURN: two externally-tangent circles for sharp turns.
-        ///   Circle 1 (entry): tangent to incoming leg at the overfly point, on inside of turn.
-        ///   Circle 2 (exit):  tangent to outgoing leg, on outside of turn.
-        ///   |c1 – c2| = 2R (externally tangent).
+        /// SHARP TURN: overfly past the vertex, fly a straight secant to the tangent point
+        /// of a single exit orbit, then orbit out aligned with the outgoing leg.
         ///
-        /// If circle 1's sweep &lt; minArcDeg the entry arc is replaced with a straight leg.
-        /// <paramref name="forceStraightEntry"/> forces that straight-secant entry
-        /// regardless of sweep — used for dead-end 180° U-turns, where the full S
-        /// (two opposite arcs) reads as an overlapping-circle "flower"; a dumb secant
-        /// into a single exit orbit is cleaner (and good enough for a turnaround).
-        /// overflyDist is automatically clamped to the geometrically valid maximum.
+        /// This is a Dubins S-turn with its entry circle collapsed to a straight leg. The
+        /// full two-arc S reads as an overlapping-circle "flower" — worst at 180°
+        /// turnarounds — and the secant's slight entry kink has most of an orbit to wash
+        /// out before the leg we actually care about. The geometry is still solved as two
+        /// tangent circles to locate the transfer point; only the entry arc is dropped.
+        /// overflyDist is clamped to the geometrically valid maximum.
         /// </summary>
-        private static TurnResult SolveDubinsSTurn(
+        private static TurnResult SolveDubinsTurn(
             Vec2 vertex, Vec2 dirIn, Vec2 dirOut,
-            bool turnsLeft, double radius, double overflyDist, double minArcDeg,
-            bool forceStraightEntry = false)
+            bool turnsLeft, double radius, double overflyDist)
         {
-            bool c1CW = !turnsLeft;
             bool c2CW = turnsLeft;
-            double minArcRad = minArcDeg * Deg2Rad;
 
-            // Perpendiculars: circle 1 on inside of incoming, circle 2 on outside of outgoing.
+            // Perpendiculars: entry circle on inside of incoming, exit circle on outside.
             var perpIn  = Geom.Perp(dirIn,  turnsLeft ? 1 : -1);
             var perpOut = Geom.Perp(dirOut, turnsLeft ? -1 : 1);
 
-            // Solve the dual-circle geometry for a given overfly distance.
-            (Vec2 c1, Vec2 c2, Vec2 transfer, Vec2 entry, Vec2 exit)? Solve(double ofDist)
+            // Solve the dual-circle geometry for a given overfly distance; the transfer
+            // point is the tangent between them, which the straight secant flies to.
+            (Vec2 c2, Vec2 transfer, Vec2 entry, Vec2 exit)? Solve(double ofDist)
             {
                 var ofPt = Geom.Add(vertex, Geom.Scale(dirIn, ofDist));
                 var c1   = Geom.Add(ofPt, Geom.Scale(perpIn, radius));
@@ -459,14 +454,11 @@ namespace Carbonix.Planning
                 // Pick the more-negative d to place c2 behind the vertex.
                 double d = Math.Min((-qb + sq) / (2 * qa), (-qb - sq) / (2 * qa));
                 var c2 = Geom.Add(vertex, Geom.Add(Geom.Scale(dirOut, d), Geom.Scale(perpOut, radius)));
-                return (c1, c2,
-                        Geom.Midpoint(c1, c2),
-                        ofPt,
-                        Geom.Add(vertex, Geom.Scale(dirOut, d)));
+                return (c2, Geom.Midpoint(c1, c2), ofPt, Geom.Add(vertex, Geom.Scale(dirOut, d)));
             }
 
-            // Compute max overfly = the single-circle tangent entry distance on the
-            // OUTSIDE of the turn.  The entryT of this solution is the maximum useful overfly.
+            // Max overfly = the single-circle tangent entry distance on the OUTSIDE of the
+            // turn; that solution's entryT is the maximum useful overfly.
             int outsideSide = turnsLeft ? -1 : 1;
             var singleSol = SolveTangentCircle(vertex, dirIn, dirOut, radius, outsideSide,
                 (a, b) =>
@@ -482,37 +474,16 @@ namespace Carbonix.Planning
             var res = Solve(clampedOverfly) ?? Solve(0);
             if (res == null) return null;
 
-            var (c1r, c2r, transferPoint, entryPoint, exitPoint) = res.Value;
-
-            // Check circle 1 sweep — skip it if too small.
-            double a1Start = Math.Atan2(entryPoint.Y - c1r.Y, entryPoint.X - c1r.X);
-            double a1End   = Math.Atan2(transferPoint.Y - c1r.Y, transferPoint.X - c1r.X);
-            bool skipC1    = forceStraightEntry || Math.Abs(Geom.ArcSweep(a1Start, a1End, c1CW)) < minArcRad;
-
-            if (skipC1)
-            {
-                return new TurnResult
-                {
-                    Kind = TurnKind.DubinsStraightToOrbit,
-                    EntryPoint = entryPoint,
-                    ExitPoint = exitPoint,
-                    TransferPoint = transferPoint,
-                    Loiters = new List<LoiterInfo>
-                    {
-                        new LoiterInfo { Center = c2r, Radius = radius, Clockwise = c2CW },
-                    },
-                };
-            }
+            var (c2r, transferPoint, entryPoint, exitPoint) = res.Value;
 
             return new TurnResult
             {
-                Kind = TurnKind.DubinsSTurn,
+                Kind = TurnKind.DubinsStraightToOrbit,
                 EntryPoint = entryPoint,
                 ExitPoint = exitPoint,
                 TransferPoint = transferPoint,
                 Loiters = new List<LoiterInfo>
                 {
-                    new LoiterInfo { Center = c1r, Radius = radius, Clockwise = c1CW },
                     new LoiterInfo { Center = c2r, Radius = radius, Clockwise = c2CW },
                 },
             };
@@ -627,37 +598,20 @@ namespace Carbonix.Planning
                     continue;
                 }
 
-                // ── SHARP: Dubins S-turn ──────────────────────────────────────
+                // ── SHARP: overfly → straight secant → single exit orbit ──────
                 {
-                    // Dead-end caps (the only vertices carrying a turn override) are 180°
-                    // U-turns — force the straight-secant entry instead of the full S.
-                    var turn = SolveDubinsSTurn(poly[i], dirIn, dirOut, turnsLeft,
-                        turnRadius, p.OverflyDistM, p.MinDubinsArcDeg,
-                        forceStraightEntry: meta[i].turnLeftOverride.HasValue);
+                    var turn = SolveDubinsTurn(poly[i], dirIn, dirOut, turnsLeft,
+                        turnRadius, p.OverflyDistM);
 
                     if (turn == null) { AddWP(poly[i], i, true); continue; }
 
-                    // Entry/overfly waypoint (plain WP on or near the flight line).
+                    // Entry/overfly waypoint, straight leg to the transfer point, then
+                    // the single exit orbit.
                     AddWP(turn.EntryPoint, i, true);
-
-                    if (turn.Kind == TurnKind.DubinsStraightToOrbit)
-                    {
-                        // Straight leg to transfer point, then single exit orbit.
-                        AddWP(turn.TransferPoint.Value, i, false);
-                        var c2 = turn.Loiters[0];
-                        AddLoiter(c2.Center, c2.Radius, c2.Clockwise, i,
-                            ArcTurns(turn.TransferPoint.Value, turn.ExitPoint, c2.Center, c2.Clockwise));
-                    }
-                    else
-                    {
-                        // Full S-turn: entry orbit → exit orbit.
-                        var c1 = turn.Loiters[0];
-                        var c2 = turn.Loiters[1];
-                        AddLoiter(c1.Center, c1.Radius, c1.Clockwise, i,
-                            ArcTurns(turn.EntryPoint, turn.TransferPoint.Value, c1.Center, c1.Clockwise));
-                        AddLoiter(c2.Center, c2.Radius, c2.Clockwise, i,
-                            ArcTurns(turn.TransferPoint.Value, turn.ExitPoint, c2.Center, c2.Clockwise));
-                    }
+                    AddWP(turn.TransferPoint.Value, i, false);
+                    var c2 = turn.Loiters[0];
+                    AddLoiter(c2.Center, c2.Radius, c2.Clockwise, i,
+                        ArcTurns(turn.TransferPoint.Value, turn.ExitPoint, c2.Center, c2.Clockwise));
                 }
             }
 
@@ -1370,7 +1324,6 @@ namespace Carbonix.Planning
                 CornerCutThresholdDeg = p.CornerCutThresholdDeg,
                 FullOrbitThresholdDeg = p.FullOrbitThresholdDeg,
                 OverflyDistM          = p.OverflyDistM,
-                MinDubinsArcDeg       = p.MinDubinsArcDeg,
                 TurnRadiusM           = p.TurnRadiusM,
                 CornerCutRadiusM      = p.CornerCutRadiusM,
             };
