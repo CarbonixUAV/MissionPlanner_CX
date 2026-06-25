@@ -98,6 +98,64 @@ namespace Carbonix
             elev_profile.HoverChanged += ElevProfile_HoverChanged;
 
             elev_profile.AltitudeChanged += ElevProfile_AltitudeChanged;
+
+            AddGradientRows();
+        }
+
+        // Climb-gradient hint thresholds (percent). Each leg is flown both ways, so the
+        // binding check is |slope| against the climb limit; segments steeper than warn draw
+        // gold, steeper than max draw red. Added in code to avoid touching the Designer.
+        private System.Windows.Forms.NumericUpDown NUM_gradwarn;
+        private System.Windows.Forms.NumericUpDown NUM_gradmax;
+
+        private void AddGradientRows()
+        {
+            System.Windows.Forms.NumericUpDown MakeNum(decimal val) => new System.Windows.Forms.NumericUpDown
+            {
+                Anchor = System.Windows.Forms.AnchorStyles.Left,
+                DecimalPlaces = 1,
+                Increment = 0.5m,
+                Minimum = 0m,
+                Maximum = 100m,
+                Value = val,
+                Width = 60,
+            };
+            System.Windows.Forms.Label Lbl(string t, System.Windows.Forms.AnchorStyles a) =>
+                new System.Windows.Forms.Label { Text = t, Anchor = a, AutoSize = true };
+
+            NUM_gradwarn = MakeNum(4m);
+            NUM_gradmax = MakeNum(5m);
+
+            int row = tbl_altitude.RowCount;
+            tbl_altitude.RowCount = row + 2;
+            tbl_altitude.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 24F));
+            tbl_altitude.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 24F));
+
+            tbl_altitude.Controls.Add(Lbl("Grad warn:", System.Windows.Forms.AnchorStyles.Right), 0, row);
+            tbl_altitude.Controls.Add(NUM_gradwarn, 1, row);
+            tbl_altitude.Controls.Add(Lbl("%", System.Windows.Forms.AnchorStyles.Left), 2, row);
+            tbl_altitude.Controls.Add(Lbl("Grad max:", System.Windows.Forms.AnchorStyles.Right), 0, row + 1);
+            tbl_altitude.Controls.Add(NUM_gradmax, 1, row + 1);
+            tbl_altitude.Controls.Add(Lbl("%", System.Windows.Forms.AnchorStyles.Left), 2, row + 1);
+
+            grp_altitude.Height += 48;
+
+            NUM_gradwarn.ValueChanged += GradParams_ValueChanged;
+            NUM_gradmax.ValueChanged += GradParams_ValueChanged;
+        }
+
+        private void GradParams_ValueChanged(object sender, EventArgs e)
+        {
+            if (freeze_handlers) return;
+            ApplyGradientThresholds();
+            elev_profile.Invalidate();
+        }
+
+        // Gradient is a unitless rise/run ratio, so the percent values map straight through.
+        private void ApplyGradientThresholds()
+        {
+            elev_profile.GradYellowPct = (double)NUM_gradwarn.Value;
+            elev_profile.GradRedPct = (double)NUM_gradmax.Value;
         }
 
         /// <summary>
@@ -884,6 +942,7 @@ namespace Carbonix
 
             elev_profile.HomeTerrainAlt = homeTerrainAlt;
             ApplySurfaceOffsets();
+            ApplyGradientThresholds();
 
             elev_profile.SetData(elevationPoints, p.MinAGL, p.MaxAGL, preserveView);
         }

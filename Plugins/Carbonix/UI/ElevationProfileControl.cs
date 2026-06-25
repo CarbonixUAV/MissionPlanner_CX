@@ -44,6 +44,11 @@ namespace Carbonix.UI
         // Target (scan) AGL over raw SRTM, drawn green: line = terrain + TargetAglM. NaN = hide.
         public double TargetAglM { get; set; } = double.NaN;
 
+        // Planned-path gradient warning thresholds (percent, |slope|). A segment steeper than
+        // GradYellowPct draws gold, steeper than GradRedPct draws red. NaN = no flagging.
+        public double GradYellowPct { get; set; } = double.NaN;
+        public double GradRedPct { get; set; } = double.NaN;
+
         public event EventHandler<AltChangeEventArgs> AltitudeChanged;
         public event EventHandler<WaypointInsertEventArgs> WaypointInsertRequested;
 
@@ -640,17 +645,28 @@ namespace Carbonix.UI
 
             // The aircraft flies at constant altitude (AltRelM) between waypoints — leg
             // terrain samples are excluded so the path is straight between actual waypoints.
-            var pts = new List<PointF>();
-            foreach (var s in Points.OrderBy(s => s.DistM))
-            {
-                if (s.IsLegTerrainSample) continue;
-                pts.Add(D2S(s.DistM * DistMultiplier, s.AltRelM * AltMultiplier));
-            }
+            // Each segment is coloured by its absolute climb/descent gradient (each leg is
+            // flown both ways, so |slope| vs the climb limit is the binding check): yellow
+            // past the warn threshold, red past the max.
+            var path = Points.Where(s => !s.IsLegTerrainSample).OrderBy(s => s.DistM).ToList();
 
-            if (pts.Count >= 2)
+            for (int i = 0; i + 1 < path.Count; i++)
             {
-                using (var pen = new Pen(Color.FromArgb(160, Color.DodgerBlue), 1.5f))
-                    g.DrawLines(pen, pts.ToArray());
+                var a = path[i];
+                var b = path[i + 1];
+                PointF pa = D2S(a.DistM * DistMultiplier, a.AltRelM * AltMultiplier);
+                PointF pb = D2S(b.DistM * DistMultiplier, b.AltRelM * AltMultiplier);
+
+                double run = b.DistM - a.DistM;
+                double gradPct = run > 1e-6 ? Math.Abs(b.AltRelM - a.AltRelM) / run * 100.0 : 0.0;
+
+                Color col; float w;
+                if (!double.IsNaN(GradRedPct) && gradPct >= GradRedPct)        { col = Color.Red;    w = 2.5f; }
+                else if (!double.IsNaN(GradYellowPct) && gradPct >= GradYellowPct) { col = Color.Gold; w = 2.5f; }
+                else                                                          { col = Color.FromArgb(160, Color.DodgerBlue); w = 1.5f; }
+
+                using (var pen = new Pen(col, w))
+                    g.DrawLine(pen, pa, pb);
             }
         }
 
@@ -734,6 +750,10 @@ namespace Carbonix.UI
                 items.Add((Color.LimeGreen, true, 1.5f, $"Target ({TargetAglM * AltMultiplier:F0} {AltUnit})"));
             items.Add((Color.DarkOrange, false, 5f, "Loiter arc"));
             items.Add((Color.DodgerBlue, false, 1.5f, "Planned path"));
+            if (!double.IsNaN(GradYellowPct))
+                items.Add((Color.Gold, false, 2.5f, $"Grad ≥{GradYellowPct:F0}%"));
+            if (!double.IsNaN(GradRedPct))
+                items.Add((Color.Red, false, 2.5f, $"Grad ≥{GradRedPct:F0}%"));
 
             float x = r.Left + 6;
             float y = r.Top + 4;
