@@ -41,6 +41,9 @@ namespace Carbonix.Planning
 
         // Loiter radius for corner-cut inscribed circles (medium turns).
         public double CornerCutRadiusM { get; set; } = 150;
+
+        // All fields are value types, so a shallow copy is a full copy.
+        public CorridorParameters Clone() => (CorridorParameters)MemberwiseClone();
     }
 
     /// <summary>
