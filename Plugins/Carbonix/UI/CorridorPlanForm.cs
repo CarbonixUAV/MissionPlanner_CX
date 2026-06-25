@@ -880,8 +880,9 @@ namespace Carbonix
         private void ApplySurfaceOffsets()
         {
             double mult = CurrentState.multiplieralt;
-            elev_profile.MsaM     = floorSurface.Loaded   ? (double)NUM_minalgl.Value / mult : double.NaN;
-            elev_profile.CeilingM = ceilingSurface.Loaded ? (double)NUM_maxagl.Value / mult : double.NaN;
+            elev_profile.MsaM       = floorSurface.Loaded   ? (double)NUM_minalgl.Value / mult : double.NaN;
+            elev_profile.CeilingM   = ceilingSurface.Loaded ? (double)NUM_maxagl.Value / mult : double.NaN;
+            elev_profile.TargetAglM = (double)NUM_defagl.Value / mult;
         }
 
         // ─── Statistics ───────────────────────────────────────────────────────────
