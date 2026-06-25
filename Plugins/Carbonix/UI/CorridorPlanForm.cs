@@ -796,8 +796,11 @@ namespace Carbonix
                     // Sample only the flown (primary) arc; the un-flown remainder is dropped.
                     SampleArc(center, radius, entry, sign * primary, wp, loiterAlt);
                 }
-                else
+                else if (!wp.IsTurnHelper)
                 {
+                    // Turn-block lead-in helpers (overfly + transfer) are omitted: the loiter
+                    // represents the turn, and the preturn isn't a scan station. Their legs
+                    // are still sampled below for continuous terrain + correct distance.
                     samples.Add(new ElevationPoint
                     {
                         DistM          = cum,
