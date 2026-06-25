@@ -51,6 +51,11 @@ namespace Carbonix
         // Home terrain altitude (m) — computed once per generation
         private double homeTerrainAlt;
 
+        // Floor/ceiling surface models (whole-continent COGs) sampled along the profile to
+        // draw reference lines. Loaded once on open from the global Carbonix settings.
+        private readonly SurfaceProvider floorSurface = new SurfaceProvider();
+        private readonly SurfaceProvider ceilingSurface = new SurfaceProvider();
+
         // Map overlays
         private readonly GMapOverlay layer_corridor;
 
@@ -151,6 +156,18 @@ namespace Carbonix
             BUT_branches_add.Visible = false;
             BUT_branches_remove.Visible = false;
             CHK_returnpath.Visible = false;
+
+            // Altitude fields now drive three distinct surfaces: the target (scan) altitude is
+            // AGL over raw SRTM and drives generation; MSA and Ceiling are offsets over the
+            // floor/ceiling surface models, drawn as manual reference lines on the profile.
+            grp_altitude.Text = "Altitude";
+            lbl_defagl.Text = "Target AGL:";
+            lbl_minalgl.Text = "MSA:";
+            lbl_maxagl.Text = "Ceiling:";
+
+            // Load the floor/ceiling surface COGs (header parse only; pixels read on demand).
+            floorSurface.Load(plugin.CorridorFloorSurfacePath);
+            ceilingSurface.Load(plugin.CorridorCeilingSurfacePath);
 
             SetAltUnits();
             RecalcCoverage();
@@ -455,6 +472,14 @@ namespace Carbonix
         {
             if (freeze_handlers) return;
             RecalcCoverage();
+
+            // MSA / ceiling are reference-line offsets — update them live without a regen.
+            // (Target AGL only affects the planned line, which refreshes on the next Generate.)
+            if (elevationPoints != null)
+            {
+                ApplySurfaceOffsets();
+                elev_profile.Invalidate();
+            }
         }
 
         private void CorridorParams_ValueChanged(object sender, EventArgs e)
@@ -555,6 +580,11 @@ namespace Carbonix
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
                         var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome);
                         var profile = BuildTourProfile(generated, capturedHome, homeT);
+                        foreach (var ep in profile)
+                        {
+                            ep.FloorSurfaceAmsl = floorSurface.SampleAmsl(ep.Lat, ep.Lng) ?? double.NaN;
+                            ep.CeilingSurfaceAmsl = ceilingSurface.SampleAmsl(ep.Lat, ep.Lng) ?? double.NaN;
+                        }
                         return (pls, tr, generated, profile, homeT);
                     });
             }
@@ -827,7 +857,20 @@ namespace Carbonix
             elev_profile.AltUnit  = CurrentState.AltUnit;
             elev_profile.DistUnit = CurrentState.DistanceUnit;
 
+            elev_profile.HomeTerrainAlt = homeTerrainAlt;
+            ApplySurfaceOffsets();
+
             elev_profile.SetData(elevationPoints, p.MinAGL, p.MaxAGL, preserveView);
+        }
+
+        // Push the live MSA / ceiling offsets (metres) to the profile. Cheap — the surface
+        // samples are fixed; only the offset shifts the reference line, so this needs no
+        // re-sample or regenerate. Offset is NaN (line hidden) when its surface isn't loaded.
+        private void ApplySurfaceOffsets()
+        {
+            double mult = CurrentState.multiplieralt;
+            elev_profile.MsaM     = floorSurface.Loaded   ? (double)NUM_minalgl.Value / mult : double.NaN;
+            elev_profile.CeilingM = ceilingSurface.Loaded ? (double)NUM_maxagl.Value / mult : double.NaN;
         }
 
         // ─── Statistics ───────────────────────────────────────────────────────────

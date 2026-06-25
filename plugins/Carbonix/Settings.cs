@@ -20,6 +20,13 @@ namespace Carbonix
         public string controller;
         public string weather_api_key;
 
+        // Floor/ceiling surface COGs (absolute-AMSL max-filtered SRTM) drawn as reference
+        // lines on the corridor elevation profile. Filename under the user-data "DSM" folder
+        // (absolute path overrides). Empty = no surface. (Eventually the plugin will download
+        // + cache these into DSM itself.)
+        public string corridor_floor_surface;
+        public string corridor_ceiling_surface;
+
         public GeneralSettings()
         {
             velz_unit = VelZUnits.meters_per_second;
@@ -80,6 +87,9 @@ namespace Carbonix
             placeholder for the find/replace.
             */
             weather_api_key = "5f88b0183ab94ee68cb15d418c";
+
+            corridor_floor_surface = "floor_surface.tif";
+            corridor_ceiling_surface = "ceiling_surface.tif";
         }
     }
 
