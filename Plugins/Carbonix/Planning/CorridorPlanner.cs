@@ -536,7 +536,7 @@ namespace Carbonix.Planning
             double cornerCutRad = p.CornerCutThresholdDeg * Deg2Rad;
             double fullOrbitRad = p.FullOrbitThresholdDeg * Deg2Rad;
 
-            void AddWP(Vec2 pt, int srcIdx, bool isLineWp)
+            void AddWP(Vec2 pt, int srcIdx, bool isLineWp, Vec2? terrainAt = null)
             {
                 commands.Add(new CartCommand
                 {
@@ -548,6 +548,7 @@ namespace Carbonix.Planning
                     CorridorVertexIndex = isLineWp ? meta[srcIdx].corridorVtxIdx : -1,
                     IsBranchVertex = isLineWp && meta[srcIdx].isBranchVertex,
                     BranchId = isLineWp ? meta[srcIdx].branchId : -1,
+                    TerrainAnchor = terrainAt,
                 });
             }
 
@@ -615,10 +616,14 @@ namespace Carbonix.Planning
 
                     if (turn == null) { AddWP(poly[i], i, true); continue; }
 
-                    // Entry/overfly waypoint, straight leg to the transfer point, then
-                    // the single exit orbit.
-                    AddWP(turn.EntryPoint, i, true);
-                    AddWP(turn.TransferPoint.Value, i, false);
+                    // Entry/overfly waypoint, straight leg to the transfer point, then the
+                    // single exit orbit. The transfer point sits off the flight line (its own
+                    // terrain projection is unreliable), so anchor the whole turn block —
+                    // entry, transfer, orbit — to the exit terrain: the turn holds the exit
+                    // scan altitude and the climb falls on the approach leg (a ramp, not a
+                    // step on the preturn).
+                    AddWP(turn.EntryPoint, i, true, turn.ExitPoint);
+                    AddWP(turn.TransferPoint.Value, i, false, turn.ExitPoint);
                     var c2 = turn.Loiters[0];
                     AddLoiter(c2.Center, c2.Radius, c2.Clockwise, i,
                         ArcTurns(turn.TransferPoint.Value, turn.ExitPoint, c2.Center, c2.Clockwise),
