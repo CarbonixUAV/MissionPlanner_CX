@@ -614,8 +614,11 @@ namespace Carbonix.Planning
                     var turn = SolveCornerCut(poly[i], dirIn, dirOut, turnsLeft, cornerCutRadius);
                     if (turn == null) { AddWP(poly[i], i, true); continue; }
 
-                    AddWP(turn.EntryPoint, i, true);
-                    AddWP(turn.ExitPoint, i, true);
+                    // Both cut points share the corner vertex's altitude (a flat chord at the
+                    // corner's scan alt) — they're one editable station (same VertexId, linked
+                    // drag), so anchor both terrain samples to the vertex to match.
+                    AddWP(turn.EntryPoint, i, true, poly[i]);
+                    AddWP(turn.ExitPoint, i, true, poly[i]);
                     continue;
                 }
 
