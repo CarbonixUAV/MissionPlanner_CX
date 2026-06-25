@@ -593,15 +593,25 @@ namespace Carbonix.UI
             if (double.IsNaN(TargetAglM)) return;
 
             var seg = new List<PointF>();
-            foreach (var s in Points.OrderBy(p => p.DistM))
+            using (var pen = new Pen(Color.FromArgb(220, Color.LimeGreen), 1.5f) { DashStyle = DashStyle.Dash })
             {
-                if (s.IsLoiterWaypoint || s.IsInserted) continue;
-                double relM = (s.TerrainAlt - s.HomeTerrainAlt) + TargetAglM;
-                seg.Add(D2S(s.DistM * DistMultiplier, relM * AltMultiplier));
+                foreach (var s in Points.OrderBy(p => p.DistM))
+                {
+                    // The alternate (un-flown) loiter arc has no meaningful target — blank it.
+                    if (s.IsAlternateArc)
+                    {
+                        if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
+                        seg.Clear();
+                        continue;
+                    }
+                    // Centre anchor / inserted: skip without breaking the line.
+                    if (s.IsLoiterWaypoint || s.IsInserted) continue;
+
+                    double relM = (s.TerrainAlt - s.HomeTerrainAlt) + TargetAglM;
+                    seg.Add(D2S(s.DistM * DistMultiplier, relM * AltMultiplier));
+                }
+                if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
             }
-            if (seg.Count >= 2)
-                using (var pen = new Pen(Color.FromArgb(220, Color.LimeGreen), 1.5f) { DashStyle = DashStyle.Dash })
-                    g.DrawLines(pen, seg.ToArray());
         }
 
         private void DrawLoiterArcs(Graphics g)
