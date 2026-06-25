@@ -110,7 +110,7 @@ namespace MissionPlanner.Utilities
                 GDAL_NODATA = 42113
             }
 
-            public bool LoadFile(string filename)
+            public bool LoadFile(string filename, bool addToIndex = true)
             {
                 FileName = filename;
 
@@ -426,8 +426,9 @@ namespace MissionPlanner.Utilities
 
                     log.InfoFormat("Start Point ({0},{1},{2}) --> ({3},{4},{5})", i, j, k, x, y, z);
 
-                    lock (index)
-                        GeoTiff.index.Add(this);
+                    if (addToIndex)
+                        lock (index)
+                            GeoTiff.index.Add(this);
 
                     /*
 
@@ -527,71 +528,83 @@ namespace MissionPlanner.Utilities
                 if (index.Count == 0)
                     return srtm.altresponce.Invalid;
 
-            var answer = new srtm.altresponce();
-
             foreach (var geotiffdata in index.ToArray())
             {
-                if (geotiffdata.Area.Contains(lat, lng))
-                {
-                    // get answer
-                    var xf = map(lat, geotiffdata.Area.Top, geotiffdata.Area.Bottom, 0, geotiffdata.height-1);
-                    var yf = map(lng, geotiffdata.Area.Left, geotiffdata.Area.Right, 0, geotiffdata.width-1);
-                   
-                    if (geotiffdata.srcProjection != null) 
-                    {
-                        ProjectionInfo pESRIEnd = KnownCoordinateSystems.Geographic.World.WGS1984;
-
-                        double[] xyarray = { lng, lat };
-                        Reproject.ReprojectPoints(xyarray, null, pESRIEnd, geotiffdata.srcProjection, 0, xyarray.Length / 2);
-
-                        xf = map(xyarray[1], geotiffdata.y, geotiffdata.y - geotiffdata.height * geotiffdata.yscale, 0, geotiffdata.height - 1);
-                        yf = map(xyarray[0], geotiffdata.x, geotiffdata.x + geotiffdata.width * geotiffdata.xscale, 0, geotiffdata.width - 1);
-                    }           
-                    //wgs84 && etrs89
-                    else if (geotiffdata.ProjectedCSTypeGeoKey >= 3038 && geotiffdata.ProjectedCSTypeGeoKey <= 3051 ||
-                        geotiffdata.ProjectedCSTypeGeoKey >= 32601 && geotiffdata.ProjectedCSTypeGeoKey <= 32760 ||
-                        geotiffdata.ProjectedCSTypeGeoKey >= 25828 && geotiffdata.ProjectedCSTypeGeoKey <= 25838 ||
-                        geotiffdata.ProjectedCSTypeGeoKey >= 28348 && geotiffdata.ProjectedCSTypeGeoKey <= 28358)
-                    {
-                        var pnt = PointLatLngAlt.ToUTM((geotiffdata.UTMZone) * 1, lat, lng);
-
-                        xf = map(pnt[1], geotiffdata.y, geotiffdata.y - geotiffdata.height * geotiffdata.yscale, 0,
-                            geotiffdata.height - 1);
-                        yf = map(pnt[0], geotiffdata.x, geotiffdata.x + geotiffdata.width * geotiffdata.xscale, 0,
-                            geotiffdata.width - 1);
-                    }
-
-                    int x_int = (int) xf;
-                    double x_frac = xf - x_int;
-
-                    int y_int = (int) yf;
-                    double y_frac = yf - y_int;
-
-                    
-                    //could be on one of the other images
-                    if (x_int < 0 || y_int < 0 || x_int >= geotiffdata.height -1  || y_int >= geotiffdata.width-1)
-                        continue;
-
-                    double alt00 = GetAlt(geotiffdata, x_int, y_int);
-                    double alt10 = GetAlt(geotiffdata, x_int + 1, y_int);
-                    double alt01 = GetAlt(geotiffdata, x_int, y_int + 1);
-                    double alt11 = GetAlt(geotiffdata, x_int + 1, y_int + 1);
-
-                    double v1 = avg(alt00, alt10, x_frac);
-                    double v2 = avg(alt01, alt11, x_frac);
-                    double v = avg(v1, v2, y_frac);
-
-                    if (v > -1000)
-                        answer.currenttype = srtm.tiletype.valid;
-                    if(alt00 < -1000 || alt10 < -1000 || alt01 < -1000 || alt11 < -1000 )
-                        answer.currenttype = srtm.tiletype.invalid;
-                    answer.alt = v;
-                    answer.altsource = "GeoTiff";
+                var answer = sampleTiff(geotiffdata, lat, lng);
+                if (answer.altsource == "GeoTiff")
                     return answer;
-                }
             }
 
             return srtm.altresponce.Invalid;
+        }
+
+        /// <summary>
+        /// Sample a single GeoTIFF at lat/lng. Returns an answer with altsource "GeoTiff"
+        /// when the point falls inside this tiff's coverage (currenttype valid/invalid per
+        /// the data), or <see cref="srtm.altresponce.Invalid"/> (altsource unset) when the
+        /// point is outside coverage — letting callers query a specific surface directly
+        /// rather than the shared <see cref="index"/>.
+        /// </summary>
+        public static srtm.altresponce sampleTiff(geotiffdata geotiffdata, double lat, double lng)
+        {
+            if (geotiffdata == null || !geotiffdata.Area.Contains(lat, lng))
+                return srtm.altresponce.Invalid;
+
+            var answer = new srtm.altresponce();
+
+            var xf = map(lat, geotiffdata.Area.Top, geotiffdata.Area.Bottom, 0, geotiffdata.height - 1);
+            var yf = map(lng, geotiffdata.Area.Left, geotiffdata.Area.Right, 0, geotiffdata.width - 1);
+
+            if (geotiffdata.srcProjection != null)
+            {
+                ProjectionInfo pESRIEnd = KnownCoordinateSystems.Geographic.World.WGS1984;
+
+                double[] xyarray = { lng, lat };
+                Reproject.ReprojectPoints(xyarray, null, pESRIEnd, geotiffdata.srcProjection, 0, xyarray.Length / 2);
+
+                xf = map(xyarray[1], geotiffdata.y, geotiffdata.y - geotiffdata.height * geotiffdata.yscale, 0, geotiffdata.height - 1);
+                yf = map(xyarray[0], geotiffdata.x, geotiffdata.x + geotiffdata.width * geotiffdata.xscale, 0, geotiffdata.width - 1);
+            }
+            //wgs84 && etrs89
+            else if (geotiffdata.ProjectedCSTypeGeoKey >= 3038 && geotiffdata.ProjectedCSTypeGeoKey <= 3051 ||
+                geotiffdata.ProjectedCSTypeGeoKey >= 32601 && geotiffdata.ProjectedCSTypeGeoKey <= 32760 ||
+                geotiffdata.ProjectedCSTypeGeoKey >= 25828 && geotiffdata.ProjectedCSTypeGeoKey <= 25838 ||
+                geotiffdata.ProjectedCSTypeGeoKey >= 28348 && geotiffdata.ProjectedCSTypeGeoKey <= 28358)
+            {
+                var pnt = PointLatLngAlt.ToUTM((geotiffdata.UTMZone) * 1, lat, lng);
+
+                xf = map(pnt[1], geotiffdata.y, geotiffdata.y - geotiffdata.height * geotiffdata.yscale, 0,
+                    geotiffdata.height - 1);
+                yf = map(pnt[0], geotiffdata.x, geotiffdata.x + geotiffdata.width * geotiffdata.xscale, 0,
+                    geotiffdata.width - 1);
+            }
+
+            int x_int = (int) xf;
+            double x_frac = xf - x_int;
+
+            int y_int = (int) yf;
+            double y_frac = yf - y_int;
+
+            // mapped outside the pixel grid — treat as not covered (may be in another tiff)
+            if (x_int < 0 || y_int < 0 || x_int >= geotiffdata.height - 1 || y_int >= geotiffdata.width - 1)
+                return srtm.altresponce.Invalid;
+
+            double alt00 = GetAlt(geotiffdata, x_int, y_int);
+            double alt10 = GetAlt(geotiffdata, x_int + 1, y_int);
+            double alt01 = GetAlt(geotiffdata, x_int, y_int + 1);
+            double alt11 = GetAlt(geotiffdata, x_int + 1, y_int + 1);
+
+            double v1 = avg(alt00, alt10, x_frac);
+            double v2 = avg(alt01, alt11, x_frac);
+            double v = avg(v1, v2, y_frac);
+
+            if (v > -1000)
+                answer.currenttype = srtm.tiletype.valid;
+            if (alt00 < -1000 || alt10 < -1000 || alt01 < -1000 || alt11 < -1000)
+                answer.currenttype = srtm.tiletype.invalid;
+            answer.alt = v;
+            answer.altsource = "GeoTiff";
+            return answer;
         }
 
         private static MemoryCache cachescanlines =
