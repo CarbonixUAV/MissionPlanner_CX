@@ -88,8 +88,8 @@ namespace Carbonix
             */
             weather_api_key = "5f88b0183ab94ee68cb15d418c";
 
-            corridor_floor_surface = "floor_surface.tif";
-            corridor_ceiling_surface = "ceiling_surface.tif";
+            corridor_floor_surface = "https://cx-bobs-test-bucket.s3.dualstack.ap-southeast-2.amazonaws.com/floor_surface.tif";
+            corridor_ceiling_surface = "https://cx-bobs-test-bucket.s3.dualstack.ap-southeast-2.amazonaws.com/ceiling_surface.tif";
         }
     }
 

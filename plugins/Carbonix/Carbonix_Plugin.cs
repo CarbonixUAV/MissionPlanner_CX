@@ -43,6 +43,7 @@ namespace Carbonix
         private static string ResolveDsmPath(string nameOrPath)
         {
             if (string.IsNullOrWhiteSpace(nameOrPath)) return nameOrPath;
+            if (Planning.SurfaceProvider.IsUrl(nameOrPath)) return nameOrPath;   // remote COG
             return Path.Combine(Settings.GetUserDataDirectory(), "DSM", nameOrPath);
         }
 
