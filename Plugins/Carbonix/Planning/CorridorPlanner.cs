@@ -511,6 +511,11 @@ namespace Carbonix.Planning
             public double LoiterTurns;
             public bool IsBranchVertex;
             public int BranchId = -1;
+
+            // When set, terrain (hence altitude) is sampled here instead of at Position.
+            // Used for loiters so the orbit targets the scan altitude at its EXIT, not at
+            // the orbit centre (~the turn vertex, which reads like the entry/exit average).
+            public Vec2? TerrainAnchor;
         }
 
         // Per-source-vertex metadata for the combined polyline.
@@ -546,7 +551,7 @@ namespace Carbonix.Planning
                 });
             }
 
-            void AddLoiter(Vec2 center, double radius, bool clockwise, int srcIdx, double turns)
+            void AddLoiter(Vec2 center, double radius, bool clockwise, int srcIdx, double turns, Vec2 terrainAt)
             {
                 float radiusSigned = clockwise ? (float)radius : -(float)radius;
                 commands.Add(new CartCommand
@@ -564,6 +569,7 @@ namespace Carbonix.Planning
                     LoiterTurns = turns,
                     IsBranchVertex = meta[srcIdx].isBranchVertex,
                     BranchId = meta[srcIdx].branchId,
+                    TerrainAnchor = terrainAt,   // target scan altitude at the orbit exit
                 });
             }
 
@@ -615,7 +621,8 @@ namespace Carbonix.Planning
                     AddWP(turn.TransferPoint.Value, i, false);
                     var c2 = turn.Loiters[0];
                     AddLoiter(c2.Center, c2.Radius, c2.Clockwise, i,
-                        ArcTurns(turn.TransferPoint.Value, turn.ExitPoint, c2.Center, c2.Clockwise));
+                        ArcTurns(turn.TransferPoint.Value, turn.ExitPoint, c2.Center, c2.Clockwise),
+                        turn.ExitPoint);
                 }
             }
 
@@ -799,7 +806,8 @@ namespace Carbonix.Planning
             foreach (var cmd in commands)
             {
                 var geo       = FromCart(cmd.Position);
-                var terrQuery = terrainQueryPoint(cmd, geo);
+                var terrGeo   = cmd.TerrainAnchor.HasValue ? FromCart(cmd.TerrainAnchor.Value) : geo;
+                var terrQuery = terrainQueryPoint(cmd, terrGeo);
                 double terr   = GetTerrainAlt(terrQuery.Lat, terrQuery.Lng);
 
                 result.Add(new CorridorWaypoint
