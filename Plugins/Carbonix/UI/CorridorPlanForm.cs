@@ -690,7 +690,7 @@ namespace Carbonix
                 return Math.Abs(b - a);
             }
 
-            void SampleArc(PointLatLngAlt center, double radius, double startBearing, double sweepDeg, CorridorWaypoint owner)
+            void SampleArc(PointLatLngAlt center, double radius, double startBearing, double sweepDeg, CorridorWaypoint owner, double altRel)
             {
                 double arcLen = 2.0 * Math.PI * radius * Math.Abs(sweepDeg) / 360.0;
                 int n = Math.Max(2, (int)(arcLen / SampleSpacingM));
@@ -700,7 +700,7 @@ namespace Carbonix
                     samples.Add(new ElevationPoint
                     {
                         DistM             = cum + arcLen * k / n,
-                        AltRelM           = owner.AltRelM,
+                        AltRelM           = altRel,
                         TerrainAlt        = CorridorPlanner.GetTerrainAlt(pt.Lat, pt.Lng),
                         HomeTerrainAlt    = homeTerrainAlt,
                         IsLoiterArcSample = true,
@@ -768,11 +768,19 @@ namespace Carbonix
                     double primary = AngleDiffDeg(entry, exit, cw);   // flown arc, [0,360)
                     double primaryLen = 2.0 * Math.PI * radius * primary / 360.0;
 
+                    // Fly the loiter flat at the scan altitude for its EXIT, sampled at the
+                    // rendered orbit-exit point (the exact point the target line uses) rather
+                    // than the engine's projected exit — so the bar's exit sits on the green
+                    // target line. = wp.AltRelM shifted by (rendered-exit − engine-exit) terrain.
+                    var exitPt = center.newpos(exit, radius);
+                    double loiterAlt = wp.AltRelM
+                        + (CorridorPlanner.GetTerrainAlt(exitPt.Lat, exitPt.Lng) - wp.TerrainAltM);
+
                     // Loiter bar anchor over the flown arc.
                     samples.Add(new ElevationPoint
                     {
                         DistM            = cum,
-                        AltRelM          = wp.AltRelM,
+                        AltRelM          = loiterAlt,
                         TerrainAlt       = wp.TerrainAltM,
                         HomeTerrainAlt   = homeTerrainAlt,
                         IsLoiterWaypoint = true,
@@ -786,7 +794,7 @@ namespace Carbonix
                     });
 
                     // Sample only the flown (primary) arc; the un-flown remainder is dropped.
-                    SampleArc(center, radius, entry, sign * primary, wp);
+                    SampleArc(center, radius, entry, sign * primary, wp, loiterAlt);
                 }
                 else
                 {
