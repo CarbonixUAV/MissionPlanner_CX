@@ -99,6 +99,26 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void MediumCorner_CutAsStraightChord_NoLoiter()
+        {
+            // ~45° turn — within the corner-cut band (15°..60°). It used to make an inscribed
+            // loiter; now it's cut with a straight chord (entry + exit waypoints), no loiter.
+            var line = new List<PointLatLngAlt>
+            {
+                P(BaseLat, BaseLng),
+                P(BaseLat, BaseLng + 0.02),
+                P(BaseLat - 0.02, BaseLng + 0.044),
+            };
+
+            var wps = CorridorPlanner.GenerateMission(line, Params(), line[0]);
+
+            Assert.IsFalse(wps.Any(w => w.Command == MAVLink.MAV_CMD.LOITER_TURNS),
+                "a corner-cut turn should be a straight chord, not a loiter");
+            Assert.IsTrue(wps.Count(w => w.IsLineWaypoint) >= 4,
+                "the cut replaces the bare vertex with entry + exit cut waypoints");
+        }
+
+        [TestMethod]
         public void TwoPasses_ProduceOffsetLanesOnBothSides()
         {
             // Even pass count → no centerline lane; the two passes sit at ±PassOffsetM

@@ -620,9 +620,9 @@ namespace Carbonix
         /// <summary>
         /// Read-only elevation profile of the flown mission. Straight legs come from the
         /// same <see cref="MissionSegmentizer"/> the map uses (exact tangent entry/exit),
-        /// so the profile matches the map. Each loiter is unwrapped over the FULL circle
-        /// (entry → full turn → exit) so an errant extra turn can't hide unvetted terrain.
-        /// Interactive editing and first-pass-per-leg de-dup are a follow-up.
+        /// so the profile matches the map. Each loiter is unwrapped over its flown (primary)
+        /// arc only — corner cuts are now straight chords (no arc), so the only loiters are
+        /// the big Dubins turns whose flown arc is most of the circle.
         /// </summary>
         // Load the floor/ceiling surfaces once, lazily, on the generation background thread —
         // a remote COG header fetch must not block the UI. Idempotent; generation is gated so
@@ -680,7 +680,7 @@ namespace Carbonix
                 return Math.Abs(b - a);
             }
 
-            void SampleArc(PointLatLngAlt center, double radius, double startBearing, double sweepDeg, CorridorWaypoint owner, bool alternate)
+            void SampleArc(PointLatLngAlt center, double radius, double startBearing, double sweepDeg, CorridorWaypoint owner)
             {
                 double arcLen = 2.0 * Math.PI * radius * Math.Abs(sweepDeg) / 360.0;
                 int n = Math.Max(2, (int)(arcLen / SampleSpacingM));
@@ -694,7 +694,6 @@ namespace Carbonix
                         TerrainAlt        = CorridorPlanner.GetTerrainAlt(pt.Lat, pt.Lng),
                         HomeTerrainAlt    = homeTerrainAlt,
                         IsLoiterArcSample = true,
-                        IsAlternateArc    = alternate,
                         WaypointIndex     = owner.CorridorVertexIndex,
                         IsBranchVertex    = owner.IsBranchVertex,
                         BranchId          = owner.BranchId,
@@ -757,22 +756,18 @@ namespace Carbonix
                     double exit  = center.GetBearing(arc.Path[arc.Path.Count - 1]);
                     double sign = cw ? 1.0 : -1.0;
                     double primary = AngleDiffDeg(entry, exit, cw);   // flown arc, [0,360)
-                    double altSweep = 360.0 - primary;
-                    double circumference = 2.0 * Math.PI * radius;
-                    double primaryLen = circumference * primary / 360.0;
-                    double totalLen = circumference;   // full circle (primary + alternate)
+                    double primaryLen = 2.0 * Math.PI * radius * primary / 360.0;
 
-                    // Loiter bar anchor spanning the full circle.
+                    // Loiter bar anchor over the flown arc.
                     samples.Add(new ElevationPoint
                     {
-                        DistM             = cum,
-                        AltRelM           = wp.AltRelM,
-                        TerrainAlt        = wp.TerrainAltM,
-                        HomeTerrainAlt    = homeTerrainAlt,
-                        IsLoiterWaypoint  = true,
-                        LoiterRadiusM     = radius,
-                        LoiterArcLengthM  = totalLen,
-                        LoiterPrimaryLenM = primaryLen,
+                        DistM            = cum,
+                        AltRelM          = wp.AltRelM,
+                        TerrainAlt       = wp.TerrainAltM,
+                        HomeTerrainAlt   = homeTerrainAlt,
+                        IsLoiterWaypoint = true,
+                        LoiterRadiusM    = radius,
+                        LoiterArcLengthM = primaryLen,
                         WaypointIndex    = wp.CorridorVertexIndex,
                         IsBranchVertex   = wp.IsBranchVertex,
                         BranchId         = wp.BranchId,
@@ -780,11 +775,8 @@ namespace Carbonix
                         Lng              = wp.Lng,
                     });
 
-                    // Full circle for worst-case terrain: primary (flown) + alternate
-                    // (remainder). Ends at the entry tangent; the discontinuity to the
-                    // exit leg is accepted.
-                    SampleArc(center, radius, entry, sign * primary,  wp, alternate: false);
-                    SampleArc(center, radius, exit,  sign * altSweep, wp, alternate: true);
+                    // Sample only the flown (primary) arc; the un-flown remainder is dropped.
+                    SampleArc(center, radius, entry, sign * primary, wp);
                 }
                 else
                 {

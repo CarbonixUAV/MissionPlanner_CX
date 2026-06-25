@@ -27,18 +27,16 @@ namespace Carbonix.Planning
 
         // Turn thresholds (unsigned heading-change in degrees)
         //   [0,              CornerCutThresholdDeg) : gentle — plain waypoint
-        //   [CornerCut,      FullOrbitThresholdDeg) : corner cut — inscribed loiter circle
-        //   [FullOrbit, ∞)                          : Dubins S-turn — two tangent circles
+        //   [CornerCut,      FullOrbitThresholdDeg) : corner cut — straight chord across the corner
+        //   [FullOrbit, ∞)                          : sharp turn — overfly + single exit orbit
         public double CornerCutThresholdDeg { get; set; } = 15;
         public double FullOrbitThresholdDeg { get; set; } = 60;
 
-        // How far past the vertex to overfly before entering the S-turn (metres).
+        // How far past the vertex to overfly before entering the sharp turn (metres).
         // Automatically clamped by the solver to the geometrically valid maximum.
         public double OverflyDistM { get; set; } = 100;
 
-        // If the Dubins entry-circle sweep is below this, replace it with a straight leg.
-
-        // Loiter radius for Dubins S-turns (sharp turns, two tangent circles).
+        // Orbit radius for sharp turns (overfly + single exit orbit).
         public double TurnRadiusM { get; set; } = 300;
 
         // Loiter radius for corner-cut inscribed circles (medium turns).
@@ -208,18 +206,12 @@ namespace Carbonix.Planning
 
         // Loiter arc visualisation
         public bool IsLoiterWaypoint { get; set; }
-        public double LoiterArcLengthM { get; set; } // full unwrapped span (primary + alt + primary)
-        public double LoiterPrimaryLenM { get; set; } // one primary (flown) arc portion's length
+        public double LoiterArcLengthM { get; set; } // flown (primary) arc length
         public double LoiterRadiusM { get; set; }
 
-        // Terrain fill points distributed around the loiter circumference.
+        // Terrain fill points distributed around the loiter arc.
         // NOT draggable; provide terrain variation across the arc for rendering.
         public bool IsLoiterArcSample { get; set; }
-
-        // True for the loiter's *alternate* (un-flown) remainder arc. Floor/ceiling still
-        // cover it (worst-case for an errant extra turn), but the target/scan altitude is
-        // meaningless there, so the target line is blanked over it.
-        public bool IsAlternateArc { get; set; }
 
         // Terrain fill points inserted between waypoints along straight legs.
         // Used ONLY for terrain fill and min/max band rendering; excluded from the
@@ -597,15 +589,16 @@ namespace Carbonix.Planning
                 }
 
                 // ── CORNER CUT: between the two thresholds ────────────────────
+                // Straight chord cut: fly to the entry cut point then straight across to the
+                // exit cut point (no loiter arc). CornerCutRadius still sizes how far the cut
+                // is pulled in from the vertex (via SolveCornerCut's tangent points).
                 if (angle < fullOrbitRad)
                 {
                     var turn = SolveCornerCut(poly[i], dirIn, dirOut, turnsLeft, cornerCutRadius);
                     if (turn == null) { AddWP(poly[i], i, true); continue; }
 
                     AddWP(turn.EntryPoint, i, true);
-                    var cc = turn.Loiters[0];
-                    AddLoiter(cc.Center, cc.Radius, cc.Clockwise, i,
-                        ArcTurns(turn.EntryPoint, turn.ExitPoint, cc.Center, cc.Clockwise));
+                    AddWP(turn.ExitPoint, i, true);
                     continue;
                 }
 
