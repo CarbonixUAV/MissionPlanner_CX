@@ -41,6 +41,8 @@ namespace Carbonix.UI
         public double HomeTerrainAlt { get; set; }
         public double MsaM { get; set; } = double.NaN;
         public double CeilingM { get; set; } = double.NaN;
+        // Target (scan) AGL over raw SRTM, drawn green: line = terrain + TargetAglM. NaN = hide.
+        public double TargetAglM { get; set; } = double.NaN;
 
         public event EventHandler<AltChangeEventArgs> AltitudeChanged;
         public event EventHandler<WaypointInsertEventArgs> WaypointInsertRequested;
@@ -514,10 +516,11 @@ namespace Carbonix.UI
 
         private void DrawTerrainFill(Graphics g, RectangleF r)
         {
-            // Exclude user-inserted WP samples (their TerrainAlt is a rough interpolation,
-            // not an actual SRTM query — including them creates spikes).
+            // Exclude user-inserted WP samples (rough interpolated TerrainAlt → spikes) and
+            // loiter centre anchors (they sit at the circle centre, off the flown track, and
+            // collide in DistM with the entry-leg end → a vertical step into the loiter).
             var terrPts = Points
-                .Where(s => !s.IsInserted)
+                .Where(s => !s.IsInserted && !s.IsLoiterWaypoint)
                 .OrderBy(s => s.DistM)
                 .ToList();
 
@@ -549,14 +552,16 @@ namespace Carbonix.UI
                 g.DrawLines(pen, surfacePts);
         }
 
-        // Floor (red) and ceiling (orange) reference lines from the loaded surface models:
-        // each sample's line value is (surface AMSL + live offset - home terrain). Drawn only
-        // where the surface has coverage — NaN samples break the line into segments.
+        // Reference lines: floor/MSA (red) and ceiling (blue) from the surface models —
+        // line value = surface AMSL + live offset - home; and the target/scan altitude
+        // (green) = raw terrain + Target AGL. Loiter centre anchors are skipped (they're not
+        // on the flown ground track); NaN surface samples break the line into segments.
         private void DrawFloorCeiling(Graphics g)
         {
             if (Points == null) return;
             DrawSurfaceLine(g, s => s.FloorSurfaceAmsl,   MsaM,     Color.Red);
-            DrawSurfaceLine(g, s => s.CeilingSurfaceAmsl, CeilingM, Color.Orange);
+            DrawSurfaceLine(g, s => s.CeilingSurfaceAmsl, CeilingM, Color.DeepSkyBlue);
+            DrawTargetLine(g);
         }
 
         private void DrawSurfaceLine(Graphics g, Func<ElevationPoint, double> surfaceAmsl, double offsetM, Color color)
@@ -568,6 +573,7 @@ namespace Carbonix.UI
             {
                 foreach (var s in Points.OrderBy(p => p.DistM))
                 {
+                    if (s.IsLoiterWaypoint) continue;   // centre anchor, not on the flown track
                     double amsl = surfaceAmsl(s);
                     if (double.IsNaN(amsl))
                     {
@@ -580,6 +586,22 @@ namespace Carbonix.UI
                 }
                 if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
             }
+        }
+
+        private void DrawTargetLine(Graphics g)
+        {
+            if (double.IsNaN(TargetAglM)) return;
+
+            var seg = new List<PointF>();
+            foreach (var s in Points.OrderBy(p => p.DistM))
+            {
+                if (s.IsLoiterWaypoint || s.IsInserted) continue;
+                double relM = (s.TerrainAlt - s.HomeTerrainAlt) + TargetAglM;
+                seg.Add(D2S(s.DistM * DistMultiplier, relM * AltMultiplier));
+            }
+            if (seg.Count >= 2)
+                using (var pen = new Pen(Color.FromArgb(220, Color.LimeGreen), 1.5f) { DashStyle = DashStyle.Dash })
+                    g.DrawLines(pen, seg.ToArray());
         }
 
         private void DrawLoiterArcs(Graphics g)
@@ -725,7 +747,9 @@ namespace Carbonix.UI
             if (!double.IsNaN(MsaM))
                 items.Add((Color.Red, true, 1.5f, $"Floor (MSA {MsaM * AltMultiplier:F0} {AltUnit})"));
             if (!double.IsNaN(CeilingM))
-                items.Add((Color.Orange, true, 1.5f, $"Ceiling ({CeilingM * AltMultiplier:F0} {AltUnit})"));
+                items.Add((Color.DeepSkyBlue, true, 1.5f, $"Ceiling ({CeilingM * AltMultiplier:F0} {AltUnit})"));
+            if (!double.IsNaN(TargetAglM))
+                items.Add((Color.LimeGreen, true, 1.5f, $"Target ({TargetAglM * AltMultiplier:F0} {AltUnit})"));
             items.Add((Color.DarkOrange, false, 5f, "Loiter arc"));
             items.Add((Color.DodgerBlue, false, 1.5f, "Planned path"));
 
