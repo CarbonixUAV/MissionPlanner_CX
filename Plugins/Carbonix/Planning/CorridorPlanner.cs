@@ -808,8 +808,9 @@ namespace Carbonix.Planning
 
             var commands = GenerateMissionCartesian(cartPts, meta, p, p.TurnRadiusM, p.CornerCutRadiusM);
 
-            // Terrain query point is chosen by the caller (centreline projection for
-            // lanes → all lanes of a polyline share one altitude profile).
+            // Terrain (hence altitude) is sampled on the centreline so both lanes share one
+            // profile. Turn helpers carry a TerrainAnchor (the orbit exit) so the turn block
+            // targets the exit station — still projected to the centreline.
             double agl = p.DefaultAGL;   // target AGL over raw SRTM; floor/ceiling are manual, not clamped
             foreach (var cmd in commands)
             {
