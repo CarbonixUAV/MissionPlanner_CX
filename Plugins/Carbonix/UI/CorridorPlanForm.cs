@@ -576,7 +576,17 @@ namespace Carbonix
                         var (pls, tr) = CorridorTourBuilder.Build(
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
                         var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome);
-                        var profile = BuildTourProfile(generated, capturedHome, homeT);
+
+                        // The elevation profile is a single representative view of both passes,
+                        // so build it from a centreline (offset 0) mission of the same tour:
+                        // straights, corner-cut chords and loiter arcs all land on the centreline
+                        // (loiters centred on the centreline turn geometry), giving one honest
+                        // terrain/clearance read shared by both lanes. The offset mission above
+                        // stays the flown/exported one (map, stats, accept).
+                        var pCenter = capturedP.Clone();
+                        pCenter.PassOffsetM = 0;
+                        var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome);
+                        var profile = BuildTourProfile(centreMission, capturedHome, homeT);
                         EnsureSurfacesLoaded();   // remote header fetch happens here, off the UI thread
                         foreach (var ep in profile)
                         {
