@@ -597,13 +597,6 @@ namespace Carbonix.UI
             {
                 foreach (var s in Points.OrderBy(p => p.DistM))
                 {
-                    // The alternate (un-flown) loiter arc has no meaningful target — blank it.
-                    if (s.IsAlternateArc)
-                    {
-                        if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
-                        seg.Clear();
-                        continue;
-                    }
                     // Centre anchor / inserted: skip without breaking the line.
                     if (s.IsLoiterWaypoint || s.IsInserted) continue;
 
@@ -624,40 +617,19 @@ namespace Carbonix.UI
                 double altDisp = s.AltRelM * AltMultiplier;
                 Color col = active ? Color.Yellow : Color.DarkOrange;
                 float thick = active ? 9f : 6f;
-                float thin  = active ? 5f : 3f;
 
                 double d0 = s.DistM;
-                double total = s.LoiterArcLengthM;
-                double prim = s.LoiterPrimaryLenM;
+                double total = s.LoiterArcLengthM;   // flown arc
 
-                void Seg(double a, double b, float w)
-                {
-                    PointF pa = D2S(a * DistMultiplier, altDisp);
-                    PointF pb = D2S(b * DistMultiplier, altDisp);
-                    using (var pen = new Pen(col, w) { StartCap = LineCap.Round, EndCap = LineCap.Round })
-                        g.DrawLine(pen, pa, pb);
-                }
+                PointF pa = D2S(d0 * DistMultiplier, altDisp);
+                PointF pb = D2S((d0 + total) * DistMultiplier, altDisp);
+                using (var pen = new Pen(col, thick) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                    g.DrawLine(pen, pa, pb);
 
-                // The unwrap is primary (flown) + alternate (the unlikely remainder). Draw
-                // the flown primary thick and the alternate thin, so the part that matters
-                // most is visually emphasised.
-                if (prim > 0 && prim < total)
-                {
-                    Seg(d0, d0 + prim, thick);          // primary (flown) arc
-                    Seg(d0 + prim, d0 + total, thin);   // alternate remainder
-                }
-                else
-                {
-                    Seg(d0, d0 + total, thick);
-                }
-
-                // Endpoint markers
-                PointF e0 = D2S(d0 * DistMultiplier, altDisp);
-                PointF e1 = D2S((d0 + total) * DistMultiplier, altDisp);
                 using (var b = new SolidBrush(col))
                 {
-                    g.FillEllipse(b, e0.X - 4, e0.Y - 4, 8, 8);
-                    g.FillEllipse(b, e1.X - 4, e1.Y - 4, 8, 8);
+                    g.FillEllipse(b, pa.X - 4, pa.Y - 4, 8, 8);
+                    g.FillEllipse(b, pb.X - 4, pb.Y - 4, 8, 8);
                 }
             }
         }
