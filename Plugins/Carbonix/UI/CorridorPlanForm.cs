@@ -55,6 +55,7 @@ namespace Carbonix
         // draw reference lines. Loaded once on open from the global Carbonix settings.
         private readonly SurfaceProvider floorSurface = new SurfaceProvider();
         private readonly SurfaceProvider ceilingSurface = new SurfaceProvider();
+        private bool surfacesLoadAttempted;
 
         // Map overlays
         private readonly GMapOverlay layer_corridor;
@@ -164,10 +165,6 @@ namespace Carbonix
             lbl_defagl.Text = "Target AGL:";
             lbl_minalgl.Text = "MSA:";
             lbl_maxagl.Text = "Ceiling:";
-
-            // Load the floor/ceiling surface COGs (header parse only; pixels read on demand).
-            floorSurface.Load(plugin.CorridorFloorSurfacePath);
-            ceilingSurface.Load(plugin.CorridorCeilingSurfacePath);
 
             SetAltUnits();
             RecalcCoverage();
@@ -580,6 +577,7 @@ namespace Carbonix
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
                         var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome);
                         var profile = BuildTourProfile(generated, capturedHome, homeT);
+                        EnsureSurfacesLoaded();   // remote header fetch happens here, off the UI thread
                         foreach (var ep in profile)
                         {
                             ep.FloorSurfaceAmsl = floorSurface.SampleAmsl(ep.Lat, ep.Lng) ?? double.NaN;
@@ -626,6 +624,19 @@ namespace Carbonix
         /// (entry → full turn → exit) so an errant extra turn can't hide unvetted terrain.
         /// Interactive editing and first-pass-per-leg de-dup are a follow-up.
         /// </summary>
+        // Load the floor/ceiling surfaces once, lazily, on the generation background thread —
+        // a remote COG header fetch must not block the UI. Idempotent; generation is gated so
+        // there's no concurrent caller.
+        private void EnsureSurfacesLoaded()
+        {
+            if (surfacesLoadAttempted) return;
+            surfacesLoadAttempted = true;
+
+            string cacheDir = Path.Combine(MissionPlanner.Utilities.Settings.GetUserDataDirectory(), "DSM", "cache");
+            floorSurface.Load(plugin.CorridorFloorSurfacePath, cacheDir);
+            ceilingSurface.Load(plugin.CorridorCeilingSurfacePath, cacheDir);
+        }
+
         private static List<ElevationPoint> BuildTourProfile(
             List<CorridorWaypoint> wps, PointLatLngAlt home, double homeTerrainAlt)
         {

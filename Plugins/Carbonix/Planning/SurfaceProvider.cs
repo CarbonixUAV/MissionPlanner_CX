@@ -21,18 +21,39 @@ namespace Carbonix.Planning
         public string FilePath { get; private set; }
         public bool Loaded => data != null;
 
-        /// <summary>Load (or clear, if path is null/missing) the surface. Returns true on success.</summary>
-        public bool Load(string path)
+        public static bool IsUrl(string s) =>
+            s != null && (s.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                       || s.StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// Load (or clear, if path is null/missing) the surface. A path may be a local file
+        /// or an https URL to a Cloud-Optimized GeoTIFF — remote surfaces are read through a
+        /// range/caching stream (<paramref name="cacheDir"/> holds the persisted chunks).
+        /// Returns true on success. May block on network for a remote header — call off the
+        /// UI thread.
+        /// </summary>
+        public bool Load(string path, string cacheDir = null)
         {
             data = null;
             FilePath = path;
 
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            if (string.IsNullOrWhiteSpace(path))
                 return false;
 
             try
             {
                 var d = new GeoTiff.geotiffdata();
+                if (IsUrl(path))
+                {
+                    var cache = new CogBlockCache(path, cacheDir ?? Path.GetTempPath());
+                    d.RemoteReadInto = cache.ReadInto;
+                    d.RemoteLength = cache.Length;
+                }
+                else if (!File.Exists(path))
+                {
+                    return false;
+                }
+
                 if (d.LoadFile(path, addToIndex: false))
                     data = d;
             }

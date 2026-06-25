@@ -116,7 +116,7 @@ namespace MissionPlanner.Utilities
 
                 log.InfoFormat("GeoTiff {0}", filename);
 
-                using (Tiff tiff = Tiff.Open(filename, "r"))
+                using (Tiff tiff = OpenTiff())
                 {
                     width = tiff.GetField(TiffTag.IMAGEWIDTH)[0].ToInt();
                     height = tiff.GetField(TiffTag.IMAGELENGTH)[0].ToInt();
@@ -493,6 +493,62 @@ namespace MissionPlanner.Utilities
 
             public Dictionary<GKID, object> GeoKeys = new Dictionary<GKID, object>();
             public ProjectionInfo srcProjection;
+
+            /// <summary>
+            /// When set, the GeoTIFF is read through this random-access byte source
+            /// (position, dest, destOffset, count) → bytes-copied, instead of a local file —
+            /// e.g. an HTTP-range-backed caching source for a remote COG. The caller keeps it
+            /// callable for the life of this object. Null = open <see cref="FileName"/> locally.
+            /// </summary>
+            public Func<long, byte[], int, int, int> RemoteReadInto;
+            public long RemoteLength;
+
+            internal Tiff OpenTiff()
+            {
+                return RemoteReadInto != null
+                    ? Tiff.ClientOpen(FileName, "r", null, new DelegateTiffStream(RemoteLength, RemoteReadInto))
+                    : Tiff.Open(FileName, "r");
+            }
+
+            // Adapts a byte-source delegate to a LibTiff read-only stream, so callers (e.g. a
+            // plugin) can supply remote/cached bytes without referencing the TIFF library.
+            private sealed class DelegateTiffStream : TiffStream
+            {
+                private readonly long _length;
+                private readonly Func<long, byte[], int, int, int> _readInto;
+                private long _pos;
+
+                public DelegateTiffStream(long length, Func<long, byte[], int, int, int> readInto)
+                {
+                    _length = length;
+                    _readInto = readInto;
+                }
+
+                public override int Read(object clientData, byte[] buffer, int offset, int count)
+                {
+                    int n = _readInto(_pos, buffer, offset, count);
+                    _pos += n;
+                    return n;
+                }
+
+                public override long Seek(object clientData, long offset, SeekOrigin origin)
+                {
+                    switch (origin)
+                    {
+                        case SeekOrigin.Begin:   _pos = offset; break;
+                        case SeekOrigin.Current: _pos += offset; break;
+                        case SeekOrigin.End:     _pos = _length + offset; break;
+                    }
+                    return _pos;
+                }
+
+                public override long Size(object clientData) => _length;
+
+                public override void Write(object clientData, byte[] buffer, int offset, int count)
+                    => throw new NotSupportedException("remote GeoTIFF is read-only");
+
+                public override void Close(object clientData) { }
+            }
         }
 
         static GeoTiff()
@@ -624,7 +680,7 @@ namespace MissionPlanner.Utilities
                 {
                     lock(geotiffdata)
                         if (geotiffdata.Tiff == null)
-                            geotiffdata.Tiff = Tiff.Open(geotiffdata.FileName, "r");
+                            geotiffdata.Tiff = geotiffdata.OpenTiff();
 
                     lock (geotiffdata.Tiff)
                     {
