@@ -13,12 +13,12 @@ namespace Carbonix.UI
     ///
     /// Y axis  → altitude relative to home (terrain surface varies visually).
     /// Terrain surface drawn as a filled polygon from SRTM data.
-    /// Min/max AGL shown as terrain-following dashed bands.
+    /// Floor/ceiling reference lines drawn from the loaded surface models + live offsets.
     /// Flight path drawn through loiter arcs.
     ///
     /// Interaction:
     ///   Hover near dot/bar → cursor SizeNS + highlight
-    ///   Left-drag on dot/bar → adjust AGL (clamped to min/max)
+    ///   Left-drag on dot/bar → adjust altitude
     ///   Left-drag empty → pan X+Y
     ///   Scroll → zoom Y   Ctrl+Scroll → zoom X   Double-click → reset
     /// </summary>
@@ -34,6 +34,13 @@ namespace Carbonix.UI
         public double DistMultiplier { get; set; } = 1.0;
         public string AltUnit { get; set; } = "m";
         public string DistUnit { get; set; } = "m";
+
+        // Floor/ceiling reference lines: home-terrain datum + live offsets (metres). The line
+        // at each sample is (surface AMSL + offset - HomeTerrainAlt); offsets are applied at
+        // draw time so MSA/ceiling can be tweaked live without re-sampling. NaN offset = hide.
+        public double HomeTerrainAlt { get; set; }
+        public double MsaM { get; set; } = double.NaN;
+        public double CeilingM { get; set; } = double.NaN;
 
         public event EventHandler<AltChangeEventArgs> AltitudeChanged;
         public event EventHandler<WaypointInsertEventArgs> WaypointInsertRequested;
@@ -461,7 +468,7 @@ namespace Carbonix.UI
             if (Points != null && Points.Count > 0)
             {
                 DrawTerrainFill(g, r);
-                DrawMinMaxBands(g, r);
+                DrawFloorCeiling(g);
                 DrawLoiterArcs(g);
                 DrawPlannedPath(g);
                 DrawWaypointDots(g);
@@ -542,36 +549,36 @@ namespace Carbonix.UI
                 g.DrawLines(pen, surfacePts);
         }
 
-        private void DrawMinMaxBands(Graphics g, RectangleF r)
+        // Floor (red) and ceiling (orange) reference lines from the loaded surface models:
+        // each sample's line value is (surface AMSL + live offset - home terrain). Drawn only
+        // where the surface has coverage — NaN samples break the line into segments.
+        private void DrawFloorCeiling(Graphics g)
         {
-            // Skip user-inserted WP samples (approximate terrain → would distort the bands).
-            var ordered = Points
-                .Where(s => !s.IsInserted)
-                .OrderBy(s => s.DistM)
-                .ToList();
+            if (Points == null) return;
+            DrawSurfaceLine(g, s => s.FloorSurfaceAmsl,   MsaM,     Color.Red);
+            DrawSurfaceLine(g, s => s.CeilingSurfaceAmsl, CeilingM, Color.Orange);
+        }
 
-            if (ordered.Count < 2) return;
+        private void DrawSurfaceLine(Graphics g, Func<ElevationPoint, double> surfaceAmsl, double offsetM, Color color)
+        {
+            if (double.IsNaN(offsetM)) return;
 
-            var minPts = new List<PointF>();
-            var maxPts = new List<PointF>();
-
-            foreach (var s in ordered)
+            var seg = new List<PointF>();
+            using (var pen = new Pen(Color.FromArgb(200, color), 1.5f) { DashStyle = DashStyle.Dash })
             {
-                double terrRelDisp = (s.TerrainAlt - s.HomeTerrainAlt) * AltMultiplier;
-                double x = s.DistM * DistMultiplier;
-                minPts.Add(D2S(x, terrRelDisp + MinAGLMetres * AltMultiplier));
-                maxPts.Add(D2S(x, terrRelDisp + MaxAGLMetres * AltMultiplier));
-            }
-
-            if (minPts.Count >= 2)
-            {
-                using (var pen = new Pen(Color.FromArgb(200, Color.Red), 1.5f) { DashStyle = DashStyle.Dash })
-                    g.DrawLines(pen, minPts.ToArray());
-            }
-            if (maxPts.Count >= 2)
-            {
-                using (var pen = new Pen(Color.FromArgb(200, Color.Orange), 1.5f) { DashStyle = DashStyle.Dash })
-                    g.DrawLines(pen, maxPts.ToArray());
+                foreach (var s in Points.OrderBy(p => p.DistM))
+                {
+                    double amsl = surfaceAmsl(s);
+                    if (double.IsNaN(amsl))
+                    {
+                        if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
+                        seg.Clear();
+                        continue;
+                    }
+                    double relM = amsl + offsetM - HomeTerrainAlt;
+                    seg.Add(D2S(s.DistM * DistMultiplier, relM * AltMultiplier));
+                }
+                if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
             }
         }
 
@@ -711,14 +718,16 @@ namespace Carbonix.UI
 
         private void DrawLegend(Graphics g, RectangleF r)
         {
-            var items = new (Color c, bool dash, float w, string label)[]
+            var items = new List<(Color c, bool dash, float w, string label)>
             {
                 (Color.SaddleBrown,  false, 2.5f, "Terrain"),
-                (Color.Red,          true,  1.5f, $"Min AGL ({MinAGLMetres * AltMultiplier:F0} {AltUnit})"),
-                (Color.Orange,       true,  1.5f, $"Max AGL ({MaxAGLMetres * AltMultiplier:F0} {AltUnit})"),
-                (Color.DarkOrange,   false, 5f,   "Loiter arc"),
-                (Color.DodgerBlue,   false, 1.5f, "Planned path"),
             };
+            if (!double.IsNaN(MsaM))
+                items.Add((Color.Red, true, 1.5f, $"Floor (MSA {MsaM * AltMultiplier:F0} {AltUnit})"));
+            if (!double.IsNaN(CeilingM))
+                items.Add((Color.Orange, true, 1.5f, $"Ceiling ({CeilingM * AltMultiplier:F0} {AltUnit})"));
+            items.Add((Color.DarkOrange, false, 5f, "Loiter arc"));
+            items.Add((Color.DodgerBlue, false, 1.5f, "Planned path"));
 
             float x = r.Left + 6;
             float y = r.Top + 4;

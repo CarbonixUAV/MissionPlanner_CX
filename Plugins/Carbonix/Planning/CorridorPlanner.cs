@@ -193,6 +193,12 @@ namespace Carbonix.Planning
         public double AltRelM { get; set; }
         public double TerrainAlt { get; set; }       // absolute terrain alt (metres)
         public double HomeTerrainAlt { get; set; }
+
+        // Absolute-AMSL samples from the floor/ceiling surface COGs at this point (NaN when
+        // no surface is loaded or the point is outside coverage). The profile draws reference
+        // lines at (surface + live MSA/ceiling offset); generation does not use these.
+        public double FloorSurfaceAmsl { get; set; } = double.NaN;
+        public double CeilingSurfaceAmsl { get; set; } = double.NaN;
         public bool IsLineWaypoint { get; set; }
         public int WaypointIndex { get; set; }       // corridor vertex index
 
@@ -791,7 +797,7 @@ namespace Carbonix.Planning
 
             // Terrain query point is chosen by the caller (centreline projection for
             // lanes → all lanes of a polyline share one altitude profile).
-            double agl = Clamp(p.DefaultAGL, p.MinAGL, p.MaxAGL);
+            double agl = p.DefaultAGL;   // target AGL over raw SRTM; floor/ceiling are manual, not clamped
             foreach (var cmd in commands)
             {
                 var geo       = FromCart(cmd.Position);
@@ -1330,7 +1336,7 @@ namespace Carbonix.Planning
 
             var wps = GenerateMission(corridorLine, centrelineParams, homePoint, branches);
             double homeTerrAlt = GetTerrainAlt(homePoint.Lat, homePoint.Lng);
-            double agl = Clamp(p.DefaultAGL, p.MinAGL, p.MaxAGL);
+            double agl = p.DefaultAGL;   // target AGL over raw SRTM; floor/ceiling are manual, not clamped
 
             // Build a lookup of loiter WPs keyed by (corridor vertex index, is-branch,
             // branch id) so we can attach arc sub-samples to the correct vertex below.
