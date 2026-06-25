@@ -144,6 +144,11 @@ namespace Carbonix.Planning
         public bool IsBranchVertex { get; set; }
         public int BranchId { get; set; } = -1;
 
+        // True for the sharp-turn lead-in helpers (overfly + transfer). They're flown and
+        // exported, but the elevation profile omits them — the turn is represented by the
+        // loiter, and the preturn isn't a scan station worth showing.
+        public bool IsTurnHelper { get; set; }
+
         // Stable identity, derived from the legacy fields for now (behaviour-neutral).
         // Later steps make this the stored identity and retire the three fields above.
         public VertexId Vertex =>
@@ -514,6 +519,7 @@ namespace Carbonix.Planning
             public double LoiterTurns;
             public bool IsBranchVertex;
             public int BranchId = -1;
+            public bool IsTurnHelper;
 
             // When set, terrain (hence altitude) is sampled here instead of at Position.
             // Used for loiters so the orbit targets the scan altitude at its EXIT, not at
@@ -539,7 +545,7 @@ namespace Carbonix.Planning
             double cornerCutRad = p.CornerCutThresholdDeg * Deg2Rad;
             double fullOrbitRad = p.FullOrbitThresholdDeg * Deg2Rad;
 
-            void AddWP(Vec2 pt, int srcIdx, bool isLineWp, Vec2? terrainAt = null)
+            void AddWP(Vec2 pt, int srcIdx, bool isLineWp, Vec2? terrainAt = null, bool turnHelper = false)
             {
                 commands.Add(new CartCommand
                 {
@@ -552,6 +558,7 @@ namespace Carbonix.Planning
                     IsBranchVertex = isLineWp && meta[srcIdx].isBranchVertex,
                     BranchId = isLineWp ? meta[srcIdx].branchId : -1,
                     TerrainAnchor = terrainAt,
+                    IsTurnHelper = turnHelper,
                 });
             }
 
@@ -625,8 +632,8 @@ namespace Carbonix.Planning
                     // entry, transfer, orbit — to the exit terrain: the turn holds the exit
                     // scan altitude and the climb falls on the approach leg (a ramp, not a
                     // step on the preturn).
-                    AddWP(turn.EntryPoint, i, true, turn.ExitPoint);
-                    AddWP(turn.TransferPoint.Value, i, false, turn.ExitPoint);
+                    AddWP(turn.EntryPoint, i, true, turn.ExitPoint, turnHelper: true);
+                    AddWP(turn.TransferPoint.Value, i, false, turn.ExitPoint, turnHelper: true);
                     var c2 = turn.Loiters[0];
                     AddLoiter(c2.Center, c2.Radius, c2.Clockwise, i,
                         ArcTurns(turn.TransferPoint.Value, turn.ExitPoint, c2.Center, c2.Clockwise),
@@ -838,6 +845,7 @@ namespace Carbonix.Planning
                     LoiterTurns         = cmd.LoiterTurns,
                     IsBranchVertex      = cmd.IsBranchVertex,
                     BranchId            = cmd.BranchId,
+                    IsTurnHelper        = cmd.IsTurnHelper,
                 });
             }
 
