@@ -216,6 +216,11 @@ namespace Carbonix.Planning
         // NOT draggable; provide terrain variation across the arc for rendering.
         public bool IsLoiterArcSample { get; set; }
 
+        // True for the loiter's *alternate* (un-flown) remainder arc. Floor/ceiling still
+        // cover it (worst-case for an errant extra turn), but the target/scan altitude is
+        // meaningless there, so the target line is blanked over it.
+        public bool IsAlternateArc { get; set; }
+
         // Terrain fill points inserted between waypoints along straight legs.
         // Used ONLY for terrain fill and min/max band rendering; excluded from the
         // planned flight path (aircraft flies at constant AltRelM, not terrain-following).

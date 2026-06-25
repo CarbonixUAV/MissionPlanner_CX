@@ -680,7 +680,7 @@ namespace Carbonix
                 return Math.Abs(b - a);
             }
 
-            void SampleArc(PointLatLngAlt center, double radius, double startBearing, double sweepDeg, CorridorWaypoint owner)
+            void SampleArc(PointLatLngAlt center, double radius, double startBearing, double sweepDeg, CorridorWaypoint owner, bool alternate)
             {
                 double arcLen = 2.0 * Math.PI * radius * Math.Abs(sweepDeg) / 360.0;
                 int n = Math.Max(2, (int)(arcLen / SampleSpacingM));
@@ -694,6 +694,7 @@ namespace Carbonix
                         TerrainAlt        = CorridorPlanner.GetTerrainAlt(pt.Lat, pt.Lng),
                         HomeTerrainAlt    = homeTerrainAlt,
                         IsLoiterArcSample = true,
+                        IsAlternateArc    = alternate,
                         WaypointIndex     = owner.CorridorVertexIndex,
                         IsBranchVertex    = owner.IsBranchVertex,
                         BranchId          = owner.BranchId,
@@ -782,8 +783,8 @@ namespace Carbonix
                     // Full circle for worst-case terrain: primary (flown) + alternate
                     // (remainder). Ends at the entry tangent; the discontinuity to the
                     // exit leg is accepted.
-                    SampleArc(center, radius, entry, sign * primary,  wp);
-                    SampleArc(center, radius, exit,  sign * altSweep, wp);
+                    SampleArc(center, radius, entry, sign * primary,  wp, alternate: false);
+                    SampleArc(center, radius, exit,  sign * altSweep, wp, alternate: true);
                 }
                 else
                 {
