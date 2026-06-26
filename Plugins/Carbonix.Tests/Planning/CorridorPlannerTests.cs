@@ -266,6 +266,25 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void Altitudes_AreAbsoluteAmsl_IndependentOfHomeTerrain()
+        {
+            // Terrain rises with easting. Put HOME at the HIGH (east) end — altitudes must still
+            // be terrain + AGL in absolute AMSL, NOT shifted down by the home terrain. (Pre-MSL
+            // this returned terr - homeTerrain + AGL, so the west end would have read 80-endTerr.)
+            CorridorPlanner.TerrainProvider = (lat, lng) => (lng - BaseLng) * MetresPerDegLng;
+            var line = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.01) };
+            var home = P(BaseLat, BaseLng + 0.01);   // home over high terrain (terrain != 0)
+
+            var wps = CorridorPlanner.GenerateMission(line, Params(), home);
+
+            double endTerr = 0.01 * MetresPerDegLng;
+            Assert.AreEqual(80, wps.Min(w => w.AltRelM), 2.0,
+                "west end is terrain(0) + AGL in AMSL, not offset by the home terrain");
+            Assert.AreEqual(endTerr + 80, wps.Max(w => w.AltRelM), 2.0,
+                "east end is terrain + AGL in absolute AMSL");
+        }
+
+        [TestMethod]
         public void MultiplePasses_AllLanesShareCenterlineAltitude()
         {
             // Terrain varies ONLY cross-track (with lat); the centerline lat is constant.
