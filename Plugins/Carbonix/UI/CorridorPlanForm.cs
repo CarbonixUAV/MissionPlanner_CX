@@ -111,6 +111,7 @@ namespace Carbonix
             elev_profile.AltitudeChanged += ElevProfile_AltitudeChanged;
             elev_profile.WaypointInsertRequested += ElevProfile_InsertRequested;
             elev_profile.WaypointRemoveRequested += ElevProfile_RemoveRequested;
+            elev_profile.InsertedWaypointMoved += ElevProfile_InsertedMoved;
 
             AddGradientRows();
         }
@@ -242,6 +243,43 @@ namespace Carbonix
             checkpoints.RemoveAt(idx);
             altOverrides.Remove(new Carbonix.Planning.VertexId(cp.PolylineId, cp.Id));
             _ = ExecuteGenerateAsync();
+        }
+
+        // Left/right (+ up/down) drag of a checkpoint. Re-map the new distance to a fraction
+        // along its leg (clamped to the leg's bounding vertices) and update the store + the
+        // displayed sample live — no terrain re-sample, no regenerate (the export bakes the
+        // final position on Accept). The leg geometry is fixed, so only the position changes.
+        private void ElevProfile_InsertedMoved(object sender, InsertedWaypointMoveEventArgs e)
+        {
+            if (elevationPoints == null) return;
+            int idx = checkpoints.FindIndex(c => c.Id == e.WaypointIndex);
+            if (idx < 0) return;
+            var cp = checkpoints[idx];
+
+            ElevationPoint Vertex(int index) => elevationPoints.FirstOrDefault(
+                s => s.IsLineWaypoint && s.Vertex.PolylineId == cp.PolylineId && s.Vertex.Index == index);
+            var vSeg = Vertex(cp.SegmentIndex);
+            var vSeg1 = Vertex(cp.SegmentIndex + 1);
+            if (vSeg == null || vSeg1 == null || Math.Abs(vSeg1.DistM - vSeg.DistM) < 1e-6) return;
+
+            double dist = Math.Max(Math.Min(vSeg.DistM, vSeg1.DistM),
+                          Math.Min(Math.Max(vSeg.DistM, vSeg1.DistM), e.NewDistM));   // clamp to the leg
+            double t = Math.Max(0, Math.Min(1, (dist - vSeg.DistM) / (vSeg1.DistM - vSeg.DistM)));
+
+            cp.T = t;
+            checkpoints[idx] = cp;
+            altOverrides[new Carbonix.Planning.VertexId(cp.PolylineId, cp.Id)] = e.NewAltRelM;
+
+            var sample = elevationPoints.FirstOrDefault(
+                s => s.Vertex.PolylineId == cp.PolylineId && s.Vertex.Index == cp.Id);
+            if (sample != null)
+            {
+                sample.DistM = dist;
+                sample.AltRelM = e.NewAltRelM;
+                sample.Lat = vSeg.Lat + t * (vSeg1.Lat - vSeg.Lat);
+                sample.Lng = vSeg.Lng + t * (vSeg1.Lng - vSeg.Lng);
+            }
+            elev_profile.Invalidate();
         }
 
         /// <summary>
@@ -1076,8 +1114,13 @@ namespace Carbonix
 
         // ─── Accept ───────────────────────────────────────────────────────────────
 
-        private void BUT_accept_Click(object sender, EventArgs e)
+        private async void BUT_accept_Click(object sender, EventArgs e)
         {
+            // Checkpoint moves are display-only; rebuild so the exported mission reflects their
+            // final positions (ordinary alt edits already live in generatedWps).
+            if (checkpoints.Count > 0)
+                await ExecuteGenerateAsync();
+
             if (generatedWps == null || generatedWps.Count == 0)
             {
                 CustomMessageBox.Show("No mission generated yet. Click Generate first.", "No Mission");

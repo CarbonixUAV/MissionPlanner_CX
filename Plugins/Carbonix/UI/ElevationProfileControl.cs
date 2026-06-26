@@ -411,9 +411,20 @@ namespace Carbonix.UI
         {
             if (Points == null || draggedSample == null) return;
 
-            var (_, newYData) = S2D(0, screenY);
+            var (newXData, newYData) = S2D(screenX, screenY);
             // Y axis IS AltRelM (altitude relative to home) — no terrain subtraction.
             double newAltRelM = newYData / AltMultiplier;
+
+            // Inserted checkpoints drag in X (along the leg) and Y (altitude). The form
+            // re-maps/clamps the position and updates the sample; we just fire the move.
+            if (draggedSample.IsInserted)
+            {
+                double newDistM = newXData / (DistMultiplier <= 0 ? 1.0 : DistMultiplier);
+                InsertedWaypointMoved?.Invoke(this,
+                    new InsertedWaypointMoveEventArgs(draggedSample.Vertex.Index, newDistM, newAltRelM));
+                Invalidate();
+                return;
+            }
 
             draggedSample.AltRelM = newAltRelM;
 
