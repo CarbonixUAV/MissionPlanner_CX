@@ -119,6 +119,40 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void Checkpoint_SplicedIntoBothPasses()
+        {
+            // 3-vertex straight line flown out + back (2 passes). A checkpoint on segment 0 at
+            // t=0.5 should splice into both passes as a plain waypoint near the segment midpoint.
+            var poly = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt>
+                {
+                    P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02), P(BaseLat, BaseLng + 0.04),
+                },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Reverse },
+            };
+            var cps = new List<Checkpoint>
+            {
+                new Checkpoint { PolylineId = VertexId.MainLine, SegmentIndex = 0, T = 0.5, Id = 100000 },
+            };
+
+            var wps = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(passes: 2, offset: 100), poly.Points[0], cps);
+
+            var cpWps = wps.Where(w => w.CorridorVertexIndex == 100000).ToList();
+            Assert.AreEqual(2, cpWps.Count, "checkpoint spliced into both passes");
+            Assert.IsTrue(cpWps.All(w => w.Command == MAVLink.MAV_CMD.WAYPOINT),
+                "a mid-segment checkpoint is a plain waypoint, not a loiter");
+            Assert.IsTrue(cpWps.All(w => Math.Abs(w.Lng - (BaseLng + 0.01)) < 1e-4),
+                "checkpoint sits at the segment midpoint, offset only across-track (lat)");
+        }
+
+        [TestMethod]
         public void TwoPasses_ProduceOffsetLanesOnBothSides()
         {
             // Even pass count → no centerline lane; the two passes sit at ±PassOffsetM
