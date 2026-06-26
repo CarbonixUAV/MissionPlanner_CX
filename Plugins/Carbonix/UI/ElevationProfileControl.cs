@@ -325,7 +325,23 @@ namespace Carbonix.UI
         {
             base.OnMouseDown(e);
 
-            // Right-click insert/remove is deferred in the tour model.
+            if (e.Button == MouseButtons.Right)
+            {
+                var rhit = HitTest(e.X, e.Y);
+                if (rhit != null && rhit.IsInserted)
+                {
+                    ShowRemoveMenu(rhit.Vertex.Index, e.Location);   // remove this checkpoint
+                }
+                else if (PlotArea.Contains(e.X, e.Y))
+                {
+                    var (xd, yd) = S2D(e.X, e.Y);
+                    _pendingInsertDistM = xd / (DistMultiplier <= 0 ? 1.0 : DistMultiplier);
+                    _pendingInsertAltRelM = yd / (AltMultiplier <= 0 ? 1.0 : AltMultiplier);
+                    ShowInsertMenu(e.Location);
+                }
+                return;
+            }
+
             if (e.Button != MouseButtons.Left) return;
 
             var hit = HitTest(e.X, e.Y);
@@ -437,7 +453,7 @@ namespace Carbonix.UI
         private void ShowInsertMenu(Point location)
         {
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Add waypoint here", null, (s, ev) =>
+            menu.Items.Add("Add checkpoint here", null, (s, ev) =>
                 WaypointInsertRequested?.Invoke(this, new WaypointInsertEventArgs(_pendingInsertDistM, _pendingInsertAltRelM)));
             menu.Show(this, location);
         }
@@ -448,7 +464,7 @@ namespace Carbonix.UI
         {
             _pendingRemoveIdx = waypointIdx;
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Remove waypoint", null, (s, ev) =>
+            menu.Items.Add("Remove checkpoint", null, (s, ev) =>
                 WaypointRemoveRequested?.Invoke(this, new WaypointRemoveEventArgs(_pendingRemoveIdx)));
             menu.Show(this, location);
         }
@@ -703,7 +719,7 @@ namespace Carbonix.UI
 
                 PointF cp = D2S(s.DistM * DistMultiplier, s.AltRelM * AltMultiplier);
                 float rr = active ? 8f : 5f;
-                Color fill = active ? Color.Yellow : Color.DodgerBlue;
+                Color fill = active ? Color.Yellow : (s.IsInserted ? Color.Cyan : Color.DodgerBlue);
 
                 using (var b = new SolidBrush(fill))
                     g.FillEllipse(b, cp.X - rr, cp.Y - rr, rr * 2, rr * 2);

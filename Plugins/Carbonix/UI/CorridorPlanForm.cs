@@ -62,6 +62,12 @@ namespace Carbonix
         private readonly Dictionary<Carbonix.Planning.VertexId, double> altOverrides
             = new Dictionary<Carbonix.Planning.VertexId, double>();
 
+        // Inserted altitude checkpoints, spliced into the centreline at generation. Their
+        // altitudes live in altOverrides (keyed by VertexId(edge, Id)); the Id stays clear of
+        // real vertex indices so inserting never shifts another vertex's identity.
+        private readonly List<Carbonix.Planning.Checkpoint> checkpoints = new List<Carbonix.Planning.Checkpoint>();
+        private int nextCheckpointId = 100000;
+
         // Map overlays
         private readonly GMapOverlay layer_corridor;
 
@@ -103,6 +109,8 @@ namespace Carbonix
             elev_profile.HoverChanged += ElevProfile_HoverChanged;
 
             elev_profile.AltitudeChanged += ElevProfile_AltitudeChanged;
+            elev_profile.WaypointInsertRequested += ElevProfile_InsertRequested;
+            elev_profile.WaypointRemoveRequested += ElevProfile_RemoveRequested;
 
             AddGradientRows();
         }
@@ -181,6 +189,59 @@ namespace Carbonix
                 foreach (var s in elevationPoints)
                     if (altOverrides.TryGetValue(s.Vertex, out var a))
                         s.AltRelM = a;
+        }
+
+        // Flag the spliced checkpoint samples so the profile draws/handles them as inserted.
+        private void MarkInsertedSamples()
+        {
+            if (elevationPoints == null || checkpoints.Count == 0) return;
+            var ids = new HashSet<int>(checkpoints.Select(c => c.Id));
+            foreach (var s in elevationPoints)
+                if (s.IsLineWaypoint && ids.Contains(s.WaypointIndex))
+                    s.IsInserted = true;
+        }
+
+        // Right-click "Add checkpoint": map the click distance to a leg (two consecutive
+        // centreline vertices on one edge) and splice a checkpoint there, then regenerate.
+        private void ElevProfile_InsertRequested(object sender, WaypointInsertEventArgs e)
+        {
+            if (elevationPoints == null) return;
+
+            var verts = elevationPoints.Where(s => s.IsLineWaypoint).OrderBy(s => s.DistM).ToList();
+            for (int i = 0; i + 1 < verts.Count; i++)
+            {
+                var a = verts[i];
+                var b = verts[i + 1];
+                if (e.DistM < a.DistM || e.DistM > b.DistM) continue;
+                if (a.Vertex.PolylineId != b.Vertex.PolylineId) continue;
+                if (Math.Abs(a.Vertex.Index - b.Vertex.Index) != 1) continue;   // one straight leg
+                double span = b.DistM - a.DistM;
+                if (span <= 1e-6) continue;
+
+                double frac = (e.DistM - a.DistM) / span;                          // from a toward b
+                int seg = Math.Min(a.Vertex.Index, b.Vertex.Index);
+                double t = a.Vertex.Index < b.Vertex.Index ? frac : 1.0 - frac;    // from vertex seg
+
+                int id = nextCheckpointId++;
+                checkpoints.Add(new Carbonix.Planning.Checkpoint
+                {
+                    PolylineId = a.Vertex.PolylineId, SegmentIndex = seg, T = t, Id = id,
+                });
+                altOverrides[new Carbonix.Planning.VertexId(a.Vertex.PolylineId, id)] = e.AltRelM;
+
+                _ = ExecuteGenerateAsync();   // regenerate to splice it into both passes
+                return;
+            }
+        }
+
+        private void ElevProfile_RemoveRequested(object sender, WaypointRemoveEventArgs e)
+        {
+            int idx = checkpoints.FindIndex(c => c.Id == e.WaypointIndex);
+            if (idx < 0) return;
+            var cp = checkpoints[idx];
+            checkpoints.RemoveAt(idx);
+            altOverrides.Remove(new Carbonix.Planning.VertexId(cp.PolylineId, cp.Id));
+            _ = ExecuteGenerateAsync();
         }
 
         /// <summary>
@@ -654,13 +715,14 @@ namespace Carbonix
                 var capturedFeatures = features;
                 var capturedP        = p;
                 var capturedHome     = homePoint;
+                var capturedCheckpoints = checkpoints.ToList();
                 (builtPolylines, builtTour, wps, profileSamples, terrAlt) =
                     await System.Threading.Tasks.Task.Run(() =>
                     {
                         double homeT = CorridorPlanner.GetTerrainAlt(capturedHome.Lat, capturedHome.Lng);
                         var (pls, tr) = CorridorTourBuilder.Build(
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
-                        var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome);
+                        var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints);
 
                         // The elevation profile is a single representative view of both passes,
                         // so build it from a centreline (offset 0) mission of the same tour:
@@ -670,7 +732,7 @@ namespace Carbonix
                         // stays the flown/exported one (map, stats, accept).
                         var pCenter = capturedP.Clone();
                         pCenter.PassOffsetM = 0;
-                        var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome);
+                        var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome, capturedCheckpoints);
                         var profile = BuildTourProfile(centreMission, capturedHome, homeT);
                         EnsureSurfacesLoaded();   // remote header fetch happens here, off the UI thread
                         foreach (var ep in profile)
@@ -707,6 +769,7 @@ namespace Carbonix
             homeTerrainAlt  = terrAlt;
 
             ApplyAltOverrides();   // re-apply edits/checkpoints from a previous generate
+            MarkInsertedSamples();
 
             DrawMap();
             UpdateElevationProfile(p);
