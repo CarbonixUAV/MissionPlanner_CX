@@ -871,6 +871,24 @@ namespace Carbonix.Planning
                 });
             }
 
+            // The lead-in helpers (overfly + transfer) fly level into the loiter at the
+            // loiter's own altitude — copy it straight across rather than letting each helper
+            // terrain-query independently (which drifts them off the turn altitude). A turn's
+            // helpers are emitted consecutively immediately before its loiter, so walk back
+            // over them. (Their CorridorVertexIndex isn't a reliable key — the transfer helper
+            // is a non-line waypoint and carries -1.)
+            for (int i = 0; i < result.Count; i++)
+            {
+                if (result[i].Command != MAVLink.MAV_CMD.LOITER_TURNS) continue;
+                var loiter = result[i];
+                for (int j = i - 1; j >= 0 && result[j].IsTurnHelper; j--)
+                {
+                    result[j].AltRelM     = loiter.AltRelM;
+                    result[j].AltAGL      = loiter.AltAGL;
+                    result[j].TerrainAltM = loiter.TerrainAltM;
+                }
+            }
+
             return result;
         }
 

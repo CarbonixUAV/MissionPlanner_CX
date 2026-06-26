@@ -266,6 +266,47 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void LoiterLeadIns_InheritLoiterAltitude()
+        {
+            // Terrain rises to the south. The main line runs east (flat, terrain ~0); a spur
+            // drops south (terrain climbs). The junction is a sharp turn → loiter whose exit is
+            // over the rising spur terrain. Its lead-in helpers must inherit the loiter
+            // altitude — not their own (here flat / main-line-projected) terrain, which made
+            // them dive well below the loiter.
+            CorridorPlanner.TerrainProvider = (lat, lng) => (BaseLat - lat) * MetresPerDegLat;
+            var main = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02) },
+            };
+            var spur = new Polyline
+            {
+                Id = 0,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng + 0.02), P(BaseLat - 0.01, BaseLng + 0.02) },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = 0, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = 0, Direction = TraverseDir.Reverse },
+            };
+
+            var wps = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { main, spur }, tour, Params(), main.Points[0]);
+
+            int helpers = 0;
+            for (int i = 0; i < wps.Count; i++)
+            {
+                if (!wps[i].IsTurnHelper) continue;
+                helpers++;
+                var loiter = wps.Skip(i + 1).First(w => w.Command == MAVLink.MAV_CMD.LOITER_TURNS);
+                Assert.AreEqual(loiter.AltRelM, wps[i].AltRelM, 1e-6,
+                    "a lead-in helper flies at its loiter's altitude, not its own terrain");
+            }
+            Assert.IsTrue(helpers >= 1, "the junction is a sharp turn with lead-in helpers");
+        }
+
+        [TestMethod]
         public void Altitudes_AreAbsoluteAmsl_IndependentOfHomeTerrain()
         {
             // Terrain rises with easting. Put HOME at the HIGH (east) end — altitudes must still
@@ -402,8 +443,9 @@ namespace Carbonix.Tests.Planning
             var spurWps = wps.Where(w => w.IsBranchVertex).ToList();
 
             Assert.IsTrue(mainWps.Count > 0 && spurWps.Count > 0, "both polylines contribute waypoints");
-            Assert.IsTrue(mainWps.All(w => Math.Abs(w.AltRelM - 80) < 5),
-                "main line sits at ~DefaultAGL over its flat home-latitude terrain");
+            Assert.IsTrue(mainWps.Where(w => !w.IsTurnHelper).All(w => Math.Abs(w.AltRelM - 80) < 5),
+                "main line waypoints sit at ~DefaultAGL over flat home-latitude terrain " +
+                "(turn lead-ins are excluded — they inherit their loiter's altitude)");
             Assert.IsTrue(spurWps.Max(w => w.AltRelM) > 300,
                 $"spur follows its own rising terrain (peak {spurWps.Max(w => w.AltRelM):F0} m); " +
                 "would stay ~80 if it sampled the main line");
