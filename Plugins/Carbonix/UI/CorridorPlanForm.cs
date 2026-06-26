@@ -469,6 +469,12 @@ namespace Carbonix
             elevationPoints = null;
             polylines = null;
             tour = null;
+
+            // The feature set changed, so checkpoints + alt edits (keyed by vertex identity on
+            // the old edges) no longer line up — dump them rather than mis-apply.
+            checkpoints.Clear();
+            altOverrides.Clear();
+
             BUT_accept.Enabled = false;
         }
 
