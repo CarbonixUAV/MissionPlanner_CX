@@ -776,7 +776,7 @@ namespace Carbonix.UI
             {
                 g.TranslateTransform(11, r.Top + r.Height / 2);
                 g.RotateTransform(-90);
-                g.DrawString($"Alt rel home ({AltUnit})", f, b, 0, 0,
+                g.DrawString($"Alt AMSL ({AltUnit})", f, b, 0, 0,
                     new StringFormat { Alignment = StringAlignment.Center });
                 g.ResetTransform();
 

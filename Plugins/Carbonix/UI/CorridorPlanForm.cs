@@ -824,7 +824,9 @@ namespace Carbonix
                 (builtPolylines, builtTour, wps, profileSamples, terrAlt) =
                     await System.Threading.Tasks.Task.Run(() =>
                     {
-                        double homeT = CorridorPlanner.GetTerrainAlt(capturedHome.Lat, capturedHome.Lng);
+                        // Vertical datum is sea level (absolute AMSL), so altitudes and the
+                        // profile never depend on home — change home later without regenerating.
+                        double homeT = 0;
                         var (pls, tr) = CorridorTourBuilder.Build(
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
                         var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints);
@@ -1133,9 +1135,9 @@ namespace Carbonix
             if (elevationPoints == null || p == null) return;
 
             elev_profile.AltMultiplier  = CurrentState.multiplieralt;
-            elev_profile.DistMultiplier = CurrentState.multiplierdist;
+            elev_profile.DistMultiplier = 0.001;   // metres → kilometres on the X axis
             elev_profile.AltUnit  = CurrentState.AltUnit;
-            elev_profile.DistUnit = CurrentState.DistanceUnit;
+            elev_profile.DistUnit = "km";
 
             elev_profile.HomeTerrainAlt = homeTerrainAlt;
             ApplySurfaceOffsets();
@@ -1196,10 +1198,9 @@ namespace Carbonix
 
             double aGLMult = CurrentState.multiplieralt;
 
-            // Corridor waypoints use absolute AMSL altitudes so moving the takeoff
-            // location later has no effect on the planned flight path.
-            // AltRelM is relative to the home terrain at generation time;
-            // adding homeTerrainAlt converts it to AMSL.
+            // Corridor waypoints are absolute AMSL in the GLOBAL frame, so moving the takeoff
+            // location later has no effect on the planned flight path. AltRelM is already AMSL
+            // (the model's vertical datum is sea level), written straight out below.
             var fp = MainV2.instance.FlightPlanner;
             int frameColIndex = fp.Commands.Columns["Frame"]?.Index ?? -1;
 
@@ -1221,7 +1222,7 @@ namespace Carbonix
                         wp.Command,
                         wp.P1, wp.P2, wp.P3, wp.P4,
                         wp.Lng, wp.Lat,
-                        (wp.AltRelM + homeTerrainAlt) * aGLMult);
+                        wp.AltRelM * aGLMult);
 
                     if (frameColIndex >= 0 && rowIdx >= 0 && rowIdx < fp.Commands.Rows.Count)
                         fp.Commands.Rows[rowIdx].Cells[frameColIndex].Value = (int)MAVLink.MAV_FRAME.GLOBAL;

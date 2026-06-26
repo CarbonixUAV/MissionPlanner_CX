@@ -131,7 +131,8 @@ namespace Carbonix.Planning
         // AltAGL: target altitude above ground at this point (metres, user-editable)
         public double AltAGL { get; set; }
 
-        // AltRelM: altitude relative to home (metres) — written to mission
+        // AltRelM: absolute AMSL altitude (metres) — written to mission. (Datum is sea level,
+        // not home terrain; the "Rel" is historical.)
         public double AltRelM { get; set; }
 
         // Terrain altitude at this point (absolute, metres)
@@ -703,7 +704,9 @@ namespace Carbonix.Planning
 
             if (homePoint == null) homePoint = centerLine.First();
 
-            double homeTerrainAlt = GetTerrainAlt(homePoint.Lat, homePoint.Lng);
+            // Altitudes are absolute AMSL: the vertical datum is sea level, not the home
+            // terrain, so the home position never affects the generated altitudes.
+            double homeTerrainAlt = 0;
 
             // 1. Generate offset flight lines (and each line's signed lateral offset).
             var (lines, offsets) = GenerateFlightLines(centerLine, p);
@@ -895,7 +898,9 @@ namespace Carbonix.Planning
             var byId = polylines.ToDictionary(pl => pl.Id);
             if (homePoint == null) homePoint = byId[tour[0].PolylineId].Points.First();
 
-            double homeTerrainAlt = GetTerrainAlt(homePoint.Lat, homePoint.Lng);
+            // Altitudes are absolute AMSL: the vertical datum is sea level, not the home
+            // terrain, so the home position never affects the generated altitudes.
+            double homeTerrainAlt = 0;
 
             // 1. The tour as one continuous centreline polyline (junctions shared, doubles
             //    back at dead-ends). 2. Offset the whole path at once.
