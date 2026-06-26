@@ -479,6 +479,7 @@ namespace Carbonix.UI
                 DrawLoiterArcs(g);
                 DrawPlannedPath(g);
                 DrawWaypointDots(g);
+                DrawGradientWarnings(g);   // on top of dots so warnings stay visible
                 DrawHoverCursor(g, r);
             }
             else
@@ -602,8 +603,15 @@ namespace Carbonix.UI
             {
                 foreach (var s in Points.OrderBy(p => p.DistM))
                 {
-                    // Centre anchor / inserted: skip without breaking the line.
-                    if (s.IsLoiterWaypoint || s.IsInserted) continue;
+                    // No meaningful target altitude across a loiter (it's a turn, not a scan
+                    // station) — break the line over the whole loiter span.
+                    if (s.IsLoiterWaypoint || s.IsLoiterArcSample)
+                    {
+                        if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
+                        seg.Clear();
+                        continue;
+                    }
+                    if (s.IsInserted) continue;   // inserted WP: skip without breaking
 
                     double relM = (s.TerrainAlt - s.HomeTerrainAlt) + TargetAglM;
                     seg.Add(D2S(s.DistM * DistMultiplier, relM * AltMultiplier));
@@ -639,32 +647,47 @@ namespace Carbonix.UI
             }
         }
 
+        // Classify a planned-path segment by its absolute climb/descent gradient (each leg
+        // is flown both ways, so |slope| vs the climb limit is the binding check).
+        private (Color col, float w, bool warn) ClassifySegment(ElevationPoint a, ElevationPoint b)
+        {
+            double run = b.DistM - a.DistM;
+            double gradPct = run > 1e-6 ? Math.Abs(b.AltRelM - a.AltRelM) / run * 100.0 : 0.0;
+            if (!double.IsNaN(GradRedPct) && gradPct >= GradRedPct) return (Color.Red, 2.5f, true);
+            if (!double.IsNaN(GradYellowPct) && gradPct >= GradYellowPct) return (Color.Gold, 2.5f, true);
+            return (Color.FromArgb(160, Color.DodgerBlue), 1.5f, false);
+        }
+
         private void DrawPlannedPath(Graphics g)
         {
             if (Points == null) return;
 
             // The aircraft flies at constant altitude (AltRelM) between waypoints — leg
             // terrain samples are excluded so the path is straight between actual waypoints.
-            // Each segment is coloured by its absolute climb/descent gradient (each leg is
-            // flown both ways, so |slope| vs the climb limit is the binding check): yellow
-            // past the warn threshold, red past the max.
             var path = Points.Where(s => !s.IsLegTerrainSample).OrderBy(s => s.DistM).ToList();
 
             for (int i = 0; i + 1 < path.Count; i++)
             {
-                var a = path[i];
-                var b = path[i + 1];
-                PointF pa = D2S(a.DistM * DistMultiplier, a.AltRelM * AltMultiplier);
-                PointF pb = D2S(b.DistM * DistMultiplier, b.AltRelM * AltMultiplier);
+                var (col, w, _) = ClassifySegment(path[i], path[i + 1]);
+                PointF pa = D2S(path[i].DistM * DistMultiplier, path[i].AltRelM * AltMultiplier);
+                PointF pb = D2S(path[i + 1].DistM * DistMultiplier, path[i + 1].AltRelM * AltMultiplier);
+                using (var pen = new Pen(col, w))
+                    g.DrawLine(pen, pa, pb);
+            }
+        }
 
-                double run = b.DistM - a.DistM;
-                double gradPct = run > 1e-6 ? Math.Abs(b.AltRelM - a.AltRelM) / run * 100.0 : 0.0;
-
-                Color col; float w;
-                if (!double.IsNaN(GradRedPct) && gradPct >= GradRedPct)        { col = Color.Red;    w = 2.5f; }
-                else if (!double.IsNaN(GradYellowPct) && gradPct >= GradYellowPct) { col = Color.Gold; w = 2.5f; }
-                else                                                          { col = Color.FromArgb(160, Color.DodgerBlue); w = 1.5f; }
-
+        // Re-draw just the gradient-warning segments on top of the waypoint dots, so they
+        // stay visible when the profile is zoomed out and dots would otherwise cover them.
+        private void DrawGradientWarnings(Graphics g)
+        {
+            if (Points == null) return;
+            var path = Points.Where(s => !s.IsLegTerrainSample).OrderBy(s => s.DistM).ToList();
+            for (int i = 0; i + 1 < path.Count; i++)
+            {
+                var (col, w, warn) = ClassifySegment(path[i], path[i + 1]);
+                if (!warn) continue;
+                PointF pa = D2S(path[i].DistM * DistMultiplier, path[i].AltRelM * AltMultiplier);
+                PointF pb = D2S(path[i + 1].DistM * DistMultiplier, path[i + 1].AltRelM * AltMultiplier);
                 using (var pen = new Pen(col, w))
                     g.DrawLine(pen, pa, pb);
             }
