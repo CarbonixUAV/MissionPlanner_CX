@@ -153,6 +153,46 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void Checkpoint_OnSharpTurnApproachLeg_KeepsLoiter()
+        {
+            // A ~90° corner at vertex 1 renders as a loiter. A checkpoint on the APPROACH
+            // segment (segment 0) must splice in as a plain waypoint without disturbing the
+            // turn — this is what lets the UI insert on legs leading into / out of a loiter.
+            var poly = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt>
+                {
+                    P(BaseLat, BaseLng),
+                    P(BaseLat, BaseLng + 0.02),
+                    P(BaseLat - 0.02, BaseLng + 0.02),   // ~90° turn — above full-orbit threshold
+                },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Reverse },
+            };
+            var cps = new List<Checkpoint>
+            {
+                new Checkpoint { PolylineId = VertexId.MainLine, SegmentIndex = 0, T = 0.5, Id = 100000 },
+            };
+
+            var wps = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(passes: 2, offset: 100), poly.Points[0], cps);
+
+            Assert.IsTrue(wps.Any(w => w.Command == MAVLink.MAV_CMD.LOITER_TURNS),
+                "the sharp corner still loiters with a checkpoint on its approach leg");
+
+            var cpWps = wps.Where(w => w.CorridorVertexIndex == 100000).ToList();
+            Assert.AreEqual(2, cpWps.Count, "approach-leg checkpoint spliced into both passes");
+            Assert.IsTrue(cpWps.All(w => w.Command == MAVLink.MAV_CMD.WAYPOINT),
+                "an approach-leg checkpoint is a plain waypoint, not a loiter");
+            Assert.IsTrue(cpWps.All(w => Math.Abs(w.Lng - (BaseLng + 0.01)) < 1e-3),
+                "checkpoint sits mid-approach (segment 0), offset only across-track");
+        }
+
+        [TestMethod]
         public void TwoPasses_ProduceOffsetLanesOnBothSides()
         {
             // Even pass count → no centerline lane; the two passes sit at ±PassOffsetM
