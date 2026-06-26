@@ -57,6 +57,11 @@ namespace Carbonix
         private readonly SurfaceProvider ceilingSurface = new SurfaceProvider();
         private bool surfacesLoadAttempted;
 
+        // User altitude overrides keyed by VertexId, re-applied after each regenerate so alt
+        // edits (and inserted checkpoints) survive a re-Generate instead of being recomputed.
+        private readonly Dictionary<Carbonix.Planning.VertexId, double> altOverrides
+            = new Dictionary<Carbonix.Planning.VertexId, double>();
+
         // Map overlays
         private readonly GMapOverlay layer_corridor;
 
@@ -158,6 +163,26 @@ namespace Carbonix
             elev_profile.GradRedPct = (double)NUM_gradmax.Value;
         }
 
+        // Re-apply stored alt overrides to a freshly generated mission + profile, so edits
+        // persist across a regenerate (both share VertexIds, so one value drives both).
+        private void ApplyAltOverrides()
+        {
+            if (altOverrides.Count == 0) return;
+
+            if (generatedWps != null)
+                foreach (var wp in generatedWps)
+                    if (altOverrides.TryGetValue(wp.Vertex, out var a))
+                    {
+                        wp.AltRelM = a;
+                        wp.AltAGL = a - (wp.TerrainAltM - homeTerrainAlt);
+                    }
+
+            if (elevationPoints != null)
+                foreach (var s in elevationPoints)
+                    if (altOverrides.TryGetValue(s.Vertex, out var a))
+                        s.AltRelM = a;
+        }
+
         /// <summary>
         /// Apply a profile altitude drag to every waypoint/sample sharing the dragged
         /// vertex. Keyed on VertexId, so a polyline flown out-and-back (and any spur) is
@@ -165,6 +190,8 @@ namespace Carbonix
         /// </summary>
         private void ElevProfile_AltitudeChanged(object sender, AltChangeEventArgs e)
         {
+            altOverrides[e.Vertex] = e.NewAltRelM;   // remember the edit so it survives a regenerate
+
             if (generatedWps != null)
             {
                 foreach (var wp in generatedWps)
@@ -678,6 +705,8 @@ namespace Carbonix
             generatedWps    = wps;
             elevationPoints = profileSamples;
             homeTerrainAlt  = terrAlt;
+
+            ApplyAltOverrides();   // re-apply edits/checkpoints from a previous generate
 
             DrawMap();
             UpdateElevationProfile(p);
