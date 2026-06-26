@@ -204,15 +204,29 @@ namespace Carbonix
 
         // Right-click "Add checkpoint": map the click distance to a leg (two consecutive
         // centreline vertices on one edge) and splice a checkpoint there, then regenerate.
+        // True corridor segment endpoints for (edge, seg), independent of how the turn at
+        // either end is rendered. False if the model isn't built or seg is out of range.
+        private bool TrySegmentGeo(int edgeId, int seg, out PointLatLngAlt a, out PointLatLngAlt b)
+        {
+            a = b = null;
+            var pl = polylines?.FirstOrDefault(p => p.Id == edgeId);
+            if (pl == null || seg < 0 || seg + 1 >= pl.Points.Count) return false;
+            a = pl.Points[seg];
+            b = pl.Points[seg + 1];
+            return true;
+        }
+
         private void ElevProfile_InsertRequested(object sender, WaypointInsertEventArgs e)
         {
             if (elevationPoints == null) return;
 
-            // Bracket the click with ORIGINAL vertices only (skip existing checkpoints) so a
-            // leg can take several checkpoints — they all map to the same original segment at
-            // different T, and the high checkpoint indices never break the bracket.
-            var verts = elevationPoints.Where(s => s.IsLineWaypoint && !s.IsInserted)
-                                       .OrderBy(s => s.DistM).ToList();
+            // Bracket the click between two consecutive ORIGINAL vertices on one edge. Both line
+            // waypoints AND loiter turns count as vertex anchors (a sharp turn renders as a
+            // loiter, not a line WP), so legs leading into / out of a loiter are insertable.
+            // Existing checkpoints are skipped so a leg can take several.
+            var verts = elevationPoints
+                .Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
+                .OrderBy(s => s.DistM).ToList();
             for (int i = 0; i + 1 < verts.Count; i++)
             {
                 var a = verts[i];
@@ -224,15 +238,30 @@ namespace Carbonix
                 if (span <= 1e-6) continue;
 
                 double frac = (e.DistM - a.DistM) / span;                          // from a toward b
+                int edge = a.Vertex.PolylineId;
                 int seg = Math.Min(a.Vertex.Index, b.Vertex.Index);
                 double t = a.Vertex.Index < b.Vertex.Index ? frac : 1.0 - frac;    // from vertex seg
 
                 int id = nextCheckpointId++;
                 checkpoints.Add(new Carbonix.Planning.Checkpoint
                 {
-                    PolylineId = a.Vertex.PolylineId, SegmentIndex = seg, T = t, Id = id,
+                    PolylineId = edge, SegmentIndex = seg, T = t, Id = id,
                 });
-                altOverrides[new Carbonix.Planning.VertexId(a.Vertex.PolylineId, id)] = e.AltRelM;
+                altOverrides[new Carbonix.Planning.VertexId(edge, id)] = e.AltRelM;
+
+                // Geo on the TRUE corridor segment (a loiter anchor's lat/lng is the orbit
+                // centre, off the line); fall back to the profile anchors if unavailable.
+                double lat, lng;
+                if (TrySegmentGeo(edge, seg, out var ga, out var gb))
+                {
+                    lat = ga.Lat + t * (gb.Lat - ga.Lat);
+                    lng = ga.Lng + t * (gb.Lng - ga.Lng);
+                }
+                else
+                {
+                    lat = a.Lat + frac * (b.Lat - a.Lat);
+                    lng = a.Lng + frac * (b.Lng - a.Lng);
+                }
 
                 // Display-only: add the sample directly so the insert is instant and the zoom
                 // is preserved (no regenerate). Accept bakes it into the export from the store.
@@ -247,8 +276,8 @@ namespace Carbonix
                     WaypointIndex  = id,
                     IsBranchVertex = a.IsBranchVertex,
                     BranchId       = a.BranchId,
-                    Lat            = a.Lat + frac * (b.Lat - a.Lat),
-                    Lng            = a.Lng + frac * (b.Lng - a.Lng),
+                    Lat            = lat,
+                    Lng            = lng,
                 });
                 elev_profile.Invalidate();
                 return;
@@ -278,8 +307,10 @@ namespace Carbonix
             if (idx < 0) return;
             var cp = checkpoints[idx];
 
+            // Line waypoints AND loiter turns anchor a leg (a sharp turn renders as a loiter).
             ElevationPoint Vertex(int index) => elevationPoints.FirstOrDefault(
-                s => s.IsLineWaypoint && s.Vertex.PolylineId == cp.PolylineId && s.Vertex.Index == index);
+                s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted
+                     && s.Vertex.PolylineId == cp.PolylineId && s.Vertex.Index == index);
             var vSeg = Vertex(cp.SegmentIndex);
             var vSeg1 = Vertex(cp.SegmentIndex + 1);
             if (vSeg == null || vSeg1 == null || Math.Abs(vSeg1.DistM - vSeg.DistM) < 1e-6) return;
@@ -298,8 +329,16 @@ namespace Carbonix
             {
                 sample.DistM = dist;
                 sample.AltRelM = e.NewAltRelM;
-                sample.Lat = vSeg.Lat + t * (vSeg1.Lat - vSeg.Lat);
-                sample.Lng = vSeg.Lng + t * (vSeg1.Lng - vSeg.Lng);
+                if (TrySegmentGeo(cp.PolylineId, cp.SegmentIndex, out var ga, out var gb))
+                {
+                    sample.Lat = ga.Lat + t * (gb.Lat - ga.Lat);
+                    sample.Lng = ga.Lng + t * (gb.Lng - ga.Lng);
+                }
+                else
+                {
+                    sample.Lat = vSeg.Lat + t * (vSeg1.Lat - vSeg.Lat);
+                    sample.Lng = vSeg.Lng + t * (vSeg1.Lng - vSeg.Lng);
+                }
             }
             elev_profile.Invalidate();
         }
