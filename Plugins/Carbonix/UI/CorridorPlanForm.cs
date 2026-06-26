@@ -208,7 +208,11 @@ namespace Carbonix
         {
             if (elevationPoints == null) return;
 
-            var verts = elevationPoints.Where(s => s.IsLineWaypoint).OrderBy(s => s.DistM).ToList();
+            // Bracket the click with ORIGINAL vertices only (skip existing checkpoints) so a
+            // leg can take several checkpoints — they all map to the same original segment at
+            // different T, and the high checkpoint indices never break the bracket.
+            var verts = elevationPoints.Where(s => s.IsLineWaypoint && !s.IsInserted)
+                                       .OrderBy(s => s.DistM).ToList();
             for (int i = 0; i + 1 < verts.Count; i++)
             {
                 var a = verts[i];
@@ -230,7 +234,23 @@ namespace Carbonix
                 });
                 altOverrides[new Carbonix.Planning.VertexId(a.Vertex.PolylineId, id)] = e.AltRelM;
 
-                _ = ExecuteGenerateAsync();   // regenerate to splice it into both passes
+                // Display-only: add the sample directly so the insert is instant and the zoom
+                // is preserved (no regenerate). Accept bakes it into the export from the store.
+                elevationPoints.Add(new ElevationPoint
+                {
+                    DistM          = e.DistM,
+                    AltRelM        = e.AltRelM,
+                    TerrainAlt     = a.TerrainAlt + frac * (b.TerrainAlt - a.TerrainAlt),
+                    HomeTerrainAlt = homeTerrainAlt,
+                    IsLineWaypoint = true,
+                    IsInserted     = true,
+                    WaypointIndex  = id,
+                    IsBranchVertex = a.IsBranchVertex,
+                    BranchId       = a.BranchId,
+                    Lat            = a.Lat + frac * (b.Lat - a.Lat),
+                    Lng            = a.Lng + frac * (b.Lng - a.Lng),
+                });
+                elev_profile.Invalidate();
                 return;
             }
         }
@@ -242,7 +262,9 @@ namespace Carbonix
             var cp = checkpoints[idx];
             checkpoints.RemoveAt(idx);
             altOverrides.Remove(new Carbonix.Planning.VertexId(cp.PolylineId, cp.Id));
-            _ = ExecuteGenerateAsync();
+            elevationPoints?.RemoveAll(s => s.IsInserted && s.WaypointIndex == cp.Id
+                                            && s.Vertex.PolylineId == cp.PolylineId);
+            elev_profile.Invalidate();   // display-only; Accept rebuilds the export from the store
         }
 
         // Left/right (+ up/down) drag of a checkpoint. Re-map the new distance to a fraction
@@ -1122,16 +1144,16 @@ namespace Carbonix
 
         private async void BUT_accept_Click(object sender, EventArgs e)
         {
-            // Checkpoint moves are display-only; rebuild so the exported mission reflects their
-            // final positions (ordinary alt edits already live in generatedWps).
-            if (checkpoints.Count > 0)
-                await ExecuteGenerateAsync();
-
             if (generatedWps == null || generatedWps.Count == 0)
             {
                 CustomMessageBox.Show("No mission generated yet. Click Generate first.", "No Mission");
                 return;
             }
+
+            // Insert/move/remove are display-only, so rebuild to bake the current checkpoints
+            // and edits into the exported mission (both passes) before writing it out.
+            await ExecuteGenerateAsync();
+            if (generatedWps == null || generatedWps.Count == 0) return;
 
             double aGLMult = CurrentState.multiplieralt;
 

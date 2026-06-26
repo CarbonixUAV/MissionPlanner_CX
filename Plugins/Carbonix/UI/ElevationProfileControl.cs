@@ -464,7 +464,7 @@ namespace Carbonix.UI
         private void ShowInsertMenu(Point location)
         {
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Add checkpoint here", null, (s, ev) =>
+            menu.Items.Add("Insert waypoint here", null, (s, ev) =>
                 WaypointInsertRequested?.Invoke(this, new WaypointInsertEventArgs(_pendingInsertDistM, _pendingInsertAltRelM)));
             menu.Show(this, location);
         }
@@ -475,7 +475,7 @@ namespace Carbonix.UI
         {
             _pendingRemoveIdx = waypointIdx;
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Remove checkpoint", null, (s, ev) =>
+            menu.Items.Add("Remove waypoint", null, (s, ev) =>
                 WaypointRemoveRequested?.Invoke(this, new WaypointRemoveEventArgs(_pendingRemoveIdx)));
             menu.Show(this, location);
         }
@@ -606,7 +606,7 @@ namespace Carbonix.UI
             {
                 foreach (var s in Points.OrderBy(p => p.DistM))
                 {
-                    if (s.IsLoiterWaypoint) continue;   // centre anchor, not on the flown track
+                    if (s.IsLoiterWaypoint || s.IsInserted) continue;   // not on the sampled track
                     double amsl = surfaceAmsl(s);
                     if (double.IsNaN(amsl))
                     {
