@@ -106,6 +106,22 @@ namespace Carbonix.Planning
         public double LaneOffsetM { get; set; }   // lateral offset of this lane (0 = centreline)
     }
 
+    /// <summary>
+    /// A user-inserted altitude checkpoint on a centreline segment (between vertices
+    /// SegmentIndex and SegmentIndex+1 of the polyline, at fraction T along it). Spliced
+    /// into the centreline at generation so it's flown by both passes; its identity is
+    /// <see cref="VertexId"/>(PolylineId, Id), with Id kept clear of real vertex indices so
+    /// inserting one never shifts another vertex's identity. Its altitude lives in the
+    /// caller's alt-override store, keyed by that VertexId.
+    /// </summary>
+    public struct Checkpoint
+    {
+        public int PolylineId;
+        public int SegmentIndex;
+        public double T;
+        public int Id;
+    }
+
     public class CorridorWaypoint
     {
         public MAVLink.MAV_CMD Command { get; set; }
@@ -869,7 +885,8 @@ namespace Carbonix.Planning
         /// share one altitude profile.
         /// </summary>
         public static List<CorridorWaypoint> GenerateMissionFromTour(
-            List<Polyline> polylines, List<TourStep> tour, CorridorParameters p, PointLatLngAlt homePoint)
+            List<Polyline> polylines, List<TourStep> tour, CorridorParameters p, PointLatLngAlt homePoint,
+            IReadOnlyList<Checkpoint> checkpoints = null)
         {
             var empty = new List<CorridorWaypoint>();
             if (polylines == null || polylines.Count == 0 || tour == null || tour.Count == 0)
@@ -882,7 +899,7 @@ namespace Carbonix.Planning
 
             // 1. The tour as one continuous centreline polyline (junctions shared, doubles
             //    back at dead-ends). 2. Offset the whole path at once.
-            var centre = BuildCenterlineTour(byId, tour);
+            var centre = BuildCenterlineTour(byId, tour, checkpoints);
             if (centre.Count < 2) return empty;
 
             double off = (p.NumberOfPasses >= 2) ? p.PassOffsetM / 2.0 : 0.0;
@@ -905,10 +922,20 @@ namespace Carbonix.Planning
         // flagged a dead-end when the next step reverses back along the same edge (a leaf
         // tip). Coincident junction points between steps are de-duplicated to one vertex.
         private static List<(PointLatLngAlt pt, VertexId vid, bool deadEnd, int step)> BuildCenterlineTour(
-            Dictionary<int, Polyline> byId, List<TourStep> tour)
+            Dictionary<int, Polyline> byId, List<TourStep> tour, IReadOnlyList<Checkpoint> checkpoints)
         {
             const double JoinDedupM = 0.5;
             var path = new List<(PointLatLngAlt pt, VertexId vid, bool deadEnd, int step)>();
+
+            // Group inserted checkpoints by (edge, segment) for splicing during the walk.
+            var bySeg = new Dictionary<(int edge, int seg), List<Checkpoint>>();
+            if (checkpoints != null)
+                foreach (var cp in checkpoints)
+                {
+                    var key = (cp.PolylineId, cp.SegmentIndex);
+                    if (!bySeg.TryGetValue(key, out var lst)) bySeg[key] = lst = new List<Checkpoint>();
+                    lst.Add(cp);
+                }
 
             for (int s = 0; s < tour.Count; s++)
             {
@@ -926,11 +953,34 @@ namespace Carbonix.Planning
                 {
                     int vi = fwd ? k : m - 1 - k;
                     var src = poly.Points[vi];
-                    if (k == 0 && path.Count > 0 && path[path.Count - 1].pt.GetDistance(src) < JoinDedupM)
-                        continue;   // shared junction with the previous step
-                    bool deadEnd = (k == m - 1) && nextReversesSameEdge;   // leaf tip
-                    path.Add((new PointLatLngAlt(src.Lat, src.Lng, src.Alt),
-                              new VertexId(poly.Id, vi), deadEnd, s));
+                    bool dedup = k == 0 && path.Count > 0 && path[path.Count - 1].pt.GetDistance(src) < JoinDedupM;
+                    if (!dedup)   // else: shared junction with the previous step
+                    {
+                        bool deadEnd = (k == m - 1) && nextReversesSameEdge;   // leaf tip
+                        path.Add((new PointLatLngAlt(src.Lat, src.Lng, src.Alt),
+                                  new VertexId(poly.Id, vi), deadEnd, s));
+                    }
+
+                    // Splice any checkpoints on the segment leaving this vertex toward the next
+                    // walked vertex (mid-segment, so they never affect dead-end / junction logic).
+                    if (k < m - 1 && bySeg.Count > 0)
+                    {
+                        int viNext = fwd ? vi + 1 : vi - 1;
+                        if (bySeg.TryGetValue((poly.Id, Math.Min(vi, viNext)), out var segCps))
+                        {
+                            var a = poly.Points[vi];
+                            var b = poly.Points[viNext];
+                            foreach (var cp in segCps.OrderBy(c => fwd ? c.T : 1.0 - c.T))
+                            {
+                                double tw = fwd ? cp.T : 1.0 - cp.T;
+                                var cpt = new PointLatLngAlt(
+                                    a.Lat + tw * (b.Lat - a.Lat),
+                                    a.Lng + tw * (b.Lng - a.Lng),
+                                    0);
+                                path.Add((cpt, new VertexId(poly.Id, cp.Id), false, s));
+                            }
+                        }
+                    }
                 }
             }
             return path;
