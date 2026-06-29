@@ -138,7 +138,8 @@ namespace Carbonix.Planning
         public int Id;          // lead-in waypoint identity (on the line)
         public int LoiterId;    // the spiral's own identity (off the line)
         public int Side;        // +1 / -1: which geographic side of the segment
-        public double LtaAltRelM;
+        public double LtaAltRelM;       // target (top) altitude
+        public double LeadInAltRelM;    // lead-in (bottom) altitude — also the reverse target
     }
 
     public class CorridorWaypoint
@@ -1003,6 +1004,11 @@ namespace Carbonix.Planning
                     var lead = wps[i];
                     if (lead.CorridorVertexIndex != lta.Id || lead.Vertex.PolylineId != lta.PolylineId) continue;
 
+                    // The LTA owns the lead-in altitude (the handle's bottom): stamp it on the
+                    // lead-in waypoint so both passes and the forward spiral's start agree.
+                    lead.AltRelM = lta.LeadInAltRelM;
+                    lead.AltAGL  = lta.LeadInAltRelM - lead.TerrainAltM;
+
                     var leadPt = new PointLatLngAlt(lead.Lat, lead.Lng, 0);
                     var next = (i + 1 < wps.Count) ? wps[i + 1] : (i > 0 ? wps[i - 1] : lead);
                     double travel = leadPt.GetBearing(new PointLatLngAlt(next.Lat, next.Lng, 0));
@@ -1010,7 +1016,12 @@ namespace Carbonix.Planning
                     if (i + 1 >= wps.Count) towardV1 = !towardV1;                     // next was actually prev
 
                     var centre = leadPt.newpos(perpBearing, radius);
-                    double target = towardV1 ? lta.LtaAltRelM : lead.AltRelM;
+                    double target = towardV1 ? lta.LtaAltRelM : lta.LeadInAltRelM;
+
+                    // The spiral sits on a FIXED geographic side, which is right-of-travel one way
+                    // and left-of-travel the other — so the loiter direction (radius sign) flips
+                    // between the passes; otherwise both circle the same way.
+                    double dirSign = (lta.Side >= 0 ? 1.0 : -1.0) * (towardV1 ? 1.0 : -1.0);
                     var loiter = new CorridorWaypoint
                     {
                         Command             = MAVLink.MAV_CMD.LOITER_TO_ALT,
@@ -1019,7 +1030,7 @@ namespace Carbonix.Planning
                         AltRelM             = target,
                         AltAGL              = target - lead.TerrainAltM,
                         TerrainAltM         = lead.TerrainAltM,
-                        P2                  = (float)(lta.Side >= 0 ? radius : -radius),
+                        P2                  = (float)(dirSign * radius),
                         P4                  = 1,   // exit tangent
                         LoiterRadiusM       = radius,
                         CorridorVertexIndex = lta.LoiterId,

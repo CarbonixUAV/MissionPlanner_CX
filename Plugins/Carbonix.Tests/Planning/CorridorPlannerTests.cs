@@ -590,7 +590,7 @@ namespace Carbonix.Tests.Planning
             var ltas = new List<LoiterToAlt>
             {
                 new LoiterToAlt { PolylineId = VertexId.MainLine, SegmentIndex = 0, T = 0.5,
-                                  Id = 100000, LoiterId = 200000, Side = 1, LtaAltRelM = 999 },
+                                  Id = 100000, LoiterId = 200000, Side = 1, LtaAltRelM = 999, LeadInAltRelM = 80 },
             };
 
             var wps = CorridorPlanner.GenerateMissionFromTour(
@@ -604,8 +604,12 @@ namespace Carbonix.Tests.Planning
                 "spirals carry the LTA identity and exit tangent");
             Assert.IsTrue(spirals.Any(w => Math.Abs(w.AltRelM - 999) < 1e-6),
                 "forward spiral targets the LTA altitude");
-            Assert.IsTrue(spirals.Any(w => Math.Abs(w.AltRelM - leadIns[0].AltRelM) < 1e-6),
+            Assert.IsTrue(spirals.Any(w => Math.Abs(w.AltRelM - 80) < 1e-6),
                 "reverse spiral targets the lead-in altitude");
+            Assert.IsTrue(spirals[0].P2 * spirals[1].P2 < 0,
+                "the passes circle opposite ways (fixed geographic side flips hand of travel)");
+            Assert.IsTrue(leadIns.All(w => Math.Abs(w.AltRelM - 80) < 1e-6),
+                "the lead-in waypoint carries the LTA's lead-in altitude in both passes");
 
             // The segment runs east, so a side offset shifts the spiral ~one radius in latitude.
             foreach (var sp in spirals)
@@ -635,7 +639,7 @@ namespace Carbonix.Tests.Planning
             var ltas = new List<LoiterToAlt>
             {
                 new LoiterToAlt { PolylineId = VertexId.MainLine, SegmentIndex = 0, T = 0.5,
-                                  Id = 100000, LoiterId = 200000, Side = 1, LtaAltRelM = 999 },
+                                  Id = 100000, LoiterId = 200000, Side = 1, LtaAltRelM = 999, LeadInAltRelM = 80 },
             };
 
             var centre = CorridorPlanner.GenerateMissionFromTour(
