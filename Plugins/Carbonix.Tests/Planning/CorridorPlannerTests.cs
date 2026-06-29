@@ -487,6 +487,41 @@ namespace Carbonix.Tests.Planning
                 "the straight leg after the stub is sampled, not skipped");
         }
 
+        [TestMethod]
+        public void Profile_StubReentryLoiter_IsShown()
+        {
+            // After a stub, the sharp turn that re-enters the main line is on the stub's hidden
+            // back-pass, but it's a real maneuver flown differently from the entry turn — it must
+            // still appear on the profile. Stub runs north; main runs east, so the return (south)
+            // → main (east) is a ~90 deg sharp turn → loiter at the junction.
+            var main = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.05) },
+            };
+            var stub = new Polyline
+            {
+                Id = 0,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat + 0.02, BaseLng) },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = 0, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = 0, Direction = TraverseDir.Reverse },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+            };
+
+            var mission = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { main, stub }, tour, Params(), main.Points[0]);
+
+            var profile = Carbonix.CorridorPlanForm.BuildTourProfile(mission, main.Points[0], 0);
+
+            // The re-entry loiter sits near the junction (lat ~ BaseLat); the dead-end U-turn
+            // loiter is far up the stub (lat ~ BaseLat+0.02). A loiter near the junction = re-entry.
+            Assert.IsTrue(profile.Any(s => s.IsLoiterWaypoint && s.Lat < BaseLat + 0.01),
+                "the sharp turn re-entering the main line after the stub is shown");
+        }
+
         // ── Identity (VertexId) ───────────────────────────────────────────────────
 
         [TestMethod]

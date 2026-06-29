@@ -1012,19 +1012,28 @@ namespace Carbonix
             bool Keep(CorridorWaypoint w) =>
                 firstStep.TryGetValue(w.Vertex.PolylineId, out var fs) && w.LineIndex == fs;
 
+            // A hidden back-pass node that LAUNCHES a first-pass leg (its outgoing straight lands
+            // on a shown node) is the junction where a stub's return rejoins the main line — keep
+            // it. The sharp turn there re-enters the main line, is flown differently from the
+            // stub's entry turn, and is a real clearance concern, so it belongs on the plot.
+            bool LaunchesFirstPass(int i) =>
+                straightByFrom.TryGetValue(i, out var s) && s.EndNode != null
+                && s.EndNode.MissionIndex >= 0 && s.EndNode.MissionIndex < wps.Count
+                && Keep(wps[s.EndNode.MissionIndex]);
+
             foreach (var node in graph.Nodes)
             {
                 int idx = node.MissionIndex;
                 if (idx < 0 || idx >= wps.Count) continue;
                 var wp = wps[idx];
 
-                // A node draws its OWN sample only on its first-pass traversal (back-pass
-                // repeats are hidden). Its outgoing leg is judged separately below: a
-                // de-duplicated junction can resolve to a hidden back-pass yet still launch the
-                // first pass of the next leg, so gating the leg on this node would drop it.
+                // A node draws its OWN sample on its first-pass traversal, or when it's the
+                // junction launching the next first-pass leg (the stub re-entry turn). Back-pass
+                // repeats are otherwise hidden. The outgoing leg is judged separately below.
                 bool keep = Keep(wp);
+                bool show = keep || LaunchesFirstPass(idx);
 
-                if (keep && loiterByNode.TryGetValue(idx, out var arc) && arc.Path != null && arc.Path.Count >= 2)
+                if (show && loiterByNode.TryGetValue(idx, out var arc) && arc.Path != null && arc.Path.Count >= 2)
                 {
                     var center = new PointLatLngAlt(wp.Lat, wp.Lng, 0);
                     double radius = wp.LoiterRadiusM > 0 ? wp.LoiterRadiusM : Math.Abs(wp.P3);
@@ -1063,7 +1072,7 @@ namespace Carbonix
                     // Sample only the flown (primary) arc; the un-flown remainder is dropped.
                     SampleArc(center, radius, entry, sign * primary, wp, loiterAlt);
                 }
-                else if (keep && !wp.IsTurnHelper)
+                else if (show && !wp.IsTurnHelper)
                 {
                     // Turn-block lead-in helpers (overfly + transfer) are omitted: the loiter
                     // represents the turn, and the preturn isn't a scan station. Their legs
