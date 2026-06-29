@@ -253,6 +253,11 @@ namespace Carbonix.Planning
         public double LoiterArcLengthM { get; set; } // flown (primary) arc length
         public double LoiterRadiusM { get; set; }
 
+        // Loiter-to-alt: a NON-flat spiral. AltRelM is the target (end) altitude; the spiral
+        // ramps from LtaStartAltRelM (the lead-in altitude) to it across the arc.
+        public bool IsLoiterToAlt { get; set; }
+        public double LtaStartAltRelM { get; set; }
+
         // Terrain fill points distributed around the loiter arc.
         // NOT draggable; provide terrain variation across the arc for rendering.
         public bool IsLoiterArcSample { get; set; }
