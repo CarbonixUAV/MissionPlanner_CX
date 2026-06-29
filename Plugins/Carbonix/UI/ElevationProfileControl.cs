@@ -730,6 +730,24 @@ namespace Carbonix.UI
 
                 PointF pa = D2S(d0 * DistMultiplier, yStart);
                 PointF pb = D2S((d0 + total) * DistMultiplier, yEnd);
+                // Loiter-to-alt envelope: the climb can finish anywhere in the turn, so worst-case
+                // there's a full constant-height circle at the lead-in alt AND at the target. Box
+                // the [lower, upper] alt window over the loiter footprint so the horizontal lines
+                // can be checked against terrain for clearance. Drawn under the ramp handle.
+                if (s.IsLoiterToAlt)
+                {
+                    float bx = Math.Min(pa.X, pb.X), bw = Math.Abs(pb.X - pa.X);
+                    float ytop = Math.Min(pa.Y, pb.Y), ybot = Math.Max(pa.Y, pb.Y);
+                    using (var hpen = new Pen(Color.FromArgb(200, Color.MediumTurquoise), 1.5f))
+                    using (var vpen = new Pen(Color.FromArgb(110, Color.MediumTurquoise), 1f) { DashStyle = DashStyle.Dash })
+                    {
+                        g.DrawLine(hpen, bx, ytop, bx + bw, ytop);   // constant-height turn at the upper alt
+                        g.DrawLine(hpen, bx, ybot, bx + bw, ybot);   // constant-height turn at the lower alt
+                        g.DrawLine(vpen, bx, ytop, bx, ybot);
+                        g.DrawLine(vpen, bx + bw, ytop, bx + bw, ybot);
+                    }
+                }
+
                 using (var pen = new Pen(col, thick) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                     g.DrawLine(pen, pa, pb);
 
