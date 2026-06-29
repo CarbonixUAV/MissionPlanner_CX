@@ -567,6 +567,55 @@ namespace Carbonix.Tests.Planning
                 0.5, out _, out _, out _));
         }
 
+        [TestMethod]
+        public void LoiterToAlt_EmitsLeadInPlusOffsetSpiral_BothPasses()
+        {
+            // A 3-vertex straight line flown out + back. An LTA on segment 0 should produce, in
+            // each pass, a plain lead-in waypoint on the line plus a LOITER_TO_ALT one radius to
+            // the side. Forward (toward the far vertex) targets the LTA altitude; reverse targets
+            // the lead-in altitude — climb one way, descend the other.
+            var poly = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt>
+                {
+                    P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02), P(BaseLat, BaseLng + 0.04),
+                },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Reverse },
+            };
+            var ltas = new List<LoiterToAlt>
+            {
+                new LoiterToAlt { PolylineId = VertexId.MainLine, SegmentIndex = 0, T = 0.5,
+                                  Id = 100000, LoiterId = 200000, Side = 1, LtaAltRelM = 999 },
+            };
+
+            var wps = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(passes: 2, offset: 100), poly.Points[0], null, ltas);
+
+            var leadIns = wps.Where(w => w.CorridorVertexIndex == 100000).ToList();
+            var spirals = wps.Where(w => w.Command == MAVLink.MAV_CMD.LOITER_TO_ALT).ToList();
+            Assert.AreEqual(2, leadIns.Count, "lead-in waypoint in both passes");
+            Assert.AreEqual(2, spirals.Count, "one spiral per pass");
+            Assert.IsTrue(spirals.All(w => w.CorridorVertexIndex == 200000 && w.P4 == 1),
+                "spirals carry the LTA identity and exit tangent");
+            Assert.IsTrue(spirals.Any(w => Math.Abs(w.AltRelM - 999) < 1e-6),
+                "forward spiral targets the LTA altitude");
+            Assert.IsTrue(spirals.Any(w => Math.Abs(w.AltRelM - leadIns[0].AltRelM) < 1e-6),
+                "reverse spiral targets the lead-in altitude");
+
+            // The segment runs east, so a side offset shifts the spiral ~one radius in latitude.
+            foreach (var sp in spirals)
+            {
+                var lead = leadIns.First(l => l.LineIndex == sp.LineIndex);
+                Assert.AreEqual(300.0 / MetresPerDegLat, Math.Abs(sp.Lat - lead.Lat), 5e-4,
+                    "spiral sits about one turn radius to the side of its lead-in");
+            }
+        }
+
         // ── Identity (VertexId) ───────────────────────────────────────────────────
 
         [TestMethod]
