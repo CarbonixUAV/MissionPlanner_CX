@@ -58,6 +58,14 @@ namespace Carbonix.UI
         /// <summary>Fired when the user selects "Remove waypoint" from the context menu.</summary>
         public event EventHandler<WaypointRemoveEventArgs> WaypointRemoveRequested;
 
+        // Loiter-to-alt: insert from the leg's right-click menu; target altitude by dragging the
+        // spiral handle; swap side / remove from the handle's right-click menu. Swap/Remove carry
+        // the spiral's id in WaypointRemoveEventArgs.WaypointIndex.
+        public event EventHandler<WaypointInsertEventArgs> LoiterToAltInsertRequested;
+        public event EventHandler<LoiterToAltTargetEventArgs> LoiterToAltTargetChanged;
+        public event EventHandler<WaypointRemoveEventArgs> LoiterToAltSwapRequested;
+        public event EventHandler<WaypointRemoveEventArgs> LoiterToAltRemoveRequested;
+
         /// <summary>Raised as the cursor moves over the plot, carrying the geographic
         /// position of the nearest profile sample so the map can mark it (null on leave).
         /// Only fires when the nearest sample changes, so it's cheap to handle.</summary>
@@ -187,6 +195,15 @@ namespace Carbonix.UI
             foreach (var s in Points)
             {
                 if (!s.IsLoiterWaypoint || s.LoiterArcLengthM <= 0) continue;
+                if (s.IsLoiterToAlt)
+                {
+                    // Sloped spiral handle: hit-test the ramp line from (entry, lead-in alt) to
+                    // (exit, target alt).
+                    PointF a = D2S(s.DistM * DistMultiplier, s.LtaStartAltRelM * AltMultiplier);
+                    PointF b = D2S((s.DistM + s.LoiterArcLengthM) * DistMultiplier, s.AltRelM * AltMultiplier);
+                    if (DistToSegment(ex, ey, a, b) <= BarSnap) return s;
+                    continue;
+                }
                 double altRel = s.AltRelM * AltMultiplier;
                 PointF p0 = D2S(s.DistM * DistMultiplier, altRel);
                 PointF p1 = D2S((s.DistM + s.LoiterArcLengthM) * DistMultiplier, altRel);
@@ -328,7 +345,11 @@ namespace Carbonix.UI
             if (e.Button == MouseButtons.Right)
             {
                 var rhit = HitTest(e.X, e.Y);
-                if (rhit != null && rhit.IsInserted)
+                if (rhit != null && rhit.IsLoiterToAlt)
+                {
+                    ShowLoiterToAltMenu(rhit.Vertex.Index, e.Location);   // swap side / remove
+                }
+                else if (rhit != null && rhit.IsInserted)
                 {
                     ShowRemoveMenu(rhit.Vertex.Index, e.Location);   // remove this checkpoint
                 }
@@ -426,6 +447,25 @@ namespace Carbonix.UI
                 return;
             }
 
+            // Loiter-to-alt handle: dragging sets the TARGET (top); the spiral re-ramps from the
+            // fixed lead-in altitude. Display-only — the form updates the store (the new terrain/
+            // x-axis isn't regenerated until mouse-up / accept).
+            if (draggedSample.IsLoiterToAlt)
+            {
+                draggedSample.AltRelM = newAltRelM;
+                double start = draggedSample.LtaStartAltRelM;
+                double arcLen = draggedSample.LoiterArcLengthM;
+                foreach (var arc in Points.Where(s => s.IsLoiterArcSample && s.Vertex == draggedSample.Vertex))
+                {
+                    double frac = arcLen > 0 ? (arc.DistM - draggedSample.DistM) / arcLen : 1.0;
+                    arc.AltRelM = start + (newAltRelM - start) * frac;
+                }
+                LoiterToAltTargetChanged?.Invoke(this,
+                    new LoiterToAltTargetEventArgs(draggedSample.Vertex.Index, newAltRelM));
+                Invalidate();
+                return;
+            }
+
             draggedSample.AltRelM = newAltRelM;
 
             bool isLoiter = draggedSample.IsLoiterWaypoint;
@@ -466,7 +506,30 @@ namespace Carbonix.UI
             var menu = new ContextMenuStrip();
             menu.Items.Add("Insert waypoint here", null, (s, ev) =>
                 WaypointInsertRequested?.Invoke(this, new WaypointInsertEventArgs(_pendingInsertDistM, _pendingInsertAltRelM)));
+            menu.Items.Add("Add loiter-to-alt here", null, (s, ev) =>
+                LoiterToAltInsertRequested?.Invoke(this, new WaypointInsertEventArgs(_pendingInsertDistM, _pendingInsertAltRelM)));
             menu.Show(this, location);
+        }
+
+        private void ShowLoiterToAltMenu(int loiterId, Point location)
+        {
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("Swap side", null, (s, ev) =>
+                LoiterToAltSwapRequested?.Invoke(this, new WaypointRemoveEventArgs(loiterId)));
+            menu.Items.Add("Remove loiter-to-alt", null, (s, ev) =>
+                LoiterToAltRemoveRequested?.Invoke(this, new WaypointRemoveEventArgs(loiterId)));
+            menu.Show(this, location);
+        }
+
+        // Distance from point (px,py) to segment a-b, in pixels.
+        private static double DistToSegment(float px, float py, PointF a, PointF b)
+        {
+            double dx = b.X - a.X, dy = b.Y - a.Y;
+            double len2 = dx * dx + dy * dy;
+            double t = len2 <= 0 ? 0 : ((px - a.X) * dx + (py - a.Y) * dy) / len2;
+            t = Math.Max(0, Math.Min(1, t));
+            double cx = a.X + t * dx, cy = a.Y + t * dy;
+            return Math.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
         }
 
         private int _pendingRemoveIdx;
@@ -654,15 +717,19 @@ namespace Carbonix.UI
             {
                 if (!s.IsLoiterWaypoint || s.LoiterArcLengthM <= 0) continue;
                 bool active = ReferenceEquals(s, hoveredSample) || ReferenceEquals(s, draggedSample);
-                double altDisp = s.AltRelM * AltMultiplier;
-                Color col = active ? Color.Yellow : Color.DarkOrange;
                 float thick = active ? 9f : 6f;
-
                 double d0 = s.DistM;
                 double total = s.LoiterArcLengthM;   // flown arc
 
-                PointF pa = D2S(d0 * DistMultiplier, altDisp);
-                PointF pb = D2S((d0 + total) * DistMultiplier, altDisp);
+                // Loiter-to-alt: a SLOPED handle ramping the lead-in altitude up to the target,
+                // in a distinct colour. Drag the top to set the target; right-click to swap side.
+                double yStart = (s.IsLoiterToAlt ? s.LtaStartAltRelM : s.AltRelM) * AltMultiplier;
+                double yEnd   = s.AltRelM * AltMultiplier;
+                Color col = s.IsLoiterToAlt ? (active ? Color.Cyan : Color.MediumTurquoise)
+                                            : (active ? Color.Yellow : Color.DarkOrange);
+
+                PointF pa = D2S(d0 * DistMultiplier, yStart);
+                PointF pb = D2S((d0 + total) * DistMultiplier, yEnd);
                 using (var pen = new Pen(col, thick) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                     g.DrawLine(pen, pa, pb);
 
@@ -678,6 +745,10 @@ namespace Carbonix.UI
         // is flown both ways, so |slope| vs the climb limit is the binding check).
         private (Color col, float w, bool warn) ClassifySegment(ElevationPoint a, ElevationPoint b)
         {
+            // A loiter-to-alt spiral has no horizontal climb gradient — don't flag it; the
+            // DrawLoiterArcs handle already shows it in its own colour.
+            if (a.IsLoiterToAlt || b.IsLoiterToAlt)
+                return (Color.FromArgb(150, Color.MediumTurquoise), 1.5f, false);
             double run = b.DistM - a.DistM;
             double gradPct = run > 1e-6 ? Math.Abs(b.AltRelM - a.AltRelM) / run * 100.0 : 0.0;
             if (!double.IsNaN(GradRedPct) && gradPct >= GradRedPct) return (Color.Red, 2.5f, true);
@@ -918,6 +989,19 @@ namespace Carbonix.UI
         public WaypointRemoveEventArgs(int idx)
         {
             WaypointIndex = idx;
+        }
+    }
+
+    internal class LoiterToAltTargetEventArgs : EventArgs
+    {
+        public int LoiterId { get; }
+        /// <summary>New target (top) altitude relative to home (metres) after dragging.</summary>
+        public double NewTargetAltRelM { get; }
+
+        public LoiterToAltTargetEventArgs(int loiterId, double newTargetAltRelM)
+        {
+            LoiterId = loiterId;
+            NewTargetAltRelM = newTargetAltRelM;
         }
     }
 }
