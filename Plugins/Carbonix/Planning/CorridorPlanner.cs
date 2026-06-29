@@ -122,6 +122,25 @@ namespace Carbonix.Planning
         public int Id;
     }
 
+    /// <summary>
+    /// A loiter-to-altitude inserted on a leg. It splices a plain lead-in waypoint on the line
+    /// (exactly where a <see cref="Checkpoint"/> would land, identity = <see cref="Id"/>) PLUS a
+    /// <c>LOITER_TO_ALT</c> one turn-radius to one geographic side (<see cref="Side"/> = +1/-1,
+    /// identity = <see cref="LoiterId"/>). Flown toward the segment's far end the spiral targets
+    /// <see cref="LtaAltRelM"/>; flown the other way it targets the lead-in waypoint's own
+    /// altitude — climb one way, descend the other.
+    /// </summary>
+    public struct LoiterToAlt
+    {
+        public int PolylineId;
+        public int SegmentIndex;
+        public double T;
+        public int Id;          // lead-in waypoint identity (on the line)
+        public int LoiterId;    // the spiral's own identity (off the line)
+        public int Side;        // +1 / -1: which geographic side of the segment
+        public double LtaAltRelM;
+    }
+
     public class CorridorWaypoint
     {
         public MAVLink.MAV_CMD Command { get; set; }
@@ -907,7 +926,7 @@ namespace Carbonix.Planning
         /// </summary>
         public static List<CorridorWaypoint> GenerateMissionFromTour(
             List<Polyline> polylines, List<TourStep> tour, CorridorParameters p, PointLatLngAlt homePoint,
-            IReadOnlyList<Checkpoint> checkpoints = null)
+            IReadOnlyList<Checkpoint> checkpoints = null, IReadOnlyList<LoiterToAlt> loiterToAlts = null)
         {
             var empty = new List<CorridorWaypoint>();
             if (polylines == null || polylines.Count == 0 || tour == null || tour.Count == 0)
@@ -920,9 +939,17 @@ namespace Carbonix.Planning
             // terrain, so the home position never affects the generated altitudes.
             double homeTerrainAlt = 0;
 
+            // Each loiter-to-alt's lead-in waypoint is just a checkpoint on the line; splice it
+            // alongside the real checkpoints, then attach its spiral in a post-pass below.
+            var allCps = new List<Checkpoint>();
+            if (checkpoints != null) allCps.AddRange(checkpoints);
+            if (loiterToAlts != null)
+                foreach (var lta in loiterToAlts)
+                    allCps.Add(new Checkpoint { PolylineId = lta.PolylineId, SegmentIndex = lta.SegmentIndex, T = lta.T, Id = lta.Id });
+
             // 1. The tour as one continuous centreline polyline (junctions shared, doubles
             //    back at dead-ends). 2. Offset the whole path at once.
-            var centre = BuildCenterlineTour(byId, tour, checkpoints);
+            var centre = BuildCenterlineTour(byId, tour, allCps);
             if (centre.Count < 2) return empty;
 
             double off = (p.NumberOfPasses >= 2) ? p.PassOffsetM / 2.0 : 0.0;
@@ -937,7 +964,70 @@ namespace Carbonix.Planning
                 return NearestPointOnPolyline(geo, cl).point;
             }
 
-            return SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
+            var wps = SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
+
+            if (loiterToAlts != null && loiterToAlts.Count > 0)
+                InsertLoiterToAlts(wps, loiterToAlts, byId, p.TurnRadiusM);
+
+            return wps;
+        }
+
+        /// <summary>
+        /// Attach each loiter-to-alt's spiral to its (already spliced) lead-in waypoint. For
+        /// every traversal of the lead-in: place a LOITER_TO_ALT one radius to the chosen
+        /// geographic side; flown toward the segment's far vertex it climbs to the LTA altitude
+        /// and follows the lead-in (the aircraft climbs, THEN proceeds high); flown back it
+        /// targets the lead-in altitude and precedes it (descend, THEN pass the lead-in low).
+        /// </summary>
+        private static void InsertLoiterToAlts(List<CorridorWaypoint> wps, IReadOnlyList<LoiterToAlt> ltas,
+                                               Dictionary<int, Polyline> byId, double radius)
+        {
+            var inserts = new List<(int at, CorridorWaypoint wp)>();
+            foreach (var lta in ltas)
+            {
+                if (!byId.TryGetValue(lta.PolylineId, out var pl) ||
+                    lta.SegmentIndex < 0 || lta.SegmentIndex + 1 >= pl.Points.Count) continue;
+
+                var v0 = pl.Points[lta.SegmentIndex];
+                var v1 = pl.Points[lta.SegmentIndex + 1];
+                double segBearing = v0.GetBearing(v1);                              // geographic V0 -> V1
+                double perpBearing = segBearing + (lta.Side >= 0 ? 90.0 : -90.0);   // fixed geographic side
+
+                for (int i = 0; i < wps.Count; i++)
+                {
+                    var lead = wps[i];
+                    if (lead.CorridorVertexIndex != lta.Id || lead.Vertex.PolylineId != lta.PolylineId) continue;
+
+                    var leadPt = new PointLatLngAlt(lead.Lat, lead.Lng, 0);
+                    var next = (i + 1 < wps.Count) ? wps[i + 1] : (i > 0 ? wps[i - 1] : lead);
+                    double travel = leadPt.GetBearing(new PointLatLngAlt(next.Lat, next.Lng, 0));
+                    bool towardV1 = Math.Cos((travel - segBearing) * Deg2Rad) >= 0;   // heading to far vertex?
+                    if (i + 1 >= wps.Count) towardV1 = !towardV1;                     // next was actually prev
+
+                    var centre = leadPt.newpos(perpBearing, radius);
+                    double target = towardV1 ? lta.LtaAltRelM : lead.AltRelM;
+                    var loiter = new CorridorWaypoint
+                    {
+                        Command             = MAVLink.MAV_CMD.LOITER_TO_ALT,
+                        Lat                 = centre.Lat,
+                        Lng                 = centre.Lng,
+                        AltRelM             = target,
+                        AltAGL              = target - lead.TerrainAltM,
+                        TerrainAltM         = lead.TerrainAltM,
+                        P2                  = (float)(lta.Side >= 0 ? radius : -radius),
+                        P4                  = 1,   // exit tangent
+                        LoiterRadiusM       = radius,
+                        CorridorVertexIndex = lta.LoiterId,
+                        LineIndex           = lead.LineIndex,
+                        IsBranchVertex      = lead.IsBranchVertex,
+                        BranchId            = lead.BranchId,
+                    };
+                    inserts.Add((towardV1 ? i + 1 : i, loiter));   // climb after lead-in; descend before
+                }
+            }
+
+            foreach (var ins in inserts.OrderByDescending(x => x.at))   // back-to-front keeps indices valid
+                wps.Insert(ins.at, ins.wp);
         }
 
         // Walk the tour into one continuous centreline polyline. Each point carries its
