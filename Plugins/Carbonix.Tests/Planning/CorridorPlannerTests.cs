@@ -603,13 +603,20 @@ namespace Carbonix.Tests.Planning
             Assert.IsTrue(spirals.All(w => w.CorridorVertexIndex == 200000 && w.P4 == 1),
                 "spirals carry the LTA identity and exit tangent");
             Assert.IsTrue(spirals.Any(w => Math.Abs(w.AltRelM - 999) < 1e-6),
-                "forward spiral targets the LTA altitude");
+                "one pass targets the LTA altitude (climb)");
             Assert.IsTrue(spirals.Any(w => Math.Abs(w.AltRelM - 80) < 1e-6),
-                "reverse spiral targets the lead-in altitude");
+                "the other pass targets the lead-in altitude (descend)");
             Assert.IsTrue(spirals[0].P2 * spirals[1].P2 < 0,
                 "the passes circle opposite ways (fixed geographic side flips hand of travel)");
-            Assert.IsTrue(leadIns.All(w => Math.Abs(w.AltRelM - 80) < 1e-6),
-                "the lead-in waypoint carries the LTA's lead-in altitude in both passes");
+            Assert.IsTrue(leadIns.Any(w => Math.Abs(w.AltRelM - 80) < 1e-6)
+                       && leadIns.Any(w => Math.Abs(w.AltRelM - 999) < 1e-6),
+                "each pass's lead-in carries that direction's ENTRY altitude (low out, high back)");
+
+            // The lead-in is the tangent entry, so it precedes its spiral in BOTH passes.
+            for (int k = 0; k < wps.Count; k++)
+                if (wps[k].Command == MAVLink.MAV_CMD.LOITER_TO_ALT)
+                    Assert.IsTrue(k > 0 && wps[k - 1].CorridorVertexIndex == 100000,
+                        "the lead-in waypoint immediately precedes its spiral");
 
             // The segment runs east, so a side offset shifts the spiral ~one radius in latitude.
             foreach (var sp in spirals)
