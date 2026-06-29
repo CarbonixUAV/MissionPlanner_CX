@@ -68,6 +68,10 @@ namespace Carbonix
         private readonly List<Carbonix.Planning.Checkpoint> checkpoints = new List<Carbonix.Planning.Checkpoint>();
         private int nextCheckpointId = 100000;
 
+        // Loiter-to-alt spirals inserted on the profile. Each takes two ids from nextCheckpointId
+        // (the lead-in waypoint + the spiral). Like checkpoints, they bake into the export on regen.
+        private readonly List<Carbonix.Planning.LoiterToAlt> loiterToAlts = new List<Carbonix.Planning.LoiterToAlt>();
+
         // Map overlays
         private readonly GMapOverlay layer_corridor;
 
@@ -112,6 +116,10 @@ namespace Carbonix
             elev_profile.WaypointInsertRequested += ElevProfile_InsertRequested;
             elev_profile.WaypointRemoveRequested += ElevProfile_RemoveRequested;
             elev_profile.InsertedWaypointMoved += ElevProfile_InsertedMoved;
+            elev_profile.LoiterToAltInsertRequested += ElevProfile_LoiterToAltInsertRequested;
+            elev_profile.LoiterToAltTargetChanged += ElevProfile_LoiterToAltTargetChanged;
+            elev_profile.LoiterToAltSwapRequested += ElevProfile_LoiterToAltSwap;
+            elev_profile.LoiterToAltRemoveRequested += ElevProfile_LoiterToAltRemove;
 
             AddGradientRows();
         }
@@ -399,6 +407,85 @@ namespace Carbonix
             elev_profile.Invalidate();
         }
 
+        // ─── Loiter-to-alt ──────────────────────────────────────────────────────────
+
+        // Map a profile distance to the leg it falls on (same logic the checkpoint insert uses,
+        // including stub junction legs), and the corridor altitude there.
+        private bool TryResolveLeg(double distM, out int edge, out int seg, out double t,
+                                   out double prevAlt, out double nextAlt)
+        {
+            edge = seg = -1; t = 0; prevAlt = nextAlt = 0;
+            if (elevationPoints == null) return false;
+            var verts = elevationPoints
+                .Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
+                .OrderBy(s => s.DistM).ToList();
+            for (int i = 0; i + 1 < verts.Count; i++)
+            {
+                var a = verts[i];
+                var b = verts[i + 1];
+                if (distM < a.DistM || distM > b.DistM) continue;
+                double span = b.DistM - a.DistM;
+                if (span <= 1e-6) continue;
+                double frac = (distM - a.DistM) / span;
+                if (a.Vertex.PolylineId == b.Vertex.PolylineId)
+                {
+                    if (Math.Abs(a.Vertex.Index - b.Vertex.Index) != 1) continue;
+                    edge = a.Vertex.PolylineId;
+                    seg = Math.Min(a.Vertex.Index, b.Vertex.Index);
+                    t = a.Vertex.Index < b.Vertex.Index ? frac : 1.0 - frac;
+                }
+                else if (!TryJunctionLeg(a, b, frac, out edge, out seg, out t))
+                {
+                    continue;
+                }
+                prevAlt = a.AltRelM;   // waypoint the aircraft flies in from (constant-alt entry)
+                nextAlt = b.AltRelM;   // waypoint it flies out to     (constant-alt exit)
+                return true;
+            }
+            return false;
+        }
+
+        private void ElevProfile_LoiterToAltInsertRequested(object sender, WaypointInsertEventArgs e)
+        {
+            if (!TryResolveLeg(e.DistM, out int edge, out int seg, out double t,
+                               out double prevAlt, out double nextAlt)) return;
+
+            loiterToAlts.Add(new Carbonix.Planning.LoiterToAlt
+            {
+                PolylineId = edge, SegmentIndex = seg, T = t,
+                Id = nextCheckpointId++, LoiterId = nextCheckpointId++, Side = 1,
+                LtaAltRelM = nextAlt,   // first guess: fly constant altitude out to the next waypoint
+            });
+            _ = ExecuteGenerateAsync(preserveView: true);   // spiral ground track; keep the zoom
+        }
+
+        private void ElevProfile_LoiterToAltTargetChanged(object sender, LoiterToAltTargetEventArgs e)
+        {
+            int idx = loiterToAlts.FindIndex(l => l.LoiterId == e.LoiterId);
+            if (idx < 0) return;
+            var lta = loiterToAlts[idx];
+            lta.LtaAltRelM = e.NewTargetAltRelM;
+            loiterToAlts[idx] = lta;   // display-only: control re-ramped the arc; Accept bakes it
+        }
+
+        private void ElevProfile_LoiterToAltSwap(object sender, WaypointRemoveEventArgs e)
+        {
+            int idx = loiterToAlts.FindIndex(l => l.LoiterId == e.WaypointIndex);
+            if (idx < 0) return;
+            var lta = loiterToAlts[idx];
+            lta.Side = -lta.Side;
+            loiterToAlts[idx] = lta;
+            _ = ExecuteGenerateAsync(preserveView: true);   // the spiral moves to the other side
+        }
+
+        private void ElevProfile_LoiterToAltRemove(object sender, WaypointRemoveEventArgs e)
+        {
+            int idx = loiterToAlts.FindIndex(l => l.LoiterId == e.WaypointIndex);
+            if (idx < 0) return;
+            loiterToAlts.RemoveAt(idx);
+            _ = ExecuteGenerateAsync(preserveView: true);
+        }
+
         /// <summary>
         /// Apply a profile altitude drag to every waypoint/sample sharing the dragged
         /// vertex. Keyed on VertexId, so a polyline flown out-and-back (and any spur) is
@@ -590,6 +677,7 @@ namespace Carbonix
             // The feature set changed, so checkpoints + alt edits (keyed by vertex identity on
             // the old edges) no longer line up — dump them rather than mis-apply.
             checkpoints.Clear();
+            loiterToAlts.Clear();
             altOverrides.Clear();
 
             BUT_accept.Enabled = false;
@@ -849,7 +937,7 @@ namespace Carbonix
         /// home point, then generates the mission and a read-only elevation profile on a
         /// background thread and updates the map and profile.
         /// </summary>
-        private async System.Threading.Tasks.Task ExecuteGenerateAsync()
+        private async System.Threading.Tasks.Task ExecuteGenerateAsync(bool preserveView = false)
         {
             var features = AllFeatures();
             if (features.Count == 0) return;
@@ -877,6 +965,7 @@ namespace Carbonix
                 var capturedP        = p;
                 var capturedHome     = homePoint;
                 var capturedCheckpoints = checkpoints.ToList();
+                var capturedLtas = loiterToAlts.ToList();
                 (builtPolylines, builtTour, wps, profileSamples, terrAlt) =
                     await System.Threading.Tasks.Task.Run(() =>
                     {
@@ -885,7 +974,7 @@ namespace Carbonix
                         double homeT = 0;
                         var (pls, tr) = CorridorTourBuilder.Build(
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
-                        var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints);
+                        var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints, capturedLtas);
 
                         // The elevation profile is a single representative view of both passes,
                         // so build it from a centreline (offset 0) mission of the same tour:
@@ -895,7 +984,7 @@ namespace Carbonix
                         // stays the flown/exported one (map, stats, accept).
                         var pCenter = capturedP.Clone();
                         pCenter.PassOffsetM = 0;
-                        var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome, capturedCheckpoints);
+                        var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome, capturedCheckpoints, capturedLtas);
                         var profile = BuildTourProfile(centreMission, capturedHome, homeT);
                         EnsureSurfacesLoaded();   // remote header fetch happens here, off the UI thread
                         foreach (var ep in profile)
@@ -935,7 +1024,7 @@ namespace Carbonix
             MarkInsertedSamples();
 
             DrawMap();
-            UpdateElevationProfile(p);
+            UpdateElevationProfile(p, preserveView);
             UpdateStats(p);
             BUT_accept.Enabled = true;
         }
