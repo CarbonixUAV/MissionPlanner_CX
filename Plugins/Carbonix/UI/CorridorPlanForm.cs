@@ -454,7 +454,10 @@ namespace Carbonix
             {
                 PolylineId = edge, SegmentIndex = seg, T = t,
                 Id = nextCheckpointId++, LoiterId = nextCheckpointId++, Side = 1,
-                LtaAltRelM = nextAlt,   // first guess: fly constant altitude out to the next waypoint
+                // First guess: fly constant altitude in from the previous waypoint and out to the
+                // next, so the spiral just bridges whatever the neighbours already are (drag to tune).
+                LeadInAltRelM = prevAlt,
+                LtaAltRelM = nextAlt,
             });
             _ = ExecuteGenerateAsync(preserveView: true);   // spiral ground track; keep the zoom
         }
@@ -493,6 +496,37 @@ namespace Carbonix
         /// </summary>
         private void ElevProfile_AltitudeChanged(object sender, AltChangeEventArgs e)
         {
+            // Dragging an LTA's lead-in waypoint sets the spiral's BOTTOM altitude — the LTA owns
+            // it (also the reverse spiral's target, applied on regen). Update the store and
+            // re-ramp the spiral display so the two stay locked; no stray altOverride.
+            int ltaIdx = e.IsLoiter ? -1 : loiterToAlts.FindIndex(
+                l => l.Id == e.Vertex.Index && l.PolylineId == e.Vertex.PolylineId);
+            if (ltaIdx >= 0)
+            {
+                var lta = loiterToAlts[ltaIdx];
+                lta.LeadInAltRelM = e.NewAltRelM;
+                loiterToAlts[ltaIdx] = lta;
+
+                if (elevationPoints != null)
+                {
+                    var spiralVid = new Carbonix.Planning.VertexId(lta.PolylineId, lta.LoiterId);
+                    var anchor = elevationPoints.FirstOrDefault(s => s.Vertex == spiralVid && s.IsLoiterWaypoint);
+                    if (anchor != null)
+                    {
+                        anchor.LtaStartAltRelM = e.NewAltRelM;
+                        double end = anchor.AltRelM, len = anchor.LoiterArcLengthM;
+                        foreach (var arc in elevationPoints.Where(s => s.Vertex == spiralVid && s.IsLoiterArcSample))
+                        {
+                            double frac = len > 0 ? (arc.DistM - anchor.DistM) / len : 1.0;
+                            arc.LtaStartAltRelM = e.NewAltRelM;
+                            arc.AltRelM = e.NewAltRelM + (end - e.NewAltRelM) * frac;
+                        }
+                    }
+                }
+                elev_profile.Invalidate();
+                return;   // the control already moved the lead-in dot
+            }
+
             altOverrides[e.Vertex] = e.NewAltRelM;   // remember the edit so it survives a regenerate
 
             if (generatedWps != null)
