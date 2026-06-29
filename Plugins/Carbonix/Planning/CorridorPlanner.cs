@@ -1004,19 +1004,21 @@ namespace Carbonix.Planning
                     var lead = wps[i];
                     if (lead.CorridorVertexIndex != lta.Id || lead.Vertex.PolylineId != lta.PolylineId) continue;
 
-                    // The LTA owns the lead-in altitude (the handle's bottom): stamp it on the
-                    // lead-in waypoint so both passes and the forward spiral's start agree.
-                    lead.AltRelM = lta.LeadInAltRelM;
-                    lead.AltAGL  = lta.LeadInAltRelM - lead.TerrainAltM;
-
                     var leadPt = new PointLatLngAlt(lead.Lat, lead.Lng, 0);
                     var next = (i + 1 < wps.Count) ? wps[i + 1] : (i > 0 ? wps[i - 1] : lead);
                     double travel = leadPt.GetBearing(new PointLatLngAlt(next.Lat, next.Lng, 0));
                     bool towardV1 = Math.Cos((travel - segBearing) * Deg2Rad) >= 0;   // heading to far vertex?
                     if (i + 1 >= wps.Count) towardV1 = !towardV1;                     // next was actually prev
 
-                    var centre = leadPt.newpos(perpBearing, radius);
+                    // The lead-in is the spiral's tangent ENTRY: the aircraft arrives there at the
+                    // entry-side altitude, then the spiral changes to the exit-side altitude. So per
+                    // pass the lead-in carries the arrival alt and the spiral targets the far side
+                    // (out: low → high; back: high → low). The lead-in ALWAYS precedes the spiral.
+                    lead.AltRelM = towardV1 ? lta.LeadInAltRelM : lta.LtaAltRelM;
+                    lead.AltAGL  = lead.AltRelM - lead.TerrainAltM;
                     double target = towardV1 ? lta.LtaAltRelM : lta.LeadInAltRelM;
+
+                    var centre = leadPt.newpos(perpBearing, radius);
 
                     // The spiral sits on a FIXED geographic side, which is right-of-travel one way
                     // and left-of-travel the other — so the loiter direction (radius sign) flips
@@ -1038,7 +1040,7 @@ namespace Carbonix.Planning
                         IsBranchVertex      = lead.IsBranchVertex,
                         BranchId            = lead.BranchId,
                     };
-                    inserts.Add((towardV1 ? i + 1 : i, loiter));   // climb after lead-in; descend before
+                    inserts.Add((i + 1, loiter));   // lead-in is the tangent entry: always before the spiral
                 }
             }
 
