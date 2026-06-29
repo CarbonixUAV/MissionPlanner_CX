@@ -904,7 +904,7 @@ namespace Carbonix
             ceilingSurface.Load(plugin.CorridorCeilingSurfacePath, cacheDir);
         }
 
-        private static List<ElevationPoint> BuildTourProfile(
+        internal static List<ElevationPoint> BuildTourProfile(
             List<CorridorWaypoint> wps, PointLatLngAlt home, double homeTerrainAlt)
         {
             const double SampleSpacingM = 25.0;
@@ -1002,19 +1002,29 @@ namespace Carbonix
             var firstStep = new Dictionary<int, int>();
             foreach (var w in wps)
             {
+                // Turn helpers aren't real traversal vertices — the transfer helper carries a
+                // placeholder identity (CorridorVertexIndex -1, so Vertex.PolylineId falls back
+                // to MainLine) and would poison MainLine's first-pass step with its turn index.
+                if (w.IsTurnHelper) continue;
                 int pl = w.Vertex.PolylineId;
                 if (!firstStep.TryGetValue(pl, out var st) || w.LineIndex < st) firstStep[pl] = w.LineIndex;
             }
-            bool Keep(CorridorWaypoint w) => w.LineIndex == firstStep[w.Vertex.PolylineId];
+            bool Keep(CorridorWaypoint w) =>
+                firstStep.TryGetValue(w.Vertex.PolylineId, out var fs) && w.LineIndex == fs;
 
             foreach (var node in graph.Nodes)
             {
                 int idx = node.MissionIndex;
                 if (idx < 0 || idx >= wps.Count) continue;
                 var wp = wps[idx];
-                if (!Keep(wp)) continue;   // skip repeat (back-pass) traversals
 
-                if (loiterByNode.TryGetValue(idx, out var arc) && arc.Path != null && arc.Path.Count >= 2)
+                // A node draws its OWN sample only on its first-pass traversal (back-pass
+                // repeats are hidden). Its outgoing leg is judged separately below: a
+                // de-duplicated junction can resolve to a hidden back-pass yet still launch the
+                // first pass of the next leg, so gating the leg on this node would drop it.
+                bool keep = Keep(wp);
+
+                if (keep && loiterByNode.TryGetValue(idx, out var arc) && arc.Path != null && arc.Path.Count >= 2)
                 {
                     var center = new PointLatLngAlt(wp.Lat, wp.Lng, 0);
                     double radius = wp.LoiterRadiusM > 0 ? wp.LoiterRadiusM : Math.Abs(wp.P3);
@@ -1053,7 +1063,7 @@ namespace Carbonix
                     // Sample only the flown (primary) arc; the un-flown remainder is dropped.
                     SampleArc(center, radius, entry, sign * primary, wp, loiterAlt);
                 }
-                else if (!wp.IsTurnHelper)
+                else if (keep && !wp.IsTurnHelper)
                 {
                     // Turn-block lead-in helpers (overfly + transfer) are omitted: the loiter
                     // represents the turn, and the preturn isn't a scan station. Their legs

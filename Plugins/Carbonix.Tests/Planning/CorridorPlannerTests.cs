@@ -451,6 +451,42 @@ namespace Carbonix.Tests.Planning
                 "would stay ~80 if it sampled the main line");
         }
 
+        [TestMethod]
+        public void Profile_StubThenStraightLeg_LegIsNotSkipped()
+        {
+            // A dead-end stub (flown out + back) followed by a long, perfectly straight 2-point
+            // leg. The junction between the stub's return and the leg is de-duplicated to the
+            // stub's back-pass identity, which fails the first-pass Keep test — so the leg's one
+            // and only segment was being dropped from the profile. It must be sampled.
+            var main = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.05) },
+            };
+            var stub = new Polyline
+            {
+                Id = 0,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat + 0.004, BaseLng) },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = 0, Direction = TraverseDir.Forward },                 // out the stub
+                new TourStep { PolylineId = 0, Direction = TraverseDir.Reverse },                 // back to junction
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward }, // the long leg
+            };
+
+            var mission = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { main, stub }, tour, Params(), main.Points[0]);
+
+            var profile = Carbonix.CorridorPlanForm.BuildTourProfile(mission, main.Points[0], 0);
+
+            // The long leg runs east from the junction (lng BaseLng) to BaseLng+0.05; the stub is
+            // vertical at lng ~ BaseLng, so any leg-terrain sample east of +0.025 can only be the
+            // long leg. Without it, the leg's terrain is missing entirely.
+            Assert.IsTrue(profile.Any(s => s.IsLegTerrainSample && s.Lng > BaseLng + 0.025),
+                "the straight leg after the stub is sampled, not skipped");
+        }
+
         // ── Identity (VertexId) ───────────────────────────────────────────────────
 
         [TestMethod]
