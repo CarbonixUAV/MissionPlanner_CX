@@ -522,6 +522,51 @@ namespace Carbonix.Tests.Planning
                 "the sharp turn re-entering the main line after the stub is shown");
         }
 
+        [TestMethod]
+        public void JunctionLeg_MapsToDestinationPolylineSegment()
+        {
+            // The straight out of a stub's re-entry loiter: anchor A is the loiter at the
+            // junction (carrying the STUB's identity), anchor B is the main-line vertex it leads
+            // to. The checkpoint must land on the MAIN line, segment 0, at the click fraction —
+            // not be rejected for the two anchors being on different polylines.
+            var main = new Carbonix.Planning.Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.05) },
+            };
+            var stub = new Carbonix.Planning.Polyline
+            {
+                Id = 0,
+                Points = new List<PointLatLngAlt> { P(BaseLat, BaseLng), P(BaseLat + 0.02, BaseLng) },
+            };
+
+            var loiter = new ElevationPoint
+            {
+                IsLoiterWaypoint = true, Lat = BaseLat, Lng = BaseLng,
+                WaypointIndex = 0, IsBranchVertex = true, BranchId = 0,   // stub identity
+            };
+            var lineF = new ElevationPoint
+            {
+                IsLineWaypoint = true, Lat = BaseLat, Lng = BaseLng + 0.05,
+                WaypointIndex = 1, IsBranchVertex = false, BranchId = -1,  // main vtx 1
+            };
+
+            bool ok = Carbonix.CorridorPlanForm.TryJunctionLeg(
+                new List<Carbonix.Planning.Polyline> { main, stub }, loiter, lineF, 0.25,
+                out int edge, out int seg, out double t);
+
+            Assert.IsTrue(ok, "a loiter to other-polyline leg is recognised as a junction leg");
+            Assert.AreEqual(VertexId.MainLine, edge, "checkpoint lands on the main line, not the stub");
+            Assert.AreEqual(0, seg, "on the main's first segment (junction -> F)");
+            Assert.AreEqual(0.25, t, 1e-6, "fraction from the junction toward F");
+
+            // Two line waypoints on different polylines is NOT a junction loiter leg.
+            Assert.IsFalse(Carbonix.CorridorPlanForm.TryJunctionLeg(
+                new List<Carbonix.Planning.Polyline> { main, stub }, lineF,
+                new ElevationPoint { IsLineWaypoint = true, IsBranchVertex = true, BranchId = 0, WaypointIndex = 1 },
+                0.5, out _, out _, out _));
+        }
+
         // ── Identity (VertexId) ───────────────────────────────────────────────────
 
         [TestMethod]

@@ -216,6 +216,49 @@ namespace Carbonix
             return true;
         }
 
+        // A leg whose two profile anchors sit on DIFFERENT polylines: the straight out of a
+        // stub's re-entry loiter onto the main line (or out of an entry loiter onto a stub).
+        // The deduped junction gives the loiter the OTHER edge's identity, so the checkpoint
+        // belongs to the line anchor's polyline, on the segment that meets the junction. The
+        // loiter represents that polyline's junction vertex (the neighbour of the line anchor
+        // nearest the loiter centre). fracAtoB is the click fraction from a toward b.
+        private bool TryJunctionLeg(ElevationPoint a, ElevationPoint b, double fracAtoB,
+                                    out int edge, out int seg, out double t)
+            => TryJunctionLeg(polylines, a, b, fracAtoB, out edge, out seg, out t);
+
+        internal static bool TryJunctionLeg(List<Carbonix.Planning.Polyline> polylines,
+                                            ElevationPoint a, ElevationPoint b, double fracAtoB,
+                                            out int edge, out int seg, out double t)
+        {
+            edge = seg = -1; t = 0;
+
+            ElevationPoint loi, lin; bool loiIsA;
+            if (a.IsLoiterWaypoint && !b.IsLoiterWaypoint) { loi = a; lin = b; loiIsA = true; }
+            else if (b.IsLoiterWaypoint && !a.IsLoiterWaypoint) { loi = b; lin = a; loiIsA = false; }
+            else return false;
+
+            edge = lin.Vertex.PolylineId;
+            int edgeId = edge;
+            var pl = polylines?.FirstOrDefault(p => p.Id == edgeId);
+            if (pl == null) return false;
+
+            int li = lin.Vertex.Index;
+            var loiCentre = new PointLatLngAlt(loi.Lat, loi.Lng, 0);
+            int j = -1; double best = double.MaxValue;
+            foreach (int c in new[] { li - 1, li + 1 })   // junction = the neighbour at the loiter
+            {
+                if (c < 0 || c >= pl.Points.Count) continue;
+                double d = pl.Points[c].GetDistance(loiCentre);
+                if (d < best) { best = d; j = c; }
+            }
+            if (j < 0) return false;
+
+            seg = Math.Min(j, li);
+            double fracFromLoiter = loiIsA ? fracAtoB : 1.0 - fracAtoB;
+            t = (j < li) ? fracFromLoiter : 1.0 - fracFromLoiter;   // fraction from vertex seg
+            return true;
+        }
+
         private void ElevProfile_InsertRequested(object sender, WaypointInsertEventArgs e)
         {
             if (elevationPoints == null) return;
@@ -232,15 +275,23 @@ namespace Carbonix
                 var a = verts[i];
                 var b = verts[i + 1];
                 if (e.DistM < a.DistM || e.DistM > b.DistM) continue;
-                if (a.Vertex.PolylineId != b.Vertex.PolylineId) continue;
-                if (Math.Abs(a.Vertex.Index - b.Vertex.Index) != 1) continue;   // one straight leg
                 double span = b.DistM - a.DistM;
                 if (span <= 1e-6) continue;
-
                 double frac = (e.DistM - a.DistM) / span;                          // from a toward b
-                int edge = a.Vertex.PolylineId;
-                int seg = Math.Min(a.Vertex.Index, b.Vertex.Index);
-                double t = a.Vertex.Index < b.Vertex.Index ? frac : 1.0 - frac;    // from vertex seg
+
+                int edge, seg;
+                double t;
+                if (a.Vertex.PolylineId == b.Vertex.PolylineId)
+                {
+                    if (Math.Abs(a.Vertex.Index - b.Vertex.Index) != 1) continue;  // one straight leg
+                    edge = a.Vertex.PolylineId;
+                    seg = Math.Min(a.Vertex.Index, b.Vertex.Index);
+                    t = a.Vertex.Index < b.Vertex.Index ? frac : 1.0 - frac;        // from vertex seg
+                }
+                else if (!TryJunctionLeg(a, b, frac, out edge, out seg, out t))
+                {
+                    continue;   // different polylines and not a junction loiter leg
+                }
 
                 int id = nextCheckpointId++;
                 checkpoints.Add(new Carbonix.Planning.Checkpoint
@@ -251,6 +302,7 @@ namespace Carbonix
 
                 // Geo on the TRUE corridor segment (a loiter anchor's lat/lng is the orbit
                 // centre, off the line); fall back to the profile anchors if unavailable.
+                bool edgeIsBranch = edge != Carbonix.Planning.VertexId.MainLine;
                 double lat, lng;
                 if (TrySegmentGeo(edge, seg, out var ga, out var gb))
                 {
@@ -274,8 +326,8 @@ namespace Carbonix
                     IsLineWaypoint = true,
                     IsInserted     = true,
                     WaypointIndex  = id,
-                    IsBranchVertex = a.IsBranchVertex,
-                    BranchId       = a.BranchId,
+                    IsBranchVertex = edgeIsBranch,
+                    BranchId       = edgeIsBranch ? edge : -1,
                     Lat            = lat,
                     Lng            = lng,
                 });
@@ -307,39 +359,43 @@ namespace Carbonix
             if (idx < 0) return;
             var cp = checkpoints[idx];
 
-            // Line waypoints AND loiter turns anchor a leg (a sharp turn renders as a loiter).
-            ElevationPoint Vertex(int index) => elevationPoints.FirstOrDefault(
-                s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted
-                     && s.Vertex.PolylineId == cp.PolylineId && s.Vertex.Index == index);
-            var vSeg = Vertex(cp.SegmentIndex);
-            var vSeg1 = Vertex(cp.SegmentIndex + 1);
-            if (vSeg == null || vSeg1 == null || Math.Abs(vSeg1.DistM - vSeg.DistM) < 1e-6) return;
+            var sample = elevationPoints.FirstOrDefault(
+                s => s.Vertex.PolylineId == cp.PolylineId && s.Vertex.Index == cp.Id);
+            if (sample == null) return;
 
-            double dist = Math.Max(Math.Min(vSeg.DistM, vSeg1.DistM),
-                          Math.Min(Math.Max(vSeg.DistM, vSeg1.DistM), e.NewDistM));   // clamp to the leg
-            double t = Math.Max(0, Math.Min(1, (dist - vSeg.DistM) / (vSeg1.DistM - vSeg.DistM)));
+            // The leg's true geometry is the polyline segment. Bracket the leg by the inserted
+            // sample's neighbours in DistM (rather than by vertex identity) so a junction leg
+            // works even though its start vertex is a loiter carrying the OTHER polyline's
+            // identity (the stub re-entry case) — and the DistM position separates a junction's
+            // entry loiter from its re-entry loiter, which share a location.
+            if (!TrySegmentGeo(cp.PolylineId, cp.SegmentIndex, out var ga, out var gb)) return;
+
+            var anchors = elevationPoints
+                .Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
+                .OrderBy(s => s.DistM).ToList();
+            var before = anchors.LastOrDefault(s => s.DistM < sample.DistM);
+            var after  = anchors.FirstOrDefault(s => s.DistM > sample.DistM);
+            if (before == null || after == null || Math.Abs(after.DistM - before.DistM) < 1e-6) return;
+
+            // Keep the sample strictly inside the leg so the bracket stays stable across drags.
+            double margin = (after.DistM - before.DistM) * 1e-4;
+            double dist = Math.Max(before.DistM + margin, Math.Min(after.DistM - margin, e.NewDistM));
+            double fracBA = (dist - before.DistM) / (after.DistM - before.DistM);    // before → after
+
+            // T runs from the segment's start vertex (ga = Points[seg]); `before` may sit at
+            // either end of the segment, so orient by which vertex it is nearer.
+            var beforePt = new PointLatLngAlt(before.Lat, before.Lng, 0);
+            bool beforeAtGa = beforePt.GetDistance(ga) <= beforePt.GetDistance(gb);
+            double t = Math.Max(0, Math.Min(1, beforeAtGa ? fracBA : 1.0 - fracBA));
 
             cp.T = t;
             checkpoints[idx] = cp;
             altOverrides[new Carbonix.Planning.VertexId(cp.PolylineId, cp.Id)] = e.NewAltRelM;
 
-            var sample = elevationPoints.FirstOrDefault(
-                s => s.Vertex.PolylineId == cp.PolylineId && s.Vertex.Index == cp.Id);
-            if (sample != null)
-            {
-                sample.DistM = dist;
-                sample.AltRelM = e.NewAltRelM;
-                if (TrySegmentGeo(cp.PolylineId, cp.SegmentIndex, out var ga, out var gb))
-                {
-                    sample.Lat = ga.Lat + t * (gb.Lat - ga.Lat);
-                    sample.Lng = ga.Lng + t * (gb.Lng - ga.Lng);
-                }
-                else
-                {
-                    sample.Lat = vSeg.Lat + t * (vSeg1.Lat - vSeg.Lat);
-                    sample.Lng = vSeg.Lng + t * (vSeg1.Lng - vSeg.Lng);
-                }
-            }
+            sample.DistM = dist;
+            sample.AltRelM = e.NewAltRelM;
+            sample.Lat = ga.Lat + t * (gb.Lat - ga.Lat);
+            sample.Lng = ga.Lng + t * (gb.Lng - ga.Lng);
             elev_profile.Invalidate();
         }
 
