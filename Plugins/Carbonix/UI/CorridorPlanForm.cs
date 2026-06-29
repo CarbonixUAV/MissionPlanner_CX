@@ -1003,20 +1003,26 @@ namespace Carbonix
                 return Math.Abs(b - a);
             }
 
-            void SampleArc(PointLatLngAlt center, double radius, double startBearing, double sweepDeg, CorridorWaypoint owner, double altRel)
+            // A loiter-to-alt ramps its altitude from altStart (entry) to altEnd (exit) across
+            // the arc; a plain loiter passes altStart == altEnd and stays flat.
+            void SampleArc(PointLatLngAlt center, double radius, double startBearing, double sweepDeg,
+                           CorridorWaypoint owner, double altStart, double altEnd, bool isLta)
             {
                 double arcLen = 2.0 * Math.PI * radius * Math.Abs(sweepDeg) / 360.0;
                 int n = Math.Max(2, (int)(arcLen / SampleSpacingM));
                 for (int k = 1; k <= n; k++)
                 {
-                    var pt = center.newpos(startBearing + sweepDeg * k / n, radius);
+                    double frac = (double)k / n;
+                    var pt = center.newpos(startBearing + sweepDeg * frac, radius);
                     samples.Add(new ElevationPoint
                     {
-                        DistM             = cum + arcLen * k / n,
-                        AltRelM           = altRel,
+                        DistM             = cum + arcLen * frac,
+                        AltRelM           = altStart + (altEnd - altStart) * frac,
                         TerrainAlt        = CorridorPlanner.GetTerrainAlt(pt.Lat, pt.Lng),
                         HomeTerrainAlt    = homeTerrainAlt,
                         IsLoiterArcSample = true,
+                        IsLoiterToAlt     = isLta,
+                        LtaStartAltRelM   = altStart,
                         WaypointIndex     = owner.CorridorVertexIndex,
                         IsBranchVertex    = owner.IsBranchVertex,
                         BranchId          = owner.BranchId,
@@ -1100,22 +1106,40 @@ namespace Carbonix
                     double primary = AngleDiffDeg(entry, exit, cw);   // flown arc, [0,360)
                     double primaryLen = 2.0 * Math.PI * radius * primary / 360.0;
 
-                    // Fly the loiter flat at the scan altitude for its EXIT, sampled at the
-                    // rendered orbit-exit point (the exact point the target line uses) rather
-                    // than the engine's projected exit — so the bar's exit sits on the green
-                    // target line. = wp.AltRelM shifted by (rendered-exit − engine-exit) terrain.
-                    var exitPt = center.newpos(exit, radius);
-                    double loiterAlt = wp.AltRelM
-                        + (CorridorPlanner.GetTerrainAlt(exitPt.Lat, exitPt.Lng) - wp.TerrainAltM);
+                    bool isLta = wp.Command == MAVLink.MAV_CMD.LOITER_TO_ALT;
+                    double altStart, altEnd;
+                    if (isLta)
+                    {
+                        // Loiter-to-alt: ramp from the lead-in waypoint's altitude (the WP just
+                        // before it, where the spiral is entered) to the target (wp.AltRelM). The
+                        // segmentizer only renders a minimal capture arc, so draw a full turn to
+                        // show the spiral's ground track (and its length on the distance axis).
+                        altEnd = wp.AltRelM;
+                        altStart = (idx > 0) ? wps[idx - 1].AltRelM : wp.AltRelM;
+                        primary = 360.0;
+                        primaryLen = 2.0 * Math.PI * radius;
+                    }
+                    else
+                    {
+                        // Plain turnaround loiter: flat at the scan altitude for its EXIT, sampled
+                        // at the rendered orbit-exit point (the exact point the target line uses)
+                        // rather than the engine's projected exit, so the bar's exit sits on the
+                        // green target line. = wp.AltRelM shifted by (rendered-exit − engine-exit).
+                        var exitPt = center.newpos(exit, radius);
+                        altStart = altEnd = wp.AltRelM
+                            + (CorridorPlanner.GetTerrainAlt(exitPt.Lat, exitPt.Lng) - wp.TerrainAltM);
+                    }
 
-                    // Loiter bar anchor over the flown arc.
+                    // Loiter bar anchor over the flown arc (AltRelM = target / exit altitude).
                     samples.Add(new ElevationPoint
                     {
                         DistM            = cum,
-                        AltRelM          = loiterAlt,
+                        AltRelM          = altEnd,
+                        LtaStartAltRelM  = altStart,
                         TerrainAlt       = wp.TerrainAltM,
                         HomeTerrainAlt   = homeTerrainAlt,
                         IsLoiterWaypoint = true,
+                        IsLoiterToAlt    = isLta,
                         LoiterRadiusM    = radius,
                         LoiterArcLengthM = primaryLen,
                         WaypointIndex    = wp.CorridorVertexIndex,
@@ -1126,7 +1150,7 @@ namespace Carbonix
                     });
 
                     // Sample only the flown (primary) arc; the un-flown remainder is dropped.
-                    SampleArc(center, radius, entry, sign * primary, wp, loiterAlt);
+                    SampleArc(center, radius, entry, sign * primary, wp, altStart, altEnd, isLta);
                 }
                 else if (show && !wp.IsTurnHelper)
                 {

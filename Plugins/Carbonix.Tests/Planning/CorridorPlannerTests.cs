@@ -616,6 +616,40 @@ namespace Carbonix.Tests.Planning
             }
         }
 
+        [TestMethod]
+        public void Profile_LoiterToAlt_RampsFromLeadInToTarget()
+        {
+            var poly = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt>
+                {
+                    P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02), P(BaseLat, BaseLng + 0.04),
+                },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Reverse },
+            };
+            var ltas = new List<LoiterToAlt>
+            {
+                new LoiterToAlt { PolylineId = VertexId.MainLine, SegmentIndex = 0, T = 0.5,
+                                  Id = 100000, LoiterId = 200000, Side = 1, LtaAltRelM = 999 },
+            };
+
+            var centre = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(passes: 2, offset: 0), poly.Points[0], null, ltas);
+            var profile = Carbonix.CorridorPlanForm.BuildTourProfile(centre, poly.Points[0], 0);
+
+            var lta = profile.Where(s => s.IsLoiterToAlt).ToList();
+            Assert.IsTrue(lta.Count > 0, "the loiter-to-alt renders on the profile");
+            Assert.IsTrue(lta.Any(s => Math.Abs(s.AltRelM - 999) < 5), "the spiral reaches the target altitude");
+            Assert.IsTrue(lta.Any(s => s.AltRelM < 200), "the spiral starts near the lead-in altitude");
+            Assert.IsTrue(lta.All(s => Math.Abs(s.LtaStartAltRelM - 80) < 5),
+                "the spiral's start altitude is the lead-in (~DefaultAGL over flat terrain)");
+        }
+
         // ── Identity (VertexId) ───────────────────────────────────────────────────
 
         [TestMethod]
