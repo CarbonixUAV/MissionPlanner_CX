@@ -147,6 +147,38 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void CornerCut_ChordSlantsAtMeanGradient()
+        {
+            // Descending terrain (down going east). A ~45 deg corner makes a cut chord; the two
+            // cut points must SLANT (different altitudes, following the mean of the leg gradients)
+            // and sample terrain at their OWN positions (continuous), not both at the corner.
+            CorridorPlanner.TerrainProvider = (lat, lng) => -(lng - BaseLng) * MetresPerDegLng;
+            var line = new List<PointLatLngAlt>
+            {
+                P(BaseLat, BaseLng),
+                P(BaseLat, BaseLng + 0.02),
+                P(BaseLat - 0.02, BaseLng + 0.04),   // ~45 deg turn → corner cut
+            };
+
+            var wps = CorridorPlanner.GenerateMission(line, Params(), line[0]);
+
+            CorridorWaypoint entry = null, exit = null;
+            for (int i = 0; i + 1 < wps.Count; i++)
+                if (wps[i].IsLineWaypoint && wps[i + 1].IsLineWaypoint
+                    && wps[i].CorridorVertexIndex >= 0
+                    && wps[i].CorridorVertexIndex == wps[i + 1].CorridorVertexIndex)
+                { entry = wps[i]; exit = wps[i + 1]; break; }
+
+            Assert.IsNotNull(entry, "a ~45 deg corner produces a two-point cut chord");
+            Assert.IsTrue(Math.Abs(entry.AltRelM - exit.AltRelM) > 1.0,
+                "the cut chord slants (the two points get different altitudes), not flat");
+            Assert.IsTrue(entry.AltRelM > exit.AltRelM,
+                "on a descending run the entry sits higher than the exit");
+            Assert.IsTrue(Math.Abs(entry.TerrainAltM - exit.TerrainAltM) > 1.0,
+                "the cut points sample terrain at their own positions (continuous), not the corner");
+        }
+
+        [TestMethod]
         public void GentleBend_StaysPlainWaypoints()
         {
             var line = new List<PointLatLngAlt>

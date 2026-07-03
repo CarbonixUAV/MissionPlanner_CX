@@ -664,11 +664,12 @@ namespace Carbonix.Planning
                     var turn = SolveCornerCut(poly[i], dirIn, dirOut, turnsLeft, cornerCutRadius);
                     if (turn == null) { AddWP(poly[i], i, true); continue; }
 
-                    // Both cut points share the corner vertex's altitude (a flat chord at the
-                    // corner's scan alt) — they're one editable station (same VertexId, linked
-                    // drag), so anchor both terrain samples to the vertex to match.
-                    AddWP(turn.EntryPoint, i, true, poly[i]);
-                    AddWP(turn.ExitPoint, i, true, poly[i]);
+                    // The two cut points share the corner's VertexId (one linked station) but
+                    // sample terrain at their OWN positions (not the corner) so the terrain/target
+                    // line stays continuous through the cut. Their altitudes are set to a sloped
+                    // chord in a post-pass (mean of the in/out leg gradients).
+                    AddWP(turn.EntryPoint, i, true);
+                    AddWP(turn.ExitPoint, i, true);
                     continue;
                 }
 
@@ -939,6 +940,67 @@ namespace Carbonix.Planning
                     result[j].AltRelM = alt;
                     result[j].AltAGL  = alt - result[j].TerrainAltM;
                 }
+            }
+
+            // Corner cuts: the two chord waypoints are a linked pair sharing the corner's VertexId
+            // (consecutive line WPs, same vertex). They're driven by one control point P — like a
+            // fit-point spline — at (x = cut midpoint, y = a control altitude). The incoming leg is
+            // the line prev→P and the outgoing leg P→next; each cut endpoint takes its own leg's
+            // altitude at its own x, so the chord cuts the corner at P. Default control altitude =
+            // the corridor target at the cut midpoint (this is what a future handle drags).
+            double HorizDist(CorridorWaypoint a, CorridorWaypoint b) =>
+                new PointLatLngAlt(a.Lat, a.Lng, 0).GetDistance(new PointLatLngAlt(b.Lat, b.Lng, 0));
+            CorridorWaypoint NearestStation(int from, int step)
+            {
+                for (int k = from; k >= 0 && k < result.Count; k += step)
+                    if (!result[k].IsTurnHelper &&
+                        (result[k].IsLineWaypoint || result[k].Command == MAVLink.MAV_CMD.LOITER_TURNS))
+                        return result[k];
+                return null;
+            }
+            for (int i = 0; i + 1 < result.Count; i++)
+            {
+                var e = result[i]; var x = result[i + 1];
+                if (!e.IsLineWaypoint || !x.IsLineWaypoint || e.IsTurnHelper || x.IsTurnHelper) continue;
+                if (e.CorridorVertexIndex < 0 || e.Vertex != x.Vertex) continue;   // a corner-cut chord pair
+
+                var prev = NearestStation(i - 1, -1);
+                var next = NearestStation(i + 2, +1);
+                if (prev == null || next == null) continue;
+                double dIn = HorizDist(prev, e), dChord = HorizDist(e, x), dOut = HorizDist(x, next);
+                if (dIn < 1e-6 || dOut < 1e-6) continue;
+
+                // Distances along the path with prev at x = 0; the control point sits at the chord
+                // midpoint. y_set defaults to the target altitude at the GEOMETRIC corner (the bend
+                // where the two legs meet) — the cut usually rides slightly higher terrain than the
+                // chord itself, so this reads the corner bump. Reconstruct the corner as the leg-
+                // line intersection and sample terrain there; fall back to the cut midpoint terrain
+                // if the legs are ~parallel.
+                double xEntry = dIn;
+                double xMid   = xEntry + dChord * 0.5;
+                double xNext  = xEntry + dChord + dOut;
+                double yPrev  = prev.AltRelM, yNext = next.AltRelM;
+
+                double ySet;
+                double d1x = e.Lng - prev.Lng, d1y = e.Lat - prev.Lat;
+                double d2x = next.Lng - x.Lng, d2y = next.Lat - x.Lat;
+                double denom = d1x * d2y - d1y * d2x;
+                if (Math.Abs(denom) > 1e-12)
+                {
+                    double t = ((x.Lng - e.Lng) * d2y - (x.Lat - e.Lat) * d2x) / denom;
+                    ySet = GetTerrainAlt(e.Lat + t * d1y, e.Lng + t * d1x) + agl;
+                }
+                else
+                {
+                    ySet = 0.5 * (e.TerrainAltM + x.TerrainAltM) + agl;
+                }
+                double gIn    = (ySet - yPrev) / xMid;                 // incoming leg gradient prev→P
+                double gOut   = (yNext - ySet) / (xNext - xMid);       // outgoing leg gradient P→next
+
+                e.AltRelM = yPrev + gIn * xEntry;                      // incoming leg line at the entry x
+                e.AltAGL  = e.AltRelM - e.TerrainAltM;
+                x.AltRelM = ySet + gOut * (dChord * 0.5);              // outgoing leg line at the exit x
+                x.AltAGL  = x.AltRelM - x.TerrainAltM;
             }
 
             return result;
