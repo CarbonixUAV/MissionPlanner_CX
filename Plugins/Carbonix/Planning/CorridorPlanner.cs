@@ -679,20 +679,21 @@ namespace Carbonix.Planning
 
                     if (turn == null) { AddWP(poly[i], i, true); continue; }
 
-                    // Entry/overfly waypoint, straight leg to the transfer point, then the single
-                    // exit orbit. The loiter's first-guess altitude is the MEAN of the target
-                    // (green) altitude on the incoming and outgoing legs, sampled one radius back
-                    // from the corner on each — a sensible turn altitude that is the same in both
-                    // directions (a corner-alt post-pass then shares it across both passes and the
-                    // lead-in helpers). The helpers anchor to that same mean via the post-pass.
-                    var inTangent  = Geom.Sub(poly[i], Geom.Scale(dirIn, turnRadius));    // one radius back in
-                    var outTangent = Geom.Add(poly[i], Geom.Scale(dirOut, turnRadius));   // one radius on out
+                    // Overfly waypoint, straight leg to the transfer point, then the single exit
+                    // orbit. First-guess altitude = MEAN of the target (green) altitude at the
+                    // turn's ENTRY and EXIT points — where its footprint meets the corridor on each
+                    // side, one turn-radius from the corner along the in/out legs. That reads at the
+                    // green on both sides and is the same in both directions (unlike the solve's
+                    // ExitPoint, which sits further out and read too high). The corner-alt post-pass
+                    // then shares this across both passes and the lead-in helpers.
+                    var entryAnchor = Geom.Sub(poly[i], Geom.Scale(dirIn, turnRadius));    // one radius back, way in
+                    var exitAnchor  = Geom.Add(poly[i], Geom.Scale(dirOut, turnRadius));   // one radius on, way out
                     AddWP(turn.EntryPoint, i, true, turn.ExitPoint, turnHelper: true);
                     AddWP(turn.TransferPoint.Value, i, false, turn.ExitPoint, turnHelper: true);
                     var c2 = turn.Loiters[0];
                     AddLoiter(c2.Center, c2.Radius, c2.Clockwise, i,
                         ArcTurns(turn.TransferPoint.Value, turn.ExitPoint, c2.Center, c2.Clockwise),
-                        inTangent, outTangent);
+                        entryAnchor, exitAnchor);
                 }
             }
 
