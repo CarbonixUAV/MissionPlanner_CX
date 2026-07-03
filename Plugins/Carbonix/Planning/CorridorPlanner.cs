@@ -564,9 +564,12 @@ namespace Carbonix.Planning
             public bool IsTurnHelper;
 
             // When set, terrain (hence altitude) is sampled here instead of at Position.
-            // Used for loiters so the orbit targets the scan altitude at its EXIT, not at
-            // the orbit centre (~the turn vertex, which reads like the entry/exit average).
+            // Used for loiters so the orbit's altitude comes from the leg tangent points rather
+            // than the orbit centre. When TerrainAnchor2 is also set, the altitude is the AVERAGE
+            // of the two — the sharp-turn loiter's first guess = mean of the target (green) alt
+            // on the incoming and outgoing legs, so it's the same in both directions.
             public Vec2? TerrainAnchor;
+            public Vec2? TerrainAnchor2;
         }
 
         // Per-source-vertex metadata for the combined polyline.
@@ -607,7 +610,8 @@ namespace Carbonix.Planning
                 });
             }
 
-            void AddLoiter(Vec2 center, double radius, bool clockwise, int srcIdx, double turns, Vec2 terrainAt)
+            void AddLoiter(Vec2 center, double radius, bool clockwise, int srcIdx, double turns,
+                           Vec2 terrainAt, Vec2? terrainAt2 = null)
             {
                 float radiusSigned = clockwise ? (float)radius : -(float)radius;
                 commands.Add(new CartCommand
@@ -625,7 +629,8 @@ namespace Carbonix.Planning
                     LoiterTurns = turns,
                     IsBranchVertex = meta[srcIdx].isBranchVertex,
                     BranchId = meta[srcIdx].branchId,
-                    TerrainAnchor = terrainAt,   // target scan altitude at the orbit exit
+                    TerrainAnchor = terrainAt,     // sample terrain here (or, with 2, the mean of both)
+                    TerrainAnchor2 = terrainAt2,
                 });
             }
 
@@ -674,18 +679,20 @@ namespace Carbonix.Planning
 
                     if (turn == null) { AddWP(poly[i], i, true); continue; }
 
-                    // Entry/overfly waypoint, straight leg to the transfer point, then the
-                    // single exit orbit. The transfer point sits off the flight line (its own
-                    // terrain projection is unreliable), so anchor the whole turn block —
-                    // entry, transfer, orbit — to the exit terrain: the turn holds the exit
-                    // scan altitude and the climb falls on the approach leg (a ramp, not a
-                    // step on the preturn).
+                    // Entry/overfly waypoint, straight leg to the transfer point, then the single
+                    // exit orbit. The loiter's first-guess altitude is the MEAN of the target
+                    // (green) altitude on the incoming and outgoing legs, sampled one radius back
+                    // from the corner on each — a sensible turn altitude that is the same in both
+                    // directions (a corner-alt post-pass then shares it across both passes and the
+                    // lead-in helpers). The helpers anchor to that same mean via the post-pass.
+                    var inTangent  = Geom.Sub(poly[i], Geom.Scale(dirIn, turnRadius));    // one radius back in
+                    var outTangent = Geom.Add(poly[i], Geom.Scale(dirOut, turnRadius));   // one radius on out
                     AddWP(turn.EntryPoint, i, true, turn.ExitPoint, turnHelper: true);
                     AddWP(turn.TransferPoint.Value, i, false, turn.ExitPoint, turnHelper: true);
                     var c2 = turn.Loiters[0];
                     AddLoiter(c2.Center, c2.Radius, c2.Clockwise, i,
                         ArcTurns(turn.TransferPoint.Value, turn.ExitPoint, c2.Center, c2.Clockwise),
-                        turn.ExitPoint);
+                        inTangent, outTangent);
                 }
             }
 
@@ -875,6 +882,14 @@ namespace Carbonix.Planning
                 var terrGeo   = cmd.TerrainAnchor.HasValue ? FromCart(cmd.TerrainAnchor.Value) : geo;
                 var terrQuery = terrainQueryPoint(cmd, terrGeo);
                 double terr   = GetTerrainAlt(terrQuery.Lat, terrQuery.Lng);
+
+                // Two anchors (sharp-turn loiter): average the terrain of both leg tangent points
+                // so the turn's altitude is the mean of the incoming/outgoing target alts.
+                if (cmd.TerrainAnchor2.HasValue)
+                {
+                    var q2 = terrainQueryPoint(cmd, FromCart(cmd.TerrainAnchor2.Value));
+                    terr = 0.5 * (terr + GetTerrainAlt(q2.Lat, q2.Lng));
+                }
 
                 result.Add(new CorridorWaypoint
                 {
