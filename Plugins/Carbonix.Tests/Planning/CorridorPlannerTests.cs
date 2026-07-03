@@ -137,6 +137,13 @@ namespace Carbonix.Tests.Planning
             // edit keyed on the corner's VertexId moves the whole turn block, not just the loiter.
             Assert.IsTrue(wps.Where(w => w.IsTurnHelper).All(w => w.CorridorVertexIndex >= 0),
                 "turn helpers share their corner's identity so a manual edit reaches them");
+
+            // First guess = MEAN of the target (terrain + AGL) on the two legs, sampled one radius
+            // from the corner — NOT the exit-only altitude. Incoming leg runs east, outgoing south,
+            // so the two ±300 m terrain offsets cancel: mean terrain = 0.02*deg + 80 AGL.
+            double expected = 0.02 * MetresPerDegLng + 80;
+            Assert.AreEqual(expected, byCorner[1][0], 40,
+                "the sharp-turn loiter's first guess is the mean of the two legs' target altitudes");
         }
 
         [TestMethod]
