@@ -83,6 +83,63 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void SharpTurn_AllTurnWaypointsShareOneAltitude()
+        {
+            // Terrain varies (both axes) so the two passes' loiters/anchors would otherwise land
+            // at different altitudes. A sharp corner flown out + back: both loiters AND all their
+            // lead-in helpers, in BOTH directions, must sit at ONE identical altitude — it is the
+            // same turn at the same corner.
+            CorridorPlanner.TerrainProvider =
+                (lat, lng) => (BaseLat - lat) * MetresPerDegLat + (lng - BaseLng) * MetresPerDegLng;
+            var poly = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt>
+                {
+                    P(BaseLat, BaseLng),
+                    P(BaseLat, BaseLng + 0.02),
+                    P(BaseLat - 0.02, BaseLng + 0.02),   // ~90° sharp turn → loiter
+                },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Reverse },
+            };
+
+            var wps = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(passes: 2, offset: 100), poly.Points[0]);
+
+            // Group each turn block (its lead-in helpers + the following loiter) by corner. A
+            // corner flown both ways has two blocks; every waypoint in them must share one alt.
+            var byCorner = new Dictionary<int, List<double>>();
+            var pending = new List<double>();
+            foreach (var w in wps)
+            {
+                if (w.IsTurnHelper) { pending.Add(w.AltRelM); continue; }
+                if (w.Command == MAVLink.MAV_CMD.LOITER_TURNS)
+                {
+                    if (!byCorner.TryGetValue(w.CorridorVertexIndex, out var alts))
+                        byCorner[w.CorridorVertexIndex] = alts = new List<double>();
+                    alts.AddRange(pending);
+                    alts.Add(w.AltRelM);
+                }
+                pending.Clear();
+            }
+
+            Assert.IsTrue(byCorner.ContainsKey(1) && byCorner[1].Count >= 4,
+                "the 90-deg corner is flown both ways (loiter + helpers each pass)");
+            foreach (var kv in byCorner)
+                Assert.IsTrue(kv.Value.All(a => Math.Abs(a - kv.Value[0]) < 1e-6),
+                    $"corner {kv.Key}: every lead-in + loiter altitude is identical across both directions");
+
+            // Every lead-in helper carries its corner's identity (not -1), so a manual altitude
+            // edit keyed on the corner's VertexId moves the whole turn block, not just the loiter.
+            Assert.IsTrue(wps.Where(w => w.IsTurnHelper).All(w => w.CorridorVertexIndex >= 0),
+                "turn helpers share their corner's identity so a manual edit reaches them");
+        }
+
+        [TestMethod]
         public void GentleBend_StaysPlainWaypoints()
         {
             var line = new List<PointLatLngAlt>

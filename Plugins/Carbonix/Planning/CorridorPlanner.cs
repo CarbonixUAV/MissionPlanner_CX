@@ -596,9 +596,12 @@ namespace Carbonix.Planning
                     P1 = 0, P2 = 0, P3 = 0, P4 = 0,
                     IsLineWaypoint = isLineWp,
                     LineIndex = meta[srcIdx].lineIdx,
-                    CorridorVertexIndex = isLineWp ? meta[srcIdx].corridorVtxIdx : -1,
-                    IsBranchVertex = isLineWp && meta[srcIdx].isBranchVertex,
-                    BranchId = isLineWp ? meta[srcIdx].branchId : -1,
+                    // Turn helpers carry their corner's identity too (not just line waypoints), so
+                    // the whole turn block shares the loiter's VertexId and a manual altitude edit
+                    // keyed on it moves the lead-ins with the loiter. (firstStep excludes helpers.)
+                    CorridorVertexIndex = (isLineWp || turnHelper) ? meta[srcIdx].corridorVtxIdx : -1,
+                    IsBranchVertex = (isLineWp || turnHelper) && meta[srcIdx].isBranchVertex,
+                    BranchId = (isLineWp || turnHelper) ? meta[srcIdx].branchId : -1,
                     TerrainAnchor = terrainAt,
                     IsTurnHelper = turnHelper,
                 });
@@ -896,21 +899,29 @@ namespace Carbonix.Planning
                 });
             }
 
-            // The lead-in helpers (overfly + transfer) fly level into the loiter at the
-            // loiter's own altitude — copy it straight across rather than letting each helper
-            // terrain-query independently (which drifts them off the turn altitude). A turn's
-            // helpers are emitted consecutively immediately before its loiter, so walk back
-            // over them. (Their CorridorVertexIndex isn't a reliable key — the transfer helper
-            // is a non-line waypoint and carries -1.)
+            // A sharp-turn corner is ONE place, so both passes' loiters AND all their lead-in
+            // helpers (overfly + transfer) must share ONE altitude — otherwise the same turn
+            // reads at two heights, and a manual edit (keyed on the corner's VertexId) moves only
+            // some of it. Take the highest of the corner's loiters (safest clearance), then stamp
+            // it on every loiter at that corner and its immediately-preceding helpers, which are
+            // emitted consecutively just before it. (LOITER_TO_ALT spirals are deliberate per-pass
+            // altitude changes — left alone.)
+            var cornerAlt = new Dictionary<VertexId, double>();
+            foreach (var w in result)
+                if (w.Command == MAVLink.MAV_CMD.LOITER_TURNS &&
+                    (!cornerAlt.TryGetValue(w.Vertex, out var a) || w.AltRelM > a))
+                    cornerAlt[w.Vertex] = w.AltRelM;
+
             for (int i = 0; i < result.Count; i++)
             {
                 if (result[i].Command != MAVLink.MAV_CMD.LOITER_TURNS) continue;
-                var loiter = result[i];
+                if (!cornerAlt.TryGetValue(result[i].Vertex, out var alt)) continue;
+                result[i].AltRelM = alt;
+                result[i].AltAGL  = alt - result[i].TerrainAltM;
                 for (int j = i - 1; j >= 0 && result[j].IsTurnHelper; j--)
                 {
-                    result[j].AltRelM     = loiter.AltRelM;
-                    result[j].AltAGL      = loiter.AltAGL;
-                    result[j].TerrainAltM = loiter.TerrainAltM;
+                    result[j].AltRelM = alt;
+                    result[j].AltAGL  = alt - result[j].TerrainAltM;
                 }
             }
 
