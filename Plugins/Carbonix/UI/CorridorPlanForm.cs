@@ -72,6 +72,11 @@ namespace Carbonix
         // (the lead-in waypoint + the spiral). Like checkpoints, they bake into the export on regen.
         private readonly List<Carbonix.Planning.LoiterToAlt> loiterToAlts = new List<Carbonix.Planning.LoiterToAlt>();
 
+        // Corner-cut control altitudes (the fit point's y), keyed by the corner's VertexId. Absent
+        // = use the geometric-corner default. Passed to generation so it bakes into the export.
+        private readonly Dictionary<Carbonix.Planning.VertexId, double> cornerCutAlts =
+            new Dictionary<Carbonix.Planning.VertexId, double>();
+
         // Map overlays
         private readonly GMapOverlay layer_corridor;
 
@@ -120,6 +125,7 @@ namespace Carbonix
             elev_profile.LoiterToAltTargetChanged += ElevProfile_LoiterToAltTargetChanged;
             elev_profile.LoiterToAltSwapRequested += ElevProfile_LoiterToAltSwap;
             elev_profile.LoiterToAltRemoveRequested += ElevProfile_LoiterToAltRemove;
+            elev_profile.CornerCutControlChanged += ElevProfile_CornerCutControlChanged;
 
             AddGradientRows();
         }
@@ -489,6 +495,37 @@ namespace Carbonix
             _ = ExecuteGenerateAsync(preserveView: true);
         }
 
+        // Dragging a corner-cut fit point sets its control altitude; store it (baked on regen) and
+        // re-run the fit-point spline on the display so the two cut endpoints move live — no regen.
+        private void ElevProfile_CornerCutControlChanged(object sender, AltChangeEventArgs e)
+        {
+            cornerCutAlts[e.Vertex] = e.NewAltRelM;
+            if (elevationPoints == null) return;
+
+            var ends = elevationPoints.Where(s => s.IsLineWaypoint && !s.IsInserted && s.Vertex == e.Vertex)
+                                      .OrderBy(s => s.DistM).ToList();
+            if (ends.Count != 2) return;
+            var entry = ends[0]; var exit = ends[1];
+
+            var stations = elevationPoints.Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
+                                          .OrderBy(s => s.DistM).ToList();
+            int ei = stations.IndexOf(entry), xi = stations.IndexOf(exit);
+            if (ei <= 0 || xi + 1 >= stations.Count) return;
+            var prev = stations[ei - 1]; var next = stations[xi + 1];
+
+            double xEntry = entry.DistM - prev.DistM;
+            double xMid   = 0.5 * (entry.DistM + exit.DistM) - prev.DistM;
+            double xNext  = next.DistM - prev.DistM;
+            if (xEntry < 1e-6 || (xNext - xMid) < 1e-6) return;
+
+            double yPrev = prev.AltRelM, yNext = next.AltRelM, ySet = e.NewAltRelM;
+            double gIn  = (ySet - yPrev) / xMid;
+            double gOut = (yNext - ySet) / (xNext - xMid);
+            entry.AltRelM = yPrev + gIn * xEntry;                       // incoming leg line at entry x
+            exit.AltRelM  = ySet + gOut * ((exit.DistM - entry.DistM) * 0.5);   // outgoing line at exit x
+            elev_profile.Invalidate();   // control sample already moved by the control; Accept bakes it
+        }
+
         /// <summary>
         /// Apply a profile altitude drag to every waypoint/sample sharing the dragged
         /// vertex. Keyed on VertexId, so a polyline flown out-and-back (and any spur) is
@@ -712,6 +749,7 @@ namespace Carbonix
             // the old edges) no longer line up — dump them rather than mis-apply.
             checkpoints.Clear();
             loiterToAlts.Clear();
+            cornerCutAlts.Clear();
             altOverrides.Clear();
 
             BUT_accept.Enabled = false;
@@ -1000,6 +1038,7 @@ namespace Carbonix
                 var capturedHome     = homePoint;
                 var capturedCheckpoints = checkpoints.ToList();
                 var capturedLtas = loiterToAlts.ToList();
+                var capturedCornerCuts = new Dictionary<Carbonix.Planning.VertexId, double>(cornerCutAlts);
                 (builtPolylines, builtTour, wps, profileSamples, terrAlt) =
                     await System.Threading.Tasks.Task.Run(() =>
                     {
@@ -1008,7 +1047,7 @@ namespace Carbonix
                         double homeT = 0;
                         var (pls, tr) = CorridorTourBuilder.Build(
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
-                        var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints, capturedLtas);
+                        var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts);
 
                         // The elevation profile is a single representative view of both passes,
                         // so build it from a centreline (offset 0) mission of the same tour:
@@ -1018,7 +1057,7 @@ namespace Carbonix
                         // stays the flown/exported one (map, stats, accept).
                         var pCenter = capturedP.Clone();
                         pCenter.PassOffsetM = 0;
-                        var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome, capturedCheckpoints, capturedLtas);
+                        var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts);
                         var profile = BuildTourProfile(centreMission, capturedHome, homeT);
                         EnsureSurfacesLoaded();   // remote header fetch happens here, off the UI thread
                         foreach (var ep in profile)
@@ -1303,6 +1342,42 @@ namespace Carbonix
                     && Keep(wps[seg.EndNode.MissionIndex]))
                     SampleStraight(seg.Path[0], seg.Path[seg.Path.Count - 1], wp);
             }
+
+            // Corner-cut control points: a cut is a vertex with TWO line-WP samples (entry/exit).
+            // Add the fit-point handle at the cut midpoint; reconstruct its control altitude from
+            // the incoming leg (inverse of the engine's fit-point spline) so a drag can set it.
+            var stations = samples.Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
+                                  .OrderBy(s => s.DistM).ToList();
+            var controls = new List<ElevationPoint>();
+            foreach (var g in stations.Where(s => s.IsLineWaypoint).GroupBy(s => s.Vertex).Where(gr => gr.Count() == 2))
+            {
+                var pair = g.OrderBy(s => s.DistM).ToList();
+                var entry = pair[0]; var exit = pair[1];
+                int ei = stations.IndexOf(entry), xi = stations.IndexOf(exit);
+                if (ei <= 0 || xi + 1 >= stations.Count) continue;
+                var prev = stations[ei - 1]; var next = stations[xi + 1];
+                double xEntry = entry.DistM - prev.DistM;
+                if (xEntry < 1e-6) continue;
+                double midDist = 0.5 * (entry.DistM + exit.DistM);
+                double xMid = midDist - prev.DistM;
+                double ySet = prev.AltRelM + (entry.AltRelM - prev.AltRelM) * (xMid / xEntry);
+                entry.IsCornerCutEndpoint = true;   // dots/hit-test move to the fit point below
+                exit.IsCornerCutEndpoint  = true;
+                controls.Add(new ElevationPoint
+                {
+                    DistM              = midDist,
+                    AltRelM            = ySet,
+                    TerrainAlt         = 0.5 * (entry.TerrainAlt + exit.TerrainAlt),
+                    HomeTerrainAlt     = homeTerrainAlt,
+                    IsCornerCutControl = true,
+                    WaypointIndex      = entry.WaypointIndex,
+                    IsBranchVertex     = entry.IsBranchVertex,
+                    BranchId           = entry.BranchId,
+                    Lat                = 0.5 * (entry.Lat + exit.Lat),
+                    Lng                = 0.5 * (entry.Lng + exit.Lng),
+                });
+            }
+            samples.AddRange(controls);
 
             return samples;
         }
