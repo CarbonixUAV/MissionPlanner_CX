@@ -259,6 +259,14 @@ namespace Carbonix.Planning
         public bool IsLoiterToAlt { get; set; }
         public double LtaStartAltRelM { get; set; }
 
+        // Corner-cut control point (the fit point): DistM = cut midpoint, AltRelM = the control
+        // altitude that drives the two chord endpoints. Draggable; not a real waypoint.
+        public bool IsCornerCutControl { get; set; }
+
+        // A corner-cut chord endpoint (entry/exit). Stays on the planned path but has no draggable
+        // dot of its own — the fit point (IsCornerCutControl) is the only handle for the cut.
+        public bool IsCornerCutEndpoint { get; set; }
+
         // Terrain fill points distributed around the loiter arc.
         // NOT draggable; provide terrain variation across the arc for rendering.
         public bool IsLoiterArcSample { get; set; }
@@ -851,7 +859,8 @@ namespace Carbonix.Planning
             List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> combinedMeta,
             Func<CartCommand, PointLatLngAlt, PointLatLngAlt> terrainQueryPoint,
             CorridorParameters p,
-            double homeTerrainAlt)
+            double homeTerrainAlt,
+            IReadOnlyDictionary<VertexId, double> cornerCutAlts = null)
         {
             var result = new List<CorridorWaypoint>();
             if (combinedPts.Count == 0) return result;
@@ -982,17 +991,24 @@ namespace Carbonix.Planning
                 double yPrev  = prev.AltRelM, yNext = next.AltRelM;
 
                 double ySet;
-                double d1x = e.Lng - prev.Lng, d1y = e.Lat - prev.Lat;
-                double d2x = next.Lng - x.Lng, d2y = next.Lat - x.Lat;
-                double denom = d1x * d2y - d1y * d2x;
-                if (Math.Abs(denom) > 1e-12)
+                if (cornerCutAlts != null && cornerCutAlts.TryGetValue(e.Vertex, out var yOverride))
                 {
-                    double t = ((x.Lng - e.Lng) * d2y - (x.Lat - e.Lat) * d2x) / denom;
-                    ySet = GetTerrainAlt(e.Lat + t * d1y, e.Lng + t * d1x) + agl;
+                    ySet = yOverride;   // user-dragged control altitude
                 }
                 else
                 {
-                    ySet = 0.5 * (e.TerrainAltM + x.TerrainAltM) + agl;
+                    double d1x = e.Lng - prev.Lng, d1y = e.Lat - prev.Lat;
+                    double d2x = next.Lng - x.Lng, d2y = next.Lat - x.Lat;
+                    double denom = d1x * d2y - d1y * d2x;
+                    if (Math.Abs(denom) > 1e-12)
+                    {
+                        double t = ((x.Lng - e.Lng) * d2y - (x.Lat - e.Lat) * d2x) / denom;
+                        ySet = GetTerrainAlt(e.Lat + t * d1y, e.Lng + t * d1x) + agl;   // geometric corner
+                    }
+                    else
+                    {
+                        ySet = 0.5 * (e.TerrainAltM + x.TerrainAltM) + agl;
+                    }
                 }
                 double gIn    = (ySet - yPrev) / xMid;                 // incoming leg gradient prev→P
                 double gOut   = (yNext - ySet) / (xNext - xMid);       // outgoing leg gradient P→next
@@ -1021,7 +1037,8 @@ namespace Carbonix.Planning
         /// </summary>
         public static List<CorridorWaypoint> GenerateMissionFromTour(
             List<Polyline> polylines, List<TourStep> tour, CorridorParameters p, PointLatLngAlt homePoint,
-            IReadOnlyList<Checkpoint> checkpoints = null, IReadOnlyList<LoiterToAlt> loiterToAlts = null)
+            IReadOnlyList<Checkpoint> checkpoints = null, IReadOnlyList<LoiterToAlt> loiterToAlts = null,
+            IReadOnlyDictionary<VertexId, double> cornerCutAlts = null)
         {
             var empty = new List<CorridorWaypoint>();
             if (polylines == null || polylines.Count == 0 || tour == null || tour.Count == 0)
@@ -1059,7 +1076,7 @@ namespace Carbonix.Planning
                 return NearestPointOnPolyline(geo, cl).point;
             }
 
-            var wps = SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
+            var wps = SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt, cornerCutAlts);
 
             if (loiterToAlts != null && loiterToAlts.Count > 0)
                 InsertLoiterToAlts(wps, loiterToAlts, byId, p.TurnRadiusM);

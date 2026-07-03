@@ -66,6 +66,9 @@ namespace Carbonix.UI
         public event EventHandler<WaypointRemoveEventArgs> LoiterToAltSwapRequested;
         public event EventHandler<WaypointRemoveEventArgs> LoiterToAltRemoveRequested;
 
+        // Corner-cut fit point dragged (Y only) — carries the corner's VertexId + new control alt.
+        public event EventHandler<AltChangeEventArgs> CornerCutControlChanged;
+
         /// <summary>Raised as the cursor moves over the plot, carrying the geographic
         /// position of the nearest profile sample so the map can mark it (null on leave).
         /// Only fires when the nearest sample changes, so it's cheap to handle.</summary>
@@ -184,9 +187,18 @@ namespace Carbonix.UI
         {
             if (Points == null || !PlotArea.Contains(ex, ey)) return null;
 
+            // Corner-cut fit points first (they sit above/below the chord, so give them priority).
             foreach (var s in Points)
             {
-                if (!s.IsLineWaypoint) continue;
+                if (!s.IsCornerCutControl) continue;
+                PointF sp = D2S(s.DistM * DistMultiplier, s.AltRelM * AltMultiplier);
+                if (Math.Sqrt(Math.Pow(ex - sp.X, 2) + Math.Pow(ey - sp.Y, 2)) <= DotSnap)
+                    return s;
+            }
+
+            foreach (var s in Points)
+            {
+                if (!s.IsLineWaypoint || s.IsCornerCutEndpoint) continue;   // handled by the fit point
                 PointF sp = D2S(s.DistM * DistMultiplier, s.AltRelM * AltMultiplier);
                 if (Math.Sqrt(Math.Pow(ex - sp.X, 2) + Math.Pow(ey - sp.Y, 2)) <= DotSnap)
                     return s;
@@ -447,6 +459,16 @@ namespace Carbonix.UI
                 return;
             }
 
+            // Corner-cut fit point: Y only. Dragging sets the control altitude; the form re-runs
+            // the fit-point spline to move the two cut endpoints.
+            if (draggedSample.IsCornerCutControl)
+            {
+                draggedSample.AltRelM = newAltRelM;
+                CornerCutControlChanged?.Invoke(this, new AltChangeEventArgs(draggedSample.Vertex, false, newAltRelM));
+                Invalidate();
+                return;
+            }
+
             // Loiter-to-alt handle: dragging sets the TARGET (top); the spiral re-ramps from the
             // fixed lead-in altitude. Display-only — the form updates the store (the new terrain/
             // x-axis isn't regenerated until mouse-up / accept).
@@ -570,6 +592,7 @@ namespace Carbonix.UI
                 DrawPlannedPath(g);
                 DrawWaypointDots(g);
                 DrawGradientWarnings(g);   // on top of dots so warnings stay visible
+                DrawCornerCutControls(g);  // fit-point handles on top
                 DrawHoverCursor(g, r);
             }
             else
@@ -616,7 +639,7 @@ namespace Carbonix.UI
             // loiter centre anchors (they sit at the circle centre, off the flown track, and
             // collide in DistM with the entry-leg end → a vertical step into the loiter).
             var terrPts = Points
-                .Where(s => !s.IsInserted && !s.IsLoiterWaypoint)
+                .Where(s => !s.IsInserted && !s.IsLoiterWaypoint && !s.IsCornerCutControl)
                 .OrderBy(s => s.DistM)
                 .ToList();
 
@@ -669,7 +692,7 @@ namespace Carbonix.UI
             {
                 foreach (var s in Points.OrderBy(p => p.DistM))
                 {
-                    if (s.IsLoiterWaypoint || s.IsInserted) continue;   // not on the sampled track
+                    if (s.IsLoiterWaypoint || s.IsInserted || s.IsCornerCutControl) continue;   // not on the sampled track
                     double amsl = surfaceAmsl(s);
                     if (double.IsNaN(amsl))
                     {
@@ -695,7 +718,7 @@ namespace Carbonix.UI
                 {
                     // No meaningful target altitude across a loiter (it's a turn, not a scan
                     // station) — break the line over the whole loiter span.
-                    if (s.IsLoiterWaypoint || s.IsLoiterArcSample)
+                    if (s.IsLoiterWaypoint || s.IsLoiterArcSample || s.IsCornerCutControl)
                     {
                         if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
                         seg.Clear();
@@ -780,7 +803,9 @@ namespace Carbonix.UI
 
             // The aircraft flies at constant altitude (AltRelM) between waypoints — leg
             // terrain samples are excluded so the path is straight between actual waypoints.
-            var path = Points.Where(s => !s.IsLegTerrainSample).OrderBy(s => s.DistM).ToList();
+            // Corner-cut fit points are handles above/below the chord, not on the flown path.
+            var path = Points.Where(s => !s.IsLegTerrainSample && !s.IsCornerCutControl)
+                             .OrderBy(s => s.DistM).ToList();
 
             for (int i = 0; i + 1 < path.Count; i++)
             {
@@ -797,7 +822,7 @@ namespace Carbonix.UI
         private void DrawGradientWarnings(Graphics g)
         {
             if (Points == null) return;
-            var path = Points.Where(s => !s.IsLegTerrainSample).OrderBy(s => s.DistM).ToList();
+            var path = Points.Where(s => !s.IsLegTerrainSample && !s.IsCornerCutControl).OrderBy(s => s.DistM).ToList();
             for (int i = 0; i + 1 < path.Count; i++)
             {
                 var (col, w, warn) = ClassifySegment(path[i], path[i + 1]);
@@ -814,7 +839,7 @@ namespace Carbonix.UI
             if (Points == null) return;
             foreach (var s in Points)
             {
-                if (!s.IsLineWaypoint) continue;
+                if (!s.IsLineWaypoint || s.IsCornerCutEndpoint) continue;   // cut endpoints have no dot
                 bool active = ReferenceEquals(s, hoveredSample) || ReferenceEquals(s, draggedSample);
 
                 PointF cp = D2S(s.DistM * DistMultiplier, s.AltRelM * AltMultiplier);
@@ -824,6 +849,29 @@ namespace Carbonix.UI
                 using (var b = new SolidBrush(fill))
                     g.FillEllipse(b, cp.X - rr, cp.Y - rr, rr * 2, rr * 2);
                 using (var pen = new Pen(Color.White, 1.2f))
+                    g.DrawEllipse(pen, cp.X - rr, cp.Y - rr, rr * 2, rr * 2);
+            }
+        }
+
+        // The corner-cut fit point: a gold dot above/below the chord, with dotted guides to the
+        // two cut endpoints it drives. Drag it (Y) to set the cut's control altitude.
+        private void DrawCornerCutControls(Graphics g)
+        {
+            if (Points == null) return;
+            foreach (var s in Points)
+            {
+                if (!s.IsCornerCutControl) continue;
+                bool active = ReferenceEquals(s, hoveredSample) || ReferenceEquals(s, draggedSample);
+                PointF cp = D2S(s.DistM * DistMultiplier, s.AltRelM * AltMultiplier);
+
+                using (var guide = new Pen(Color.FromArgb(130, Color.Gold), 1f) { DashStyle = DashStyle.Dot })
+                    foreach (var end in Points.Where(p => p.IsLineWaypoint && p.Vertex == s.Vertex))
+                        g.DrawLine(guide, cp, D2S(end.DistM * DistMultiplier, end.AltRelM * AltMultiplier));
+
+                float rr = active ? 7f : 5f;
+                using (var b = new SolidBrush(active ? Color.Yellow : Color.Gold))
+                    g.FillEllipse(b, cp.X - rr, cp.Y - rr, rr * 2, rr * 2);
+                using (var pen = new Pen(Color.FromArgb(50, 50, 50), 1.2f))
                     g.DrawEllipse(pen, cp.X - rr, cp.Y - rr, rr * 2, rr * 2);
             }
         }

@@ -179,6 +179,75 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void CornerCut_ControlAltitudeOverride_MovesTheChord()
+        {
+            // Flat terrain → default control altitude = DefaultAGL, giving a flat cut. Overriding
+            // the control altitude (the fit point) for the corner raises the whole chord.
+            CorridorPlanner.TerrainProvider = (lat, lng) => 0.0;
+            var poly = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt>
+                {
+                    P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02), P(BaseLat - 0.02, BaseLng + 0.04),
+                },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+            };
+
+            (double e, double x) Cut(List<CorridorWaypoint> w)
+            {
+                for (int i = 0; i + 1 < w.Count; i++)
+                    if (w[i].IsLineWaypoint && w[i + 1].IsLineWaypoint && w[i].CorridorVertexIndex >= 0
+                        && w[i].CorridorVertexIndex == w[i + 1].CorridorVertexIndex)
+                        return (w[i].AltRelM, w[i + 1].AltRelM);
+                return (double.NaN, double.NaN);
+            }
+
+            var baseline = Cut(CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(), poly.Points[0]));
+            var overrides = new Dictionary<VertexId, double> { { new VertexId(VertexId.MainLine, 1), 500.0 } };
+            var raised = Cut(CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(), poly.Points[0], null, null, overrides));
+
+            Assert.AreEqual(80, baseline.e, 1.0, "flat terrain → flat cut at DefaultAGL by default");
+            Assert.IsTrue(raised.e > baseline.e + 10 && raised.x > baseline.x + 10,
+                "overriding the control altitude lifts both cut endpoints");
+        }
+
+        [TestMethod]
+        public void Profile_CornerCut_EmitsFitPointControl()
+        {
+            // Flat terrain → the fit point's control altitude reconstructs to DefaultAGL. The
+            // profile must emit an IsCornerCutControl handle at the cut midpoint for each cut.
+            CorridorPlanner.TerrainProvider = (lat, lng) => 0.0;
+            var poly = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt>
+                {
+                    P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.02), P(BaseLat - 0.02, BaseLng + 0.04),
+                },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Reverse },
+            };
+
+            var centre = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(passes: 2, offset: 0), poly.Points[0]);
+            var profile = Carbonix.CorridorPlanForm.BuildTourProfile(centre, poly.Points[0], 0);
+
+            var controls = profile.Where(s => s.IsCornerCutControl).ToList();
+            Assert.IsTrue(controls.Count >= 1, "the corner cut emits a fit-point control on the profile");
+            Assert.IsTrue(controls.All(c => Math.Abs(c.AltRelM - 80) < 5),
+                "the control altitude reconstructs to the geometric-corner target (flat → DefaultAGL)");
+        }
+
+        [TestMethod]
         public void GentleBend_StaysPlainWaypoints()
         {
             var line = new List<PointLatLngAlt>
