@@ -840,9 +840,11 @@ namespace Carbonix.Planning
 
             // 5-7. Solve turns, project back to geo, sample terrain, build waypoints.
             //      Lanes project onto the centreline; branch detours keep their own terrain.
-            return SolveAndBuildWaypoints(combinedPts, combinedMeta,
+            var wps = SolveAndBuildWaypoints(combinedPts, combinedMeta,
                 (cmd, geo) => cmd.IsBranchVertex ? geo : NearestPointOnPolyline(geo, centerLine).point,
                 p, homeTerrainAlt);
+            ApplyCornerCutSlant(wps, p.DefaultAGL, null);
+            return wps;
         }
 
         /// <summary>
@@ -859,8 +861,7 @@ namespace Carbonix.Planning
             List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> combinedMeta,
             Func<CartCommand, PointLatLngAlt, PointLatLngAlt> terrainQueryPoint,
             CorridorParameters p,
-            double homeTerrainAlt,
-            IReadOnlyDictionary<VertexId, double> cornerCutAlts = null)
+            double homeTerrainAlt)
         {
             var result = new List<CorridorWaypoint>();
             if (combinedPts.Count == 0) return result;
@@ -951,19 +952,44 @@ namespace Carbonix.Planning
                 }
             }
 
-            // Corner cuts: the two chord waypoints are a linked pair sharing the corner's VertexId
-            // (consecutive line WPs, same vertex). They're driven by one control point P — like a
-            // fit-point spline — at (x = cut midpoint, y = a control altitude). The incoming leg is
-            // the line prev→P and the outgoing leg P→next; each cut endpoint takes its own leg's
-            // altitude at its own x, so the chord cuts the corner at P. Default control altitude =
-            // the corridor target at the cut midpoint (this is what a future handle drags).
+            // Corner-cut slant runs later (ApplyCornerCutSlant, after loiter-to-alts are inserted)
+            // so a cut out of an LTA reads the spiral's exit altitude, not the lead-in.
+            return result;
+        }
+
+        /// <summary>
+        /// Slant each corner cut as a fit-point spline. The two chord waypoints are a linked pair
+        /// sharing the corner's VertexId (consecutive line WPs, same vertex). They're driven by one
+        /// control point P — like a fit-point spline — at (x = cut midpoint, y = a control altitude).
+        /// The incoming leg is the line prev→P and the outgoing leg P→next; each cut endpoint takes
+        /// its own leg's altitude at its own x, so the chord cuts the corner at P. Default control
+        /// altitude = terrain at the geometric corner + AGL (the cut usually rides the corner bump);
+        /// <paramref name="cornerCutAlts"/> overrides it per corner (the draggable handle).
+        /// Runs on the FINAL waypoint list — after loiter-to-alts are inserted — so a cut coming out
+        /// of an LTA takes the spiral's exit altitude (its altitude reference), not the lead-in.
+        /// </summary>
+        private static void ApplyCornerCutSlant(List<CorridorWaypoint> result, double agl,
+                                                IReadOnlyDictionary<VertexId, double> cornerCutAlts)
+        {
             double HorizDist(CorridorWaypoint a, CorridorWaypoint b) =>
                 new PointLatLngAlt(a.Lat, a.Lng, 0).GetDistance(new PointLatLngAlt(b.Lat, b.Lng, 0));
+            // Altitude reference: a loiter's exit (turnaround OR loiter-to-alt) sets the altitude
+            // the aircraft carries into the leg, so include loiters here.
             CorridorWaypoint NearestStation(int from, int step)
             {
                 for (int k = from; k >= 0 && k < result.Count; k += step)
                     if (!result[k].IsTurnHelper &&
-                        (result[k].IsLineWaypoint || result[k].Command == MAVLink.MAV_CMD.LOITER_TURNS))
+                        (result[k].IsLineWaypoint || result[k].Command == MAVLink.MAV_CMD.LOITER_TURNS
+                                                  || result[k].Command == MAVLink.MAV_CMD.LOITER_TO_ALT))
+                        return result[k];
+                return null;
+            }
+            // Leg geometry: a loiter centre is off the line, so distances + the corner-line
+            // reconstruction use the nearest on-line waypoint instead.
+            CorridorWaypoint NearestLine(int from, int step)
+            {
+                for (int k = from; k >= 0 && k < result.Count; k += step)
+                    if (!result[k].IsTurnHelper && result[k].IsLineWaypoint)
                         return result[k];
                 return null;
             }
@@ -973,10 +999,12 @@ namespace Carbonix.Planning
                 if (!e.IsLineWaypoint || !x.IsLineWaypoint || e.IsTurnHelper || x.IsTurnHelper) continue;
                 if (e.CorridorVertexIndex < 0 || e.Vertex != x.Vertex) continue;   // a corner-cut chord pair
 
-                var prev = NearestStation(i - 1, -1);
+                var prev = NearestStation(i - 1, -1);   // altitude reference (loiter exit incl.)
                 var next = NearestStation(i + 2, +1);
-                if (prev == null || next == null) continue;
-                double dIn = HorizDist(prev, e), dChord = HorizDist(e, x), dOut = HorizDist(x, next);
+                var prevGeom = NearestLine(i - 1, -1);  // leg geometry (on the line)
+                var nextGeom = NearestLine(i + 2, +1);
+                if (prev == null || next == null || prevGeom == null || nextGeom == null) continue;
+                double dIn = HorizDist(prevGeom, e), dChord = HorizDist(e, x), dOut = HorizDist(x, nextGeom);
                 if (dIn < 1e-6 || dOut < 1e-6) continue;
 
                 // Distances along the path with prev at x = 0; the control point sits at the chord
@@ -997,8 +1025,8 @@ namespace Carbonix.Planning
                 }
                 else
                 {
-                    double d1x = e.Lng - prev.Lng, d1y = e.Lat - prev.Lat;
-                    double d2x = next.Lng - x.Lng, d2y = next.Lat - x.Lat;
+                    double d1x = e.Lng - prevGeom.Lng, d1y = e.Lat - prevGeom.Lat;
+                    double d2x = nextGeom.Lng - x.Lng, d2y = nextGeom.Lat - x.Lat;
                     double denom = d1x * d2y - d1y * d2x;
                     if (Math.Abs(denom) > 1e-12)
                     {
@@ -1018,8 +1046,6 @@ namespace Carbonix.Planning
                 x.AltRelM = ySet + gOut * (dChord * 0.5);              // outgoing leg line at the exit x
                 x.AltAGL  = x.AltRelM - x.TerrainAltM;
             }
-
-            return result;
         }
 
         /// <summary>
@@ -1076,11 +1102,13 @@ namespace Carbonix.Planning
                 return NearestPointOnPolyline(geo, cl).point;
             }
 
-            var wps = SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt, cornerCutAlts);
+            var wps = SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
 
             if (loiterToAlts != null && loiterToAlts.Count > 0)
                 InsertLoiterToAlts(wps, loiterToAlts, byId, p.TurnRadiusM);
 
+            // AFTER the LTA spirals are in place, so a cut out of an LTA reads the spiral's exit alt.
+            ApplyCornerCutSlant(wps, p.DefaultAGL, cornerCutAlts);
             return wps;
         }
 

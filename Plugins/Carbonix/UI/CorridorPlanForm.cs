@@ -345,6 +345,8 @@ namespace Carbonix
                     Lat            = lat,
                     Lng            = lng,
                 });
+                InvalidateCornerCutJobs();   // the point set changed
+                RecomputeCornerCuts();       // the new checkpoint may be a cut's neighbour
                 elev_profile.Invalidate();
                 return;
             }
@@ -359,6 +361,8 @@ namespace Carbonix
             altOverrides.Remove(new Carbonix.Planning.VertexId(cp.PolylineId, cp.Id));
             elevationPoints?.RemoveAll(s => s.IsInserted && s.WaypointIndex == cp.Id
                                             && s.Vertex.PolylineId == cp.PolylineId);
+            InvalidateCornerCutJobs();   // the point set changed
+            RecomputeCornerCuts();       // removing a neighbour reshapes an adjacent cut
             elev_profile.Invalidate();   // display-only; Accept rebuilds the export from the store
         }
 
@@ -410,6 +414,8 @@ namespace Carbonix
             sample.AltRelM = e.NewAltRelM;
             sample.Lat = ga.Lat + t * (gb.Lat - ga.Lat);
             sample.Lng = ga.Lng + t * (gb.Lng - ga.Lng);
+            InvalidateCornerCutJobs();   // the checkpoint's DistM changed
+            RecomputeCornerCuts();       // moving a neighbouring checkpoint reshapes an adjacent cut
             elev_profile.Invalidate();
         }
 
@@ -475,6 +481,12 @@ namespace Carbonix
             var lta = loiterToAlts[idx];
             lta.LtaAltRelM = e.NewTargetAltRelM;
             loiterToAlts[idx] = lta;   // display-only: control re-ramped the arc; Accept bakes it
+
+            // The target IS the spiral's exit altitude, which a corner cut out of the LTA reads as
+            // its incoming reference — so the adjacent cut must re-slant (as it does for a lead-in
+            // drag). The control already moved the loiter anchor's AltRelM in the shared list.
+            RecomputeCornerCuts();
+            elev_profile.Invalidate();
         }
 
         private void ElevProfile_LoiterToAltSwap(object sender, WaypointRemoveEventArgs e)
@@ -499,31 +511,74 @@ namespace Carbonix
         // re-run the fit-point spline on the display so the two cut endpoints move live — no regen.
         private void ElevProfile_CornerCutControlChanged(object sender, AltChangeEventArgs e)
         {
-            cornerCutAlts[e.Vertex] = e.NewAltRelM;
+            cornerCutAlts[e.Vertex] = e.NewAltRelM;   // the control sample is already moved by the control
+            RecomputeCornerCuts();
+            elev_profile.Invalidate();
+        }
+
+        // One corner cut's fixed geometry: the endpoint/neighbour/control sample references plus the
+        // along-path x-distances (which depend only on DistM, unchanged by an altitude drag). Cached
+        // so the per-mouse-move recompute is pure arithmetic — no LINQ, sort or IndexOf scans, which
+        // stuttered when tweaking altitudes with hundreds of points on screen.
+        private sealed class CornerCutJob
+        {
+            public ElevationPoint Control, Entry, Exit, Prev, Next;
+            public double XEntry, XMid, XNext, ExitHalfChord;
+        }
+        private List<CornerCutJob> cornerCutJobs;   // null = stale; rebuilt lazily on next recompute
+
+        // Rebuild the corner-cut cache from the current profile. Call whenever the point SET or any
+        // DistM changes (generate, checkpoint insert/move/remove) — not on an altitude-only edit.
+        private void InvalidateCornerCutJobs() => cornerCutJobs = null;
+
+        private void RebuildCornerCutJobs()
+        {
+            cornerCutJobs = new List<CornerCutJob>();
             if (elevationPoints == null) return;
-
-            var ends = elevationPoints.Where(s => s.IsLineWaypoint && !s.IsInserted && s.Vertex == e.Vertex)
-                                      .OrderBy(s => s.DistM).ToList();
-            if (ends.Count != 2) return;
-            var entry = ends[0]; var exit = ends[1];
-
-            var stations = elevationPoints.Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
+            var stations = elevationPoints.Where(s => s.IsLineWaypoint || s.IsLoiterWaypoint)
                                           .OrderBy(s => s.DistM).ToList();
-            int ei = stations.IndexOf(entry), xi = stations.IndexOf(exit);
-            if (ei <= 0 || xi + 1 >= stations.Count) return;
-            var prev = stations[ei - 1]; var next = stations[xi + 1];
+            foreach (var control in elevationPoints.Where(s => s.IsCornerCutControl))
+            {
+                var ends = elevationPoints.Where(s => s.IsCornerCutEndpoint && s.Vertex == control.Vertex)
+                                          .OrderBy(s => s.DistM).ToList();
+                if (ends.Count != 2) continue;
+                var entry = ends[0]; var exit = ends[1];
+                int ei = stations.IndexOf(entry), xi = stations.IndexOf(exit);
+                if (ei <= 0 || xi < 0 || xi + 1 >= stations.Count) continue;
+                var prev = stations[ei - 1]; var next = stations[xi + 1];
 
-            double xEntry = entry.DistM - prev.DistM;
-            double xMid   = 0.5 * (entry.DistM + exit.DistM) - prev.DistM;
-            double xNext  = next.DistM - prev.DistM;
-            if (xEntry < 1e-6 || (xNext - xMid) < 1e-6) return;
+                // A loiter prev's altitude is carried out of its EXIT (anchor + arc), so the
+                // incoming leg starts there — otherwise the spiral length inflates the run and the
+                // leg reads near-flat, kinking the join out of an LTA.
+                double prevDist = prev.IsLoiterWaypoint ? prev.DistM + prev.LoiterArcLengthM : prev.DistM;
+                double xEntry = entry.DistM - prevDist;
+                double xMid   = 0.5 * (entry.DistM + exit.DistM) - prevDist;
+                double xNext  = next.DistM - prevDist;
+                if (xEntry < 1e-6 || (xNext - xMid) < 1e-6) continue;
 
-            double yPrev = prev.AltRelM, yNext = next.AltRelM, ySet = e.NewAltRelM;
-            double gIn  = (ySet - yPrev) / xMid;
-            double gOut = (yNext - ySet) / (xNext - xMid);
-            entry.AltRelM = yPrev + gIn * xEntry;                       // incoming leg line at entry x
-            exit.AltRelM  = ySet + gOut * ((exit.DistM - entry.DistM) * 0.5);   // outgoing line at exit x
-            elev_profile.Invalidate();   // control sample already moved by the control; Accept bakes it
+                cornerCutJobs.Add(new CornerCutJob
+                {
+                    Control = control, Entry = entry, Exit = exit, Prev = prev, Next = next,
+                    XEntry = xEntry, XMid = xMid, XNext = xNext,
+                    ExitHalfChord = (exit.DistM - entry.DistM) * 0.5,
+                });
+            }
+        }
+
+        // Re-run every corner cut's fit-point spline against its CURRENT neighbour + control
+        // altitudes, so the chord tracks adjacent edits live — matching what a regenerate produces.
+        // Cheap enough to call on every mouse-move: the geometry is cached (see RebuildCornerCutJobs).
+        private void RecomputeCornerCuts()
+        {
+            if (cornerCutJobs == null) RebuildCornerCutJobs();
+            foreach (var j in cornerCutJobs)
+            {
+                double yPrev = j.Prev.AltRelM, yNext = j.Next.AltRelM, ySet = j.Control.AltRelM;
+                double gIn  = (ySet - yPrev) / j.XMid;
+                double gOut = (yNext - ySet) / (j.XNext - j.XMid);
+                j.Entry.AltRelM = yPrev + gIn * j.XEntry;        // incoming leg at entry x
+                j.Exit.AltRelM  = ySet + gOut * j.ExitHalfChord; // outgoing leg at exit x
+            }
         }
 
         /// <summary>
@@ -560,6 +615,7 @@ namespace Carbonix
                         }
                     }
                 }
+                RecomputeCornerCuts();   // the lead-in may neighbour a cut chord
                 elev_profile.Invalidate();
                 return;   // the control already moved the lead-in dot
             }
@@ -595,6 +651,8 @@ namespace Carbonix
                     }
                 }
             }
+
+            RecomputeCornerCuts();   // a neighbouring vertex's altitude drives adjacent cut chords
 
             // No DrawMap here: an altitude change doesn't move the ground track, and
             // rebuilding the map overlay every mouse-move made dragging crawl. The profile
@@ -1092,6 +1150,7 @@ namespace Carbonix
             generatedWps    = wps;
             elevationPoints = profileSamples;
             homeTerrainAlt  = terrAlt;
+            InvalidateCornerCutJobs();   // fresh profile — the cached geometry is stale
 
             ApplyAltOverrides();   // re-apply edits/checkpoints from a previous generate
             MarkInsertedSamples();
@@ -1356,10 +1415,12 @@ namespace Carbonix
                 int ei = stations.IndexOf(entry), xi = stations.IndexOf(exit);
                 if (ei <= 0 || xi + 1 >= stations.Count) continue;
                 var prev = stations[ei - 1]; var next = stations[xi + 1];
-                double xEntry = entry.DistM - prev.DistM;
+                // A loiter prev's altitude is carried out of its EXIT (anchor + arc), not its entry.
+                double prevDist = prev.IsLoiterWaypoint ? prev.DistM + prev.LoiterArcLengthM : prev.DistM;
+                double xEntry = entry.DistM - prevDist;
                 if (xEntry < 1e-6) continue;
                 double midDist = 0.5 * (entry.DistM + exit.DistM);
-                double xMid = midDist - prev.DistM;
+                double xMid = midDist - prevDist;
                 double ySet = prev.AltRelM + (entry.AltRelM - prev.AltRelM) * (xMid / xEntry);
                 entry.IsCornerCutEndpoint = true;   // dots/hit-test move to the fit point below
                 exit.IsCornerCutEndpoint  = true;
