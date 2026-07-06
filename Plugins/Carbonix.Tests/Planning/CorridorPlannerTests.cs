@@ -248,6 +248,48 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void CornerCut_AfterLoiterToAlt_TakesLoiterExitAltitude()
+        {
+            // A loiter-to-alt (climb to 2000) then a ~45 deg corner cut. The cut's incoming leg
+            // must start from the LTA EXIT altitude (2000), not the lead-in (100) — otherwise the
+            // join out of the spiral kinks.
+            CorridorPlanner.TerrainProvider = (lat, lng) => 0.0;
+            var poly = new Polyline
+            {
+                Id = VertexId.MainLine,
+                Points = new List<PointLatLngAlt>
+                {
+                    P(BaseLat, BaseLng), P(BaseLat, BaseLng + 0.04), P(BaseLat - 0.02, BaseLng + 0.06),
+                },
+            };
+            var tour = new List<TourStep>
+            {
+                new TourStep { PolylineId = VertexId.MainLine, Direction = TraverseDir.Forward },
+            };
+            var ltas = new List<LoiterToAlt>
+            {
+                new LoiterToAlt { PolylineId = VertexId.MainLine, SegmentIndex = 0, T = 0.5,
+                                  Id = 100000, LoiterId = 200000, Side = 1, LeadInAltRelM = 100, LtaAltRelM = 2000 },
+            };
+
+            var wps = CorridorPlanner.GenerateMissionFromTour(
+                new List<Polyline> { poly }, tour, Params(), poly.Points[0], null, ltas);
+
+            CorridorWaypoint entry = null;
+            for (int i = 0; i + 1 < wps.Count; i++)
+                if (wps[i].IsLineWaypoint && wps[i + 1].IsLineWaypoint && wps[i].CorridorVertexIndex >= 0
+                    && wps[i].CorridorVertexIndex == wps[i + 1].CorridorVertexIndex)
+                { entry = wps[i]; break; }
+
+            Assert.IsNotNull(entry, "there is a corner cut after the LTA");
+            // The incoming leg descends from the LTA exit (2000) to the corner control alt (~80),
+            // so the entry sits ELEVATED above the lead-in (100). Anchoring to the lead-in instead
+            // would drop it below 100 (a flat/kinked chord). > lead-in proves it reads the spiral.
+            Assert.IsTrue(entry.AltRelM > 120,
+                $"the cut's entry ({entry.AltRelM:F0}) descends from the LTA exit (2000), not the lead-in (100)");
+        }
+
+        [TestMethod]
         public void GentleBend_StaysPlainWaypoints()
         {
             var line = new List<PointLatLngAlt>
