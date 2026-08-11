@@ -956,13 +956,31 @@ namespace GMap.NET.Internals
                            }
 
                            // check for parent tiles if not found
-                           if(img == null && okZoom > 0 && fillEmptyTiles && Provider.Projection is MercatorProjection)
+                           //
+                           // a layer that has opted out of filling still gets one
+                           // above its own max zoom: "I do not go that deep" is a
+                           // different statement from "there is nothing here", and
+                           // only the first should be answered with a magnified
+                           // parent
+                           bool overzoomed = tl.MaxZoom.HasValue && task.Value.Zoom > tl.MaxZoom.Value;
+
+                           if(img == null && okZoom > 0 && fillEmptyTiles && (tl.FillEmptyTiles || overzoomed) && Provider.Projection is MercatorProjection)
                            {
-                              int zoomOffset = task.Value.Zoom > okZoom ? task.Value.Zoom - okZoom : 1;
+                              // a layer that has opted out substitutes only from
+                              // its own deepest level. Searching past that is
+                              // wrong for it: the tileset genuinely has nothing
+                              // there, and a far ancestor would smear a handful
+                              // of its pixels across the whole screen.
+                              int floorZoom = tl.FillEmptyTiles ? 1 : Math.Max(1, tl.MaxZoom ?? 1);
+
+                              int zoomOffset = tl.FillEmptyTiles
+                                 ? (task.Value.Zoom > okZoom ? task.Value.Zoom - okZoom : 1)
+                                 : task.Value.Zoom - floorZoom;
+
                               long Ix = 0;
                               GPoint parentTile = GPoint.Empty;
 
-                              while(img == null && zoomOffset < task.Value.Zoom)
+                              while(img == null && zoomOffset < task.Value.Zoom && task.Value.Zoom - zoomOffset >= floorZoom)
                               {
                                  Ix = (long)Math.Pow(2, zoomOffset);
                                  parentTile = new GMap.NET.GPoint((task.Value.Pos.X / Ix), (task.Value.Pos.Y / Ix));

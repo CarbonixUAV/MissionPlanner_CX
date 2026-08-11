@@ -379,6 +379,21 @@ namespace GMap.NET.MapProviders
         public bool BypassCache = false;
 
         /// <summary>
+        /// when this layer has no tile at a position, whether to substitute a
+        /// magnified tile from a lower zoom level.
+        ///
+        /// Base maps want this: it is what keeps imagery on screen while a
+        /// deeper zoom loads. Sparse overlay layers do not -- for them a miss
+        /// means "nothing here", and magnifying a parent paints content across
+        /// ground that has none.
+        ///
+        /// Set false, a layer is still magnified when asked above its own
+        /// MaxZoom, so zooming past the depth it was built at leaves it blurry
+        /// rather than dropping it.
+        /// </summary>
+        public bool FillEmptyTiles = true;
+
+        /// <summary>
         /// internal proxy for image managment
         /// </summary>
         public static PureImageProxy TileImageProxy;
