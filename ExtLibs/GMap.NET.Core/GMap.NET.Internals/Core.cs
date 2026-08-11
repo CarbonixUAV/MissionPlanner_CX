@@ -187,6 +187,18 @@ namespace GMap.NET.Internals
       }
 
       public GMapProvider provider;
+
+      /// <summary>
+      /// extra tile layers drawn over the selected provider's own layers, in
+      /// order. Set through GMapControl.ExtraOverlays.
+      ///
+      /// Separate from Provider on purpose: which map is selected and what is
+      /// layered over it are different questions, and the provider slot is
+      /// user-facing and persisted. Read on the tile threads, replaced whole
+      /// rather than mutated.
+      /// </summary>
+      public volatile GMapProvider[] extraOverlays = new GMapProvider[0];
+
       public GMapProvider Provider
       {
          get
@@ -885,7 +897,20 @@ namespace GMap.NET.Internals
 
                      Tile t = new Tile(task.Value.Zoom, task.Value.Pos);
 
-                     foreach(var tl in provider.Overlays)
+                     // the provider's own layers, then anything the control has
+                     // been given to draw over the top of them
+                     var layers = provider.Overlays;
+                     var extra = extraOverlays;
+                     if(extra.Length > 0)
+                     {
+                        var own = layers ?? new GMapProvider[0];
+                        var all = new GMapProvider[own.Length + extra.Length];
+                        own.CopyTo(all, 0);
+                        extra.CopyTo(all, own.Length);
+                        layers = all;
+                     }
+
+                     foreach(var tl in layers)
                      {
                         int retry = 0;
                         do
@@ -1059,7 +1084,9 @@ namespace GMap.NET.Internals
       /// </summary>
       void UpdateBounds()
       {
-         if(!IsStarted || Provider.Equals(EmptyProvider.Instance))
+         // an empty base map is only nothing to do while there is also nothing
+         // layered over it
+         if(!IsStarted || (Provider.Equals(EmptyProvider.Instance) && extraOverlays.Length == 0))
          {
             return;
          }

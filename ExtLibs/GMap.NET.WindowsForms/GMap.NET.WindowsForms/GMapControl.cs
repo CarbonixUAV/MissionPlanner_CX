@@ -594,7 +594,10 @@ namespace GMap.NET.WindowsForms
         /// <param name="g"></param>
         void DrawMap(IGraphics g)
         {
-            if (Core.updatingBounds || MapProvider == EmptyProvider.Instance || MapProvider == null)
+            // an empty base map is only nothing to draw while there is also
+            // nothing layered over it
+            if (Core.updatingBounds || MapProvider == null ||
+                (MapProvider == EmptyProvider.Instance && Core.extraOverlays.Length == 0))
             {
                 Debug.WriteLine("Core.updatingBounds");
                 return;
@@ -2860,6 +2863,26 @@ namespace GMap.NET.WindowsForms
         public RectLatLng ViewArea
         {
             get { return Core.ViewArea; }
+        }
+
+        /// <summary>
+        /// extra tile layers drawn over the selected map type, in order -- later
+        /// entries draw over earlier ones.
+        ///
+        /// This is additive and per control: MapProvider keeps holding whatever
+        /// the user picked, so the map type dropdown, the provider list and the
+        /// persisted MapType setting all stay untouched. Assign an empty array
+        /// to remove them.
+        /// </summary>
+        [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public GMapProvider[] ExtraOverlays
+        {
+            get { return Core.extraOverlays; }
+            set
+            {
+                Core.extraOverlays = value ?? new GMapProvider[0];
+                ReloadMap();
+            }
         }
 
         [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
