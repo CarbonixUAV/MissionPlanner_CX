@@ -758,13 +758,14 @@ namespace Carbonix
                 PointLatLngAlt pnt = Host.FPMenuMapPosition;
                 double alt = double.Parse(Host.MainForm.FlightPlanner.TXT_DefaultAlt.Text);
                 // Prompt for altitude
-                var result = InputBox.Show("Loiter-to-Alt", "Enter altitude in " + MissionPlanner.CurrentState.AltUnit, ref alt);
-                if (result != DialogResult.OK)
-                {
+                if (DialogResult.Cancel == InputBox.Show("Loiter-to-Alt", "Enter altitude in " + MissionPlanner.CurrentState.AltUnit, ref alt))
                     return;
-                }
+                // Radius
+                double radius = double.Parse(Host.MainForm.FlightPlanner.TXT_loiterrad.Text);
+                if (DialogResult.Cancel == InputBox.Show("Loiter-to-Alt", "Enter radius(m)", ref radius))
+                    return;
                 pnt.Alt = alt;
-                Host.AddWPtoList(MAVLink.MAV_CMD.LOITER_TO_ALT, 0, 0, 0, 0, pnt.Lng, pnt.Lat, pnt.Alt);
+                Host.AddWPtoList(MAVLink.MAV_CMD.LOITER_TO_ALT, 0, radius, 0, 0, pnt.Lng, pnt.Lat, pnt.Alt);
             };
             // Insert the new entry at the top of the loiter submenu
             ((ToolStripMenuItem)Host.FPMenuMap.Items["loiterToolStripMenuItem"]).DropDownItems.Insert(0, landitem);
