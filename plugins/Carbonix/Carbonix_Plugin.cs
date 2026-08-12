@@ -18,7 +18,9 @@ using MissionPlanner.GCSViews.ConfigurationView;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Carbonix.CAS;
+using Carbonix.MapTiles;
 using Carbonix.Warnings;
+using GMap.NET.WindowsForms;
 
 namespace Carbonix
 {
@@ -49,6 +51,9 @@ namespace Carbonix
         SpeechWarningConsumer _speechConsumer;
 
         CasCoordinator _cas;
+
+        // Custom map tilesets (MBTiles) drawn over the base map
+        MapTilesCoordinator _maptiles;
 
         public override bool Init() { return true; }
 
@@ -85,6 +90,21 @@ namespace Carbonix
             // Add extra options to FlightPlanner (like landing planner)
             AddPlanningOptions();
 
+            // Draw local MBTiles tilesets over the base map.
+            //
+            // Anything that goes wrong here (missing SQLite native payload, an
+            // unreadable folder) must not take plugin load down with it. A
+            // tileset that fails to open is reported per-file by the catalog and
+            // shown in the management window.
+            try
+            {
+                _maptiles = new MapTilesCoordinator(Host, settings.fdmap_baselayer_allow);
+            }
+            catch (Exception ex)
+            {
+                log.Error("map tileset setup failed", ex);
+            }
+
             // Change HUD bottom color to a lighter brown color than stock
             Host.MainForm.FlightData.Load += new EventHandler(ForceHUD);
 
@@ -114,6 +134,7 @@ namespace Carbonix
         {
             _cas?.Dispose();
             _warningEngine?.Dispose();
+            _maptiles?.Dispose();
 
             return true;
         }

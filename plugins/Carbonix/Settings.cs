@@ -17,6 +17,7 @@ namespace Carbonix
         public List<string> fpmap_menu_autowp_allow;
         public List<string> fpmap_menu_maptool_allow;
         public List<string> pilot_locations;
+        public List<string> fdmap_baselayer_allow;
         public string controller;
         public string weather_api_key;
 
@@ -66,6 +67,17 @@ namespace Carbonix
             {
                 "Field",
                 "ROC1"
+            };
+            // Short list of base maps offered on the FlightData context menu.
+            // Matched on provider type name, since the display names come from
+            // localisable resource strings. The full list is still available in
+            // the map type dropdown on the Plan screen.
+            fdmap_baselayer_allow = new List<string>()
+            {
+                "GoogleSatelliteMapProvider",
+                "GoogleHybridMapProvider",
+                "GoogleTerrainMapProvider",
+                "EmptyProvider"
             };
             controller = "Radiomaster GX12 Joystick";
             /*
