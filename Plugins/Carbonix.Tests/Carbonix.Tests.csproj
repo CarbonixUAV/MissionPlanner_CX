@@ -16,4 +16,10 @@
     <ProjectReference Include="..\Carbonix\Carbonix.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Fixtures\*.mbtiles">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
