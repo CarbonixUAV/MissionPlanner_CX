@@ -987,19 +987,28 @@ namespace MissionPlanner.GCSViews
             writeKML();
         }
 
-        public void readQGC110wpfile(string file, bool append = false)
+        /// <summary>
+        /// Loads a waypoint file into the datagrid.
+        /// </summary>
+        /// <param name="insertRow">
+        /// null to replace the current mission, otherwise the row index to insert the
+        /// file at. <c>Commands.Rows.Count</c> appends.
+        /// </param>
+        public void readQGC110wpfile(string file, int? insertRow = null)
         {
-
-
             try
             {
                 var cmds = WaypointFile.ReadWaypointFile(file);
-                if ((MAVLink.MAV_MISSION_TYPE)cmb_missiontype.SelectedValue == MAVLink.MAV_MISSION_TYPE.FENCE ||
-                    (MAVLink.MAV_MISSION_TYPE)cmb_missiontype.SelectedValue == MAVLink.MAV_MISSION_TYPE.RALLY)
+                // ReadWaypointFile always puts home at index 0. processToScreen drops it for
+                // us when inserting; when replacing, only a MISSION gets to keep it long
+                // enough to be offered as the new home, so strip it here for fence/rally.
+                if (insertRow == null &&
+                    ((MAVLink.MAV_MISSION_TYPE)cmb_missiontype.SelectedValue == MAVLink.MAV_MISSION_TYPE.FENCE ||
+                     (MAVLink.MAV_MISSION_TYPE)cmb_missiontype.SelectedValue == MAVLink.MAV_MISSION_TYPE.RALLY))
                 {
                     cmds.RemoveAt(0);
                 }
-                processToScreen(cmds, append);
+                processToScreen(cmds, insertRow);
 
                 writeKML();
 
@@ -4363,19 +4372,48 @@ namespace MissionPlanner.GCSViews
             }
         }
 
-        public void loadAndAppendToolStripMenuItem_Click(object sender, EventArgs e)
+        /// <summary>
+        /// Prompts for a mission file, returning null if the user cancelled.
+        /// </summary>
+        private string promptForMissionFile()
         {
             using (OpenFileDialog fd = new OpenFileDialog())
             {
                 fd.Filter = "Ardupilot Mission|*.waypoints;*.txt";
                 fd.DefaultExt = ".waypoints";
-                DialogResult result = fd.ShowDialog();
-                string file = fd.FileName;
-                if (file != "")
-                {
-                    readQGC110wpfile(file, true);
-                }
+                if (fd.ShowDialog() != DialogResult.OK || fd.FileName == "")
+                    return null;
+                return fd.FileName;
             }
+        }
+
+        public void loadAndAppendToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string file = promptForMissionFile();
+            if (file == null)
+                return;
+
+            readQGC110wpfile(file, Commands.Rows.Count);
+        }
+
+        public void loadAndInsertToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            string file = promptForMissionFile();
+            if (file == null)
+                return;
+
+            string wpno = (selectedrow + 1).ToString("0");
+            if (InputBox.Show("Load and Insert", "Insert file after wp#", ref wpno) != DialogResult.OK)
+                return;
+
+            int insertrow;
+            if (!int.TryParse(wpno, out insertrow) || insertrow < 0 || insertrow > Commands.Rows.Count)
+            {
+                CustomMessageBox.Show("Invalid insert position", Strings.ERROR);
+                return;
+            }
+
+            readQGC110wpfile(file, insertrow);
         }
 
         public void loadFromFileToolStripMenuItem_Click(object sender, EventArgs e)
@@ -5314,8 +5352,19 @@ namespace MissionPlanner.GCSViews
         /// <summary>
         /// Processes a loaded EEPROM to the map and datagrid
         /// </summary>
-        private void processToScreen(List<Locationwp> cmds, bool append = false)
+        /// <param name="insertRow">
+        /// null replaces the current mission. Otherwise the row index to insert at, pushing
+        /// the existing rows down; <c>Commands.Rows.Count</c> appends.
+        /// </param>
+        private void processToScreen(List<Locationwp> cmds, int? insertRow = null)
         {
+            // insert and append both keep the existing rows
+            bool append = insertRow != null;
+
+            // so ctrl-z gets the pre-insert mission back. must be before quickadd is set.
+            if (append)
+                updateUndoBuffer(true);
+
             quickadd = true;
 
 
@@ -5333,7 +5382,7 @@ namespace MissionPlanner.GCSViews
             Commands.SuspendLayout();
             Commands.Enabled = false;
 
-            int i = Commands.Rows.Count - 1;
+            int i = (insertRow ?? Commands.Rows.Count) - 1;
             int cmdidx = -1;
             foreach (Locationwp temp in cmds)
             {
@@ -5351,10 +5400,9 @@ namespace MissionPlanner.GCSViews
                     continue;
                 }
 
-                if (i + 1 >= Commands.Rows.Count)
-                {
-                    selectedrow = Commands.Rows.Add();
-                }
+                // Insert at Rows.Count is an append; the grid has no user "new row" to displace.
+                Commands.Rows.Insert(i, 1);
+                selectedrow = i;
 
                 //if (i == 0 && temp.alt == 0) // skip 0 home
                 //  continue;
@@ -8384,7 +8432,7 @@ Column 1: Field type (RALLY is the only one at the moment -- may have RALLY_LAND
                 cmds[i] = cmd;
             }
 
-            processToScreen(cmds, true);
+            processToScreen(cmds, Commands.Rows.Count);
             writeKML();
 
             // Get a list of all the new map markers we just added

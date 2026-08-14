@@ -191,6 +191,7 @@ namespace MissionPlanner.GCSViews
             this.fileLoadSaveToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadWPFileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadAndAppendToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.loadAndInsertToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.saveWPFileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadKMLFileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.loadSHPFileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -1313,6 +1314,7 @@ namespace MissionPlanner.GCSViews
             this.fileLoadSaveToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.loadWPFileToolStripMenuItem,
             this.loadAndAppendToolStripMenuItem,
+            this.loadAndInsertToolStripMenuItem,
             this.appendWPStampToolStripMenuItem,
             this.saveWPFileToolStripMenuItem,
             this.loadKMLFileToolStripMenuItem,
@@ -1331,7 +1333,13 @@ namespace MissionPlanner.GCSViews
             this.loadAndAppendToolStripMenuItem.Name = "loadAndAppendToolStripMenuItem";
             resources.ApplyResources(this.loadAndAppendToolStripMenuItem, "loadAndAppendToolStripMenuItem");
             this.loadAndAppendToolStripMenuItem.Click += new System.EventHandler(this.loadAndAppendToolStripMenuItem_Click);
-            // 
+            //
+            // loadAndInsertToolStripMenuItem
+            //
+            this.loadAndInsertToolStripMenuItem.Name = "loadAndInsertToolStripMenuItem";
+            resources.ApplyResources(this.loadAndInsertToolStripMenuItem, "loadAndInsertToolStripMenuItem");
+            this.loadAndInsertToolStripMenuItem.Click += new System.EventHandler(this.loadAndInsertToolStripMenuItem_Click);
+            //
             // saveWPFileToolStripMenuItem
             // 
             this.saveWPFileToolStripMenuItem.Name = "saveWPFileToolStripMenuItem";
@@ -1673,6 +1681,7 @@ namespace MissionPlanner.GCSViews
         public ToolStripMenuItem trackerHomeToolStripMenuItem;
         public ToolStripMenuItem reverseWPsToolStripMenuItem;
         public ToolStripMenuItem loadAndAppendToolStripMenuItem;
+        public ToolStripMenuItem loadAndInsertToolStripMenuItem;
         public ToolStripMenuItem savePolygonToolStripMenuItem;
         public ToolStripMenuItem loadPolygonToolStripMenuItem;
         public CheckBox chk_grid;
