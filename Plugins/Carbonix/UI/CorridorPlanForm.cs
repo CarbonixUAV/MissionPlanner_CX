@@ -128,6 +128,7 @@ namespace Carbonix
             elev_profile.CornerCutControlChanged += ElevProfile_CornerCutControlChanged;
 
             AddGradientRows();
+            BuildEditTab();
         }
 
         // Climb-gradient hint thresholds (percent). Each leg is flown both ways, so the
@@ -810,6 +811,9 @@ namespace Carbonix
             cornerCutAlts.Clear();
             altOverrides.Clear();
 
+            // The Edit-tab legs/handles reference the old geometry — reset to the raw view.
+            ResetEditState();
+
             BUT_accept.Enabled = false;
         }
 
@@ -1097,6 +1101,8 @@ namespace Carbonix
                 var capturedCheckpoints = checkpoints.ToList();
                 var capturedLtas = loiterToAlts.ToList();
                 var capturedCornerCuts = new Dictionary<Carbonix.Planning.VertexId, double>(cornerCutAlts);
+                // Honour the Edit tab's branch-visit order so the export matches the preview.
+                var capturedLegOrder = legOrder.Count > 0 ? legOrder.ToList() : null;
                 (builtPolylines, builtTour, wps, profileSamples, terrAlt) =
                     await System.Threading.Tasks.Task.Run(() =>
                     {
@@ -1104,7 +1110,8 @@ namespace Carbonix
                         // profile never depend on home — change home later without regenerating.
                         double homeT = 0;
                         var (pls, tr) = CorridorTourBuilder.Build(
-                            capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse);
+                            capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse,
+                            capturedLegOrder);
                         var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts);
 
                         // The elevation profile is a single representative view of both passes,

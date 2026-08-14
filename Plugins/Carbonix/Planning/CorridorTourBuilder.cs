@@ -26,9 +26,16 @@ namespace Carbonix.Planning
         private static (long, long) Key(PointLatLngAlt p)
             => ((long)Math.Round(p.Lng * KeyScale), (long)Math.Round(p.Lat * KeyScale));
 
+        /// <param name="legPriority">
+        /// Optional edge-id order expressing the preferred branch-visit order. Where the DFS
+        /// genuinely has a choice (several unvisited edges at a node), edges earlier in this
+        /// list are taken first; unlisted edges fall back to the default "branches first"
+        /// heuristic. The tour stays a valid connected out-and-back walk regardless.
+        /// </param>
         public static (List<Polyline> polylines, List<TourStep> tour) Build(
             List<List<PointLatLngAlt>> features, PointLatLngAlt home,
-            double passOffsetM, int numberOfPasses, bool reverse = false)
+            double passOffsetM, int numberOfPasses, bool reverse = false,
+            IReadOnlyList<int> legPriority = null)
         {
             var polylines = new List<Polyline>();
             var tour = new List<TourStep>();
@@ -88,13 +95,24 @@ namespace Carbonix.Planning
             double off = numberOfPasses >= 2 ? passOffsetM / 2.0 : 0.0;
             var visited = new HashSet<int>();
 
+            // Priority lookup for the branch-visit-order hint (lower rank = visited first).
+            Dictionary<int, int> rank = null;
+            if (legPriority != null)
+            {
+                rank = new Dictionary<int, int>();
+                for (int i = 0; i < legPriority.Count; i++)
+                    if (!rank.ContainsKey(legPriority[i])) rank[legPriority[i]] = i;
+            }
+
             void Dfs((long, long) node, int arrivingFeature)
             {
                 if (!adjacency.TryGetValue(node, out var incident)) return;
 
                 var ordered = incident
                     .Where(e => !visited.Contains(e.edge.Id))
-                    .OrderBy(e => edgeFeature[e.edge.Id] == arrivingFeature ? 1 : 0)   // branches first
+                    // User's branch-visit order first (unlisted edges last), then branches-first.
+                    .OrderBy(e => rank != null && rank.TryGetValue(e.edge.Id, out var r) ? r : int.MaxValue)
+                    .ThenBy(e => edgeFeature[e.edge.Id] == arrivingFeature ? 1 : 0)   // branches first
                     .ToList();
 
                 foreach (var (edge, atStart) in ordered)
