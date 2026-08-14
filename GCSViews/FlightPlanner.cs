@@ -1011,6 +1011,28 @@ namespace MissionPlanner.GCSViews
             }
         }
 
+        public void readQGC110wpfileInsert(string file, int insertRow)
+        {
+            try
+            {
+                var cmds = WaypointFile.ReadWaypointFile(file);
+
+                // drop home - we keep the one we have
+                if (cmds.Count > 0)
+                    cmds.RemoveAt(0);
+
+                insertToScreen(cmds, insertRow);
+
+                writeKML();
+
+                MainMap.ZoomAndCenterMarkers("WPOverlay");
+            }
+            catch (Exception ex)
+            {
+                CustomMessageBox.Show("Can't open file! " + ex);
+            }
+        }
+
         public void redrawPolygonSurvey(List<PointLatLngAlt> list)
         {
             drawnpolygon.Points.Clear();
@@ -4378,6 +4400,32 @@ namespace MissionPlanner.GCSViews
             }
         }
 
+        public void loadAndInsertToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            using (OpenFileDialog fd = new OpenFileDialog())
+            {
+                fd.Filter = "Ardupilot Mission|*.waypoints;*.txt";
+                fd.DefaultExt = ".waypoints";
+                DialogResult result = fd.ShowDialog();
+                string file = fd.FileName;
+                if (file != "")
+                {
+                    string wpno = (selectedrow + 1).ToString("0");
+                    if (InputBox.Show("Load and Insert", "Insert file after wp#", ref wpno) != DialogResult.OK)
+                        return;
+
+                    int insertrow;
+                    if (!int.TryParse(wpno, out insertrow) || insertrow < 0 || insertrow > Commands.Rows.Count)
+                    {
+                        CustomMessageBox.Show("Invalid insert position", Strings.ERROR);
+                        return;
+                    }
+
+                    readQGC110wpfileInsert(file, insertrow);
+                }
+            }
+        }
+
         public void loadFromFileToolStripMenuItem_Click(object sender, EventArgs e)
         {
             using (OpenFileDialog fd = new OpenFileDialog())
@@ -5312,6 +5360,146 @@ namespace MissionPlanner.GCSViews
         }
 
         /// <summary>
+        /// Fills an existing datagrid row from a mission item
+        /// </summary>
+        private void cmdToRow(int rowIndex, Locationwp temp, bool ishome)
+        {
+            DataGridViewTextBoxCell cell;
+            DataGridViewComboBoxCell cellcmd;
+            cellcmd = Commands.Rows[rowIndex].Cells[Command.Index] as DataGridViewComboBoxCell;
+            cellcmd.Value = "UNKNOWN";
+            cellcmd.Tag = temp.id;
+
+            foreach (object value in Enum.GetValues(typeof(MAVLink.MAV_CMD)))
+            {
+                if ((ushort) value == temp.id)
+                {
+                    if (Program.MONO || cellcmd.Items.Contains(value.ToString()))
+                        cellcmd.Value = value.ToString();
+                    break;
+                }
+            }
+            //Check for userdefined commands
+            try
+            {
+                var id = getCmd(temp.id);
+                if (id?.Length > 0) cellcmd.Value = id;
+            }
+            catch { }
+
+
+            // from ap_common.h
+            if (temp.id == (ushort) MAVLink.MAV_CMD.WAYPOINT ||
+                temp.id == (ushort) MAVLink.MAV_CMD.SPLINE_WAYPOINT ||
+                temp.id == (ushort) MAVLink.MAV_CMD.TAKEOFF || temp.id == (ushort) MAVLink.MAV_CMD.DO_SET_HOME)
+            {
+
+                try
+                {
+                    // cm/s - ac
+                    Spline2._wp_accel_cms = MainV2.comPort.MAV.param.ContainsKey("WPNAV_ACCEL") ? MainV2.comPort.MAV.param["WPNAV_ACCEL"].float_value : 100;
+                    Spline2._wp_speed_cms = MainV2.comPort.MAV.param.ContainsKey("WPNAV_SPEED") ? MainV2.comPort.MAV.param["WPNAV_SPEED"].float_value : 600;
+
+                    // ar
+                    //WP_ACCEL - m/s
+                    //WP_SPEED - m/s
+                }
+                catch
+                {
+
+                }
+                // not home
+                if (!ishome)
+                {
+                    CMB_altmode.SelectedValue = temp.frame;
+                }
+            }
+
+            DataGridViewComboBoxCell cellframe = Commands.Rows[rowIndex].Cells[Frame.Index] as DataGridViewComboBoxCell;
+            var multipliers = cmdParamMultipliers[cellcmd.Value.ToString()];
+            cellframe.Value = (int) temp.frame;
+            cell = Commands.Rows[rowIndex].Cells[Alt.Index] as DataGridViewTextBoxCell;
+            cell.Value = temp.alt * multipliers[6];
+            cell = Commands.Rows[rowIndex].Cells[Lat.Index] as DataGridViewTextBoxCell;
+            cell.Value = temp.lat * multipliers[4];
+            cell = Commands.Rows[rowIndex].Cells[Lon.Index] as DataGridViewTextBoxCell;
+            cell.Value = temp.lng * multipliers[5];
+
+            cell = Commands.Rows[rowIndex].Cells[Param1.Index] as DataGridViewTextBoxCell;
+            cell.Value = temp.p1 * multipliers[0];
+            cell = Commands.Rows[rowIndex].Cells[Param2.Index] as DataGridViewTextBoxCell;
+            cell.Value = temp.p2 * multipliers[1];
+            cell = Commands.Rows[rowIndex].Cells[Param3.Index] as DataGridViewTextBoxCell;
+            cell.Value = temp.p3 * multipliers[2];
+            cell = Commands.Rows[rowIndex].Cells[Param4.Index] as DataGridViewTextBoxCell;
+            cell.Value = temp.p4 * multipliers[3];
+
+            // convert to utm/other
+            convertFromGeographic(temp.lat, temp.lng);
+        }
+
+        /// <summary>
+        /// Inserts commands into the datagrid, pushing the existing commands down
+        /// </summary>
+        private void insertToScreen(List<Locationwp> cmds, int insertRow)
+        {
+            if (cmds.Count == 0)
+                return;
+
+            if (insertRow < 0 || insertRow > Commands.Rows.Count)
+            {
+                CustomMessageBox.Show("Invalid insert position", Strings.ERROR);
+                return;
+            }
+
+            // so ctrl-z gets the pre-insert mission back
+            updateUndoBuffer(true);
+
+            quickadd = true;
+
+            // mono fix
+            Commands.CurrentCell = null;
+
+            Commands.SuspendLayout();
+            Commands.Enabled = false;
+
+            int i = insertRow;
+            foreach (Locationwp temp in cmds)
+            {
+                if (temp.id == 0) // 0 - end of the loaded mission
+                    break;
+                if (temp.id == 255) // bad record
+                    break;
+
+                if (i >= Commands.Rows.Count)
+                {
+                    Commands.Rows.Add();
+                }
+                else
+                {
+                    Commands.Rows.Insert(i, 1);
+                }
+
+                cmdToRow(i, temp, false);
+
+                i++;
+            }
+
+            selectedrow = Math.Max(i - 1, 0);
+
+            Commands.Enabled = true;
+            Commands.ResumeLayout();
+
+            setWPParams();
+
+            quickadd = false;
+
+            writeKML();
+
+            MainMap_OnMapZoomChanged();
+        }
+
+        /// <summary>
         /// Processes a loaded EEPROM to the map and datagrid
         /// </summary>
         private void processToScreen(List<Locationwp> cmds, bool append = false)
@@ -5358,78 +5546,7 @@ namespace MissionPlanner.GCSViews
 
                 //if (i == 0 && temp.alt == 0) // skip 0 home
                 //  continue;
-                DataGridViewTextBoxCell cell;
-                DataGridViewComboBoxCell cellcmd;
-                cellcmd = Commands.Rows[i].Cells[Command.Index] as DataGridViewComboBoxCell;
-                cellcmd.Value = "UNKNOWN";
-                cellcmd.Tag = temp.id;
-
-                foreach (object value in Enum.GetValues(typeof(MAVLink.MAV_CMD)))
-                {
-                    if ((ushort) value == temp.id)
-                    {
-                        if (Program.MONO || cellcmd.Items.Contains(value.ToString()))
-                            cellcmd.Value = value.ToString();
-                        break;
-                    }
-                }
-                //Check for userdefined commands
-                try
-                {
-                    var id = getCmd(temp.id);
-                    if (id?.Length > 0) cellcmd.Value = id;
-                }
-                catch { }
-
-
-                // from ap_common.h
-                if (temp.id == (ushort) MAVLink.MAV_CMD.WAYPOINT ||
-                    temp.id == (ushort) MAVLink.MAV_CMD.SPLINE_WAYPOINT ||
-                    temp.id == (ushort) MAVLink.MAV_CMD.TAKEOFF || temp.id == (ushort) MAVLink.MAV_CMD.DO_SET_HOME)
-                {
-
-                    try
-                    {
-                        // cm/s - ac
-                        Spline2._wp_accel_cms = MainV2.comPort.MAV.param.ContainsKey("WPNAV_ACCEL") ? MainV2.comPort.MAV.param["WPNAV_ACCEL"].float_value : 100;
-                        Spline2._wp_speed_cms = MainV2.comPort.MAV.param.ContainsKey("WPNAV_SPEED") ? MainV2.comPort.MAV.param["WPNAV_SPEED"].float_value : 600;
-
-                        // ar
-                        //WP_ACCEL - m/s
-                        //WP_SPEED - m/s
-                    }
-                    catch
-                    {
-
-                    }
-                    // not home
-                    if (i != 0)
-                    {
-                        CMB_altmode.SelectedValue = temp.frame;
-                    }
-                }
-
-                DataGridViewComboBoxCell cellframe = Commands.Rows[i].Cells[Frame.Index] as DataGridViewComboBoxCell;
-                var multipliers = cmdParamMultipliers[cellcmd.Value.ToString()];
-                cellframe.Value = (int) temp.frame;
-                cell = Commands.Rows[i].Cells[Alt.Index] as DataGridViewTextBoxCell;
-                cell.Value = temp.alt * multipliers[6];
-                cell = Commands.Rows[i].Cells[Lat.Index] as DataGridViewTextBoxCell;
-                cell.Value = temp.lat * multipliers[4];
-                cell = Commands.Rows[i].Cells[Lon.Index] as DataGridViewTextBoxCell;
-                cell.Value = temp.lng * multipliers[5];
-
-                cell = Commands.Rows[i].Cells[Param1.Index] as DataGridViewTextBoxCell;
-                cell.Value = temp.p1 * multipliers[0];
-                cell = Commands.Rows[i].Cells[Param2.Index] as DataGridViewTextBoxCell;
-                cell.Value = temp.p2 * multipliers[1];
-                cell = Commands.Rows[i].Cells[Param3.Index] as DataGridViewTextBoxCell;
-                cell.Value = temp.p3 * multipliers[2];
-                cell = Commands.Rows[i].Cells[Param4.Index] as DataGridViewTextBoxCell;
-                cell.Value = temp.p4 * multipliers[3];
-
-                // convert to utm/other
-                convertFromGeographic(temp.lat, temp.lng);
+                cmdToRow(i, temp, i == 0);
             }
 
             Commands.Enabled = true;
