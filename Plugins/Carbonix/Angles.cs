@@ -21,6 +21,15 @@ namespace Carbonix
             return degrees <= 0 ? degrees + 360 : degrees;
         }
 
+        /// <summary>
+        /// Wraps an angle to a signed difference in (-180, 180].
+        /// </summary>
+        public static double Wrap180(double degrees)
+        {
+            degrees = Wrap360(degrees);
+            return degrees > 180 ? degrees - 360 : degrees;
+        }
+
         static readonly string[] CompassPoints = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
 
         /// <summary>Returns the nearest eight-point compass direction for a bearing in degrees.</summary>
