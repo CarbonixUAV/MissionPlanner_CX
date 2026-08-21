@@ -65,5 +65,15 @@ namespace Carbonix.Tests
             Assert.AreEqual(360, Angles.Wrap360(720), 1e-9);
             Assert.AreEqual(360, Angles.Wrap360(-360), 1e-9);
         }
+
+        [TestMethod]
+        public void Wrap180_SignsTheDifference()
+        {
+            Assert.AreEqual(0, Angles.Wrap180(0), 1e-9);
+            Assert.AreEqual(-10, Angles.Wrap180(350), 1e-9);
+            Assert.AreEqual(10, Angles.Wrap180(10), 1e-9);
+            Assert.AreEqual(180, Angles.Wrap180(180), 1e-9);
+            Assert.AreEqual(-179, Angles.Wrap180(181), 1e-9);
+        }
     }
 }
