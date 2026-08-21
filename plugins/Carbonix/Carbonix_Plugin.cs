@@ -71,6 +71,9 @@ namespace Carbonix
         // Whether the transmit loop was last seen stalled, so it is reported once.
         bool _gdl90Stalled;
 
+        // Click-to-drop pin and mouse ruler on the flight map
+        MapPinTool _mappin;
+
         public override bool Init() { return true; }
 
         public override bool Loaded()
@@ -134,6 +137,18 @@ namespace Carbonix
                 log.Error("weather station setup failed", ex);
             }
 
+            // Left click on the flight map drops a pin and rulers to the mouse.
+            // Same rule as the tilesets above: a map tool that fails to attach
+            // must not stop the rest of the plugin loading.
+            try
+            {
+                _mappin = new MapPinTool(Host);
+            }
+            catch (Exception ex)
+            {
+                log.Error("map pin setup failed", ex);
+            }
+
             // Change HUD bottom color to a lighter brown color than stock
             Host.MainForm.FlightData.Load += new EventHandler(ForceHUD);
 
@@ -166,6 +181,7 @@ namespace Carbonix
             _maptiles?.Dispose();
             _weather?.Dispose();
             _gdl90?.Dispose();
+            _mappin?.Dispose();
 
             return true;
         }

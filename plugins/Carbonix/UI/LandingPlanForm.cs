@@ -179,11 +179,11 @@ namespace Carbonix
                 if (rad_loitccw.Checked) dtheta *= -1;
                 wind_direction = bearing + dtheta;
                 // Wrap wind_direction to 0, 360
-                wind_direction = Wrap360(wind_direction);
+                wind_direction = Angles.Wrap360(wind_direction);
 
                 // Update the wind direction control
                 // Wrapping still needed below to handle when wind_direction rounds to 0
-                num_winddir.Value = (decimal)Wrap360(Math.Round(wind_direction, num_winddir.DecimalPlaces));
+                num_winddir.Value = (decimal)Angles.Wrap360(Math.Round(wind_direction, num_winddir.DecimalPlaces));
             }
 
             var N = approach_points.Count;
@@ -334,14 +334,6 @@ namespace Carbonix
                 Offset = tooltip_offset
             };
             layer_small_markers.Markers.Add(marker);
-        }
-
-        // Wrap to (0, 360]
-        private double Wrap360(double angle)
-        {
-            while (angle > 360) angle -= 360;
-            while (angle <= 0) angle += 360;
-            return angle;
         }
 
         // Center on the landing point, and zoom to a level that can see all potential wind angles
@@ -529,7 +521,7 @@ namespace Carbonix
 
             // Wrap new value to (0, 360]
             freeze_handlers = true;
-            num_winddir.Value = (decimal)Wrap360((double)num_winddir.Value);
+            num_winddir.Value = (decimal)Angles.Wrap360((double)num_winddir.Value);
             wind_direction = (double)num_winddir.Value;
             freeze_handlers = false;
 
