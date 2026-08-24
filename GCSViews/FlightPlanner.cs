@@ -8362,6 +8362,7 @@ Column 1: Field type (RALLY is the only one at the moment -- may have RALLY_LAND
                 (MAVLink.MAV_MISSION_TYPE)cmb_missiontype.SelectedValue == MAVLink.MAV_MISSION_TYPE.RALLY)
             {
                 CustomMessageBox.Show("This function is not allowed during fence/rally editing");
+                return;
             }
 
             // Prompt for file
