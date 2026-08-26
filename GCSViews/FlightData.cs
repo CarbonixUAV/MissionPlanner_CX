@@ -230,6 +230,10 @@ namespace MissionPlanner.GCSViews
 
         private bool transponderNeverConnected = true;
 
+        // HUD altitude tape frame
+        private bool hudaltasl;
+        private ToolStripMenuItem hudAltAslToolStripMenuItem;
+
         public FlightData()
         {
             log.Info("Ctor Start");
@@ -412,6 +416,20 @@ namespace MissionPlanner.GCSViews
             myhud.hudcolor = ThemeManager.HudText;
 
             hud1.displayicons = Settings.Instance.GetBoolean("HUD_showicons", false);
+
+            hudaltasl = Settings.Instance.GetBoolean("HUD_altasl", false);
+            setHudAltFrame();
+
+            // Text from the resx like the rest of contextMenuStripHud, so it goes through
+            // the same translation pipeline.
+            var hudmenures = new System.ComponentModel.ComponentResourceManager(typeof(FlightData));
+            hudAltAslToolStripMenuItem = new ToolStripMenuItem();
+            hudAltAslToolStripMenuItem.Name = "hudAltAslToolStripMenuItem";
+            hudmenures.ApplyResources(hudAltAslToolStripMenuItem, "hudAltAslToolStripMenuItem");
+            hudAltAslToolStripMenuItem.CheckOnClick = true;
+            hudAltAslToolStripMenuItem.Checked = hudaltasl;
+            hudAltAslToolStripMenuItem.CheckedChanged += hudAltAslToolStripMenuItem_CheckedChanged;
+            contextMenuStripHud.Items.Add(hudAltAslToolStripMenuItem);
 
             tabControlactions.Multiline = Settings.Instance.GetBoolean("tabControlactions_Multiline", false);
 
@@ -6319,6 +6337,55 @@ namespace MissionPlanner.GCSViews
                 XPDRConnect_btn.Enabled = false;
             }
             MainV2.comPort.MAV.cs.xpdr_status_pending = false;
+        }
+
+        /// <summary>
+        /// Points the HUD altitude tape at height-above-home or AMSL. The target marker is an
+        /// absolute so it swaps too.
+        /// </summary>
+        /// <remarks>
+        /// The ground band is drawn at groundalt, the home elevation, which is only the ground
+        /// while you are near home. AMSL is what you switch to when you are far enough away to
+        /// be over different ground and expecting to go below home elevation, so a band sitting
+        /// at home would be claiming ground that is not there. Zero suppresses it instead --
+        /// the band is gated on groundalt != 0 -- and the binding has to come off with it, or
+        /// the next UpdateDataSource pushes HomeAlt straight back in.
+        /// </remarks>
+        private void setHudAltFrame()
+        {
+            rebindHud("alt", hudaltasl ? "altasl" : "alt");
+            rebindHud("targetalt", hudaltasl ? "targetaltmsl" : "targetalt");
+
+            if (hudaltasl)
+            {
+                unbindHud("groundalt");
+                hud1.groundalt = 0;
+            }
+            else
+            {
+                rebindHud("groundalt", "HomeAlt");
+            }
+        }
+
+        private void rebindHud(string property, string member)
+        {
+            unbindHud(property);
+
+            hud1.DataBindings.Add(new Binding(property, bindingSourceHud, member, false));
+        }
+
+        private void unbindHud(string property)
+        {
+            var old = hud1.DataBindings[property];
+            if (old != null)
+                hud1.DataBindings.Remove(old);
+        }
+
+        private void hudAltAslToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            hudaltasl = hudAltAslToolStripMenuItem.Checked;
+            Settings.Instance["HUD_altasl"] = hudaltasl.ToString();
+            setHudAltFrame();
         }
 
         private void showIconsToolStripMenuItem_Click(object sender, EventArgs e)
