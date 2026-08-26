@@ -2453,9 +2453,22 @@ namespace MissionPlanner
                             ch3percent = highlatency.throttle;
                             lat = highlatency.latitude / 1e7;
                             lng = highlatency.longitude / 1e7;
+                            // Raw metres: the alt/altasl getters apply the display multiplier.
                             altasl = highlatency.altitude_amsl;
-                            alt = altasl - (float)HomeAlt;
-                            alt_error = highlatency.altitude_sp - alt;
+                            alt = highlatency.altitude_amsl - (float)HomeAlt;
+
+                            // altitude_sp is home-relative, unlike HIGH_LATENCY2's setpoint.
+                            alt_error = highlatency.altitude_sp
+                                        - (highlatency.altitude_amsl - (float)HomeAlt);
+
+                            // Set both targets directly rather than let the alt_error filter
+                            // produce them: it needs a few-Hz stream, this one can be minutes.
+                            // targetalt carries altoffsethome because the alt tape it is drawn
+                            // against does; targetaltmsl is absolute, matching altasl.
+                            targetalt = (float)Math.Round(
+                                (highlatency.altitude_sp - altoffsethome) * multiplieralt, 0);
+                            targetaltmsl = (float)Math.Round(
+                                (highlatency.altitude_sp + (float)HomeAlt) * multiplieralt, 0);
                             airspeed = highlatency.airspeed;
                             targetairspeed = highlatency.airspeed_sp;
                             groundspeed = highlatency.groundspeed;
@@ -2500,10 +2513,19 @@ namespace MissionPlanner
                             lat = highlatency.latitude / 1e7;
                             lng = highlatency.longitude / 1e7;
                             //custom_mode
+                            // Raw metres, as above.
                             altasl = highlatency.altitude;
-                            alt = altasl - (float)HomeAlt;
-                            alt_error = highlatency.target_altitude - alt;
-                            targetalt = highlatency.target_altitude;
+                            alt = highlatency.altitude - (float)HomeAlt;
+
+                            // target_altitude is AMSL, so the error is against altitude.
+                            alt_error = highlatency.target_altitude - highlatency.altitude;
+
+                            // Set both directly, as above.
+                            targetaltmsl = (float)Math.Round(
+                                highlatency.target_altitude * multiplieralt, 0);
+                            targetalt = (float)Math.Round(
+                                (highlatency.target_altitude - (float)HomeAlt - altoffsethome)
+                                * multiplieralt, 0);
                             wp_dist = highlatency.target_distance;
                             wpno = highlatency.wp_num;
 
