@@ -19,8 +19,27 @@ namespace MissionPlanner.Utilities
             {
                 if (ctl.DataSource != (object)input)
                     ctl.DataSource = input;
+                if (input is CurrentState)
+                    ctl.MakeBindingsReadOnly();
                 ctl.ResetBindings(false);
             };
+        }
+
+        /// <summary>
+        /// Forces every binding attached through this source to be one-way (source -> control).
+        /// CurrentState bindings are display-only, but WinForms bindings default to
+        /// OnValidation, which writes the *displayed* value back into the source when the
+        /// control loses focus. CurrentState getters apply the unit multiplier and the setters
+        /// store raw, so with non-metric units that write-back corrupts the raw field until the
+        /// next telemetry packet.
+        /// </summary>
+        public static void MakeBindingsReadOnly(this BindingSource ctl)
+        {
+            foreach (System.Windows.Forms.Binding b in ctl.CurrencyManager.Bindings)
+            {
+                if (b.DataSourceUpdateMode != DataSourceUpdateMode.Never)
+                    b.DataSourceUpdateMode = DataSourceUpdateMode.Never;
+            }
         }
 
         public static int GetPercent(this Control ctl, int current, bool height = false)
