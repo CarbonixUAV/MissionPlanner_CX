@@ -94,7 +94,7 @@ namespace Carbonix
             if (Host.cs.GetType().GetProperty(name) != null)
             {
                 // Add binding
-                nv.DataBindings.Add("number", bindingSource1, name);
+                nv.DataBindings.Add("number", bindingSource1, name, false, DataSourceUpdateMode.Never);
                 return;
             }
             // Otherwise check if any customfields match
@@ -114,7 +114,7 @@ namespace Carbonix
 
             }
             // Add binding
-            nv.DataBindings.Add("number", bindingSource1, field);
+            nv.DataBindings.Add("number", bindingSource1, field, false, DataSourceUpdateMode.Never);
             return;
         }
 
