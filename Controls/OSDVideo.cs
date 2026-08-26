@@ -10,6 +10,7 @@ using System.Windows.Forms;
 using AviFile;
 using DirectShowLib;
 using DirectShowLib.DES;
+using MissionPlanner.Utilities;
 
 namespace MissionPlanner.Controls
 {
@@ -406,6 +407,7 @@ namespace MissionPlanner.Controls
                     //cs.UpdateCurrentSettings(bindingSource1,true,MainV2.comPort);
 
                     bindingSource1.DataSource = cs;
+                    bindingSource1.MakeBindingsReadOnly();
                     bindingSource1.ResetBindings(false);
                 }
                 catch (ThreadAbortException)
