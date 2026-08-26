@@ -233,6 +233,9 @@
   <data name="showIconsToolStripMenuItem.Text" xml:space="preserve">
     <value>Show icons</value>
   </data>
+  <data name="hudAltAslToolStripMenuItem.Text" xml:space="preserve">
+    <value>Alt strip: AMSL</value>
+  </data>
   <data name="contextMenuStripHud.Size" type="System.Drawing.Size, System.Drawing">
     <value>177, 180</value>
   </data>
