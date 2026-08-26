@@ -1112,6 +1112,7 @@ namespace MissionPlanner
                 if (_alt_error == value) return;
                 _alt_error = value;
                 targetalt = targetalt * 0.5f + (float)Math.Round(alt + alt_error, 0) * 0.5f;
+                targetaltmsl = targetaltmsl * 0.5f + (float)Math.Round(altasl + alt_error, 0) * 0.5f;
             }
         }
 
@@ -1257,6 +1258,15 @@ namespace MissionPlanner
         [GroupText("NAV")] public float targetaltd100 => targetalt / 100 % 10;
         [GroupText("NAV")]
         public float targetalt { get; private set; }
+
+        /// <summary>
+        /// Target altitude AMSL: the altasl counterpart to home-relative targetalt,
+        /// filtered the same way.
+        /// </summary>
+        [GroupText("NAV")]
+        [DisplayFieldName("targetaltmsl.Field")]
+        [DisplayText("Target Altitude MSL (alt)")]
+        public float targetaltmsl { get; private set; }
 
         [JsonIgnore]
         [IgnoreDataMember]
