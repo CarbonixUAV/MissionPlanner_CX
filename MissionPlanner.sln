@@ -224,9 +224,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MockDroneID", "ExtLibs\Mock
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TerrainMakerPlugin", "Plugins\TerrainMakerPlugin\TerrainMakerPlugin.csproj", "{DDD2FEA8-801E-463B-8913-9CCCDA2D9429}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Carbonix", "plugins\Carbonix\Carbonix.csproj", "{B31E31DB-F30B-4B2E-9FD2-0E80CB10EC83}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Carbonix", "Plugins\Carbonix\Carbonix.csproj", "{B31E31DB-F30B-4B2E-9FD2-0E80CB10EC83}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RedundantLinkManager", "plugins\RedundantLinkManager\RedundantLinkManager.csproj", "{6B6AF209-F65C-41A5-8B70-A60067EF9AF3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RedundantLinkManager", "Plugins\RedundantLinkManager\RedundantLinkManager.csproj", "{6B6AF209-F65C-41A5-8B70-A60067EF9AF3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StandardAltimeter", "Plugins\StandardAltimeter\StandardAltimeter.csproj", "{1A295949-16F2-4740-BC6C-01EB5E801286}"
 EndProject
