@@ -24,6 +24,10 @@ namespace Carbonix
         public int weather_station_log_minutes;
         public bool weather_station_raw_log;
 
+        // GDL 90 ownship output to an electronic flight bag
+        public List<string> gdl90_icaos;
+        public List<string> gdl90_callsigns;
+
         public GeneralSettings()
         {
             velz_unit = VelZUnits.meters_per_second;
@@ -104,6 +108,19 @@ namespace Carbonix
             // Debug: write every datagram from the station to a file under
             // the tlog folder, created on the first packet
             weather_station_raw_log = false;
+
+            // ICAO addresses live here rather than in {Aircraft}.json because the
+            // transponders float between airframes.
+            gdl90_icaos = new List<string>()
+            {
+                "7CFC88",
+                "7CFC89",
+            };
+            gdl90_callsigns = new List<string>()
+            {
+                "CXRPAS1",
+                "CXRPAS2",
+            };
         }
     }
 
