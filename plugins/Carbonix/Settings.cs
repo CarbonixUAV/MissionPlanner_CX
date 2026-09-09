@@ -21,6 +21,10 @@ namespace Carbonix
         public string controller;
         public string weather_api_key;
 
+        // GDL 90 ownship output to an electronic flight bag
+        public List<string> gdl90_icaos;
+        public List<string> gdl90_callsigns;
+
         public GeneralSettings()
         {
             velz_unit = VelZUnits.meters_per_second;
@@ -92,6 +96,19 @@ namespace Carbonix
             placeholder for the find/replace.
             */
             weather_api_key = "5f88b0183ab94ee68cb15d418c";
+
+            // ICAO addresses live here rather than in {Aircraft}.json because the
+            // transponders float between airframes.
+            gdl90_icaos = new List<string>()
+            {
+                "7CFC88",
+                "7CFC89",
+            };
+            gdl90_callsigns = new List<string>()
+            {
+                "CXRPAS1",
+                "CXRPAS2",
+            };
         }
     }
 
