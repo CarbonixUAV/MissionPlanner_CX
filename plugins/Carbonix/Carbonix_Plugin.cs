@@ -1,4 +1,4 @@
-﻿using log4net;
+using log4net;
 using MissionPlanner.Plugin;
 using MissionPlanner.ArduPilot.Mavlink;
 using MissionPlanner.ArduPilot;
@@ -18,6 +18,8 @@ using MissionPlanner.GCSViews.ConfigurationView;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Carbonix.CAS;
+using Carbonix.GDL90;
+using Carbonix.UI;
 using Carbonix.MapTiles;
 using Carbonix.Warnings;
 using GMap.NET.WindowsForms;
@@ -55,6 +57,16 @@ namespace Carbonix
         // Custom map tilesets (MBTiles) drawn over the base map
         MapTilesCoordinator _maptiles;
 
+        // GDL 90 ownship output to an electronic flight bag
+        Gdl90Service _gdl90;
+
+        // Every decision the EFB tab makes, held here so the selection survives the tab
+        // being rebuilt.
+        Gdl90TabPresenter _gdl90Tab;
+
+        // Whether the transmit loop was last seen stalled, so it is reported once.
+        bool _gdl90Stalled;
+
         public override bool Init() { return true; }
 
         public override bool Loaded()
@@ -64,6 +76,9 @@ namespace Carbonix
 
             // Copy over default config files
             CopyDefaultConfigFiles();
+
+            // The GDL 90 service must be set up before the EFB tab is loaded.
+            SetupGdl90();
 
             // Add custom actions/data tabs and panel
             LoadTabs();
@@ -135,6 +150,7 @@ namespace Carbonix
             _cas?.Dispose();
             _warningEngine?.Dispose();
             _maptiles?.Dispose();
+            _gdl90?.Dispose();
 
             return true;
         }
@@ -212,6 +228,22 @@ namespace Carbonix
             _warningEngine.UpdatePort(Host.comPort);
             _cas.Tick();
 
+            // A tick five seconds late is blocked in a call: the loop catches every
+            // exception, so it cannot die. A restart would only run a second tick into
+            // the same call, so a stall is reported and left to resume on its own.
+            bool stalled = _gdl90.LastTickUtc != DateTime.MinValue &&
+                (DateTime.UtcNow - _gdl90.LastTickUtc).TotalSeconds > 5;
+            if (stalled != _gdl90Stalled)
+            {
+                _gdl90Stalled = stalled;
+                if (stalled) log.Error("GDL90 transmit loop stalled");
+                else log.Info("GDL90 transmit loop resumed");
+            }
+
+            // Every link, not just the selected one: each writes its own tlog, and
+            // the frame log is written beside all of them.
+            _gdl90.UpdatePort(Host.comPort, MissionPlanner.MainV2.Comports);
+
             var is_armed = is_connected && Host.cs.armed;
             if (is_armed && !last_arm_state)
             {
@@ -262,6 +294,25 @@ namespace Carbonix
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Creates the GDL 90 service and starts its loop, with the stream switched off.
+        /// </summary>
+        private void SetupGdl90()
+        {
+            _gdl90 = new Gdl90Service();
+
+            _gdl90Tab = new Gdl90TabPresenter(settings, new Gdl90HostStore(Host.config))
+            {
+                MissionPlannerVersion = Application.ProductVersion,
+                PluginVersion = Version,
+            };
+
+            // Deliberately not configured: the only thing that hands it a destination is
+            // an operator pressing Start.
+            _gdl90.UpdatePort(Host.comPort, MissionPlanner.MainV2.Comports);
+            _gdl90.Start();
         }
 
         private void SetupWarningEngine()
@@ -398,6 +449,16 @@ namespace Carbonix
             EmergencyTab tabEmergency = new EmergencyTab(Host) { Dock = DockStyle.Fill };
             tabPageEmergency.Controls.Add(tabEmergency);
             Host.MainForm.FlightData.TabListOriginal.Insert(3, tabPageEmergency);
+
+            // Add the EFB tab, which arms the GDL 90 stream
+            TabPage tabPageEfb = new TabPage
+            {
+                Text = "EFB",
+                Name = "tabEfb"
+            };
+            EFBTab tabEfb = new EFBTab(_gdl90, _gdl90Tab) { Dock = DockStyle.Fill };
+            tabPageEfb.Controls.Add(tabEfb);
+            Host.MainForm.FlightData.TabListOriginal.Insert(4, tabPageEfb);
 
             // refilter the display list based on user selection
             Host.MainForm.FlightData.updateDisplayView();

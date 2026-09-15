@@ -1,0 +1,112 @@
+{
+  "_about": "Pressure altitude from static pressure, transcribed from the source cited below.\n\nTRANSCRIBED: press_hpa, expect_ft, page, and press_hpa_ulp - the value of the last printed place. Treat pressure as +/-1 count in that place. That covers both the source's rounding convention, which it does not state, and the ppm-level difference between its arithmetic and any reconstruction of it.\n\nDERIVED: uncertainty_ft only - one count expressed in feet.\n\nexpect_ft is GEOPOTENTIAL altitude, the source's H column.\n\nRows span -1,000 to 101,200 ft, the GDL90 altitude field's full range, and cross both ISA layer boundaries.",
+  "source": {
+    "title": "U.S. Standard Atmosphere, 1976",
+    "table": "Table IV - Geopotential Altitude, English Altitudes",
+    "pages": [
+      120,
+      122,
+      124,
+      128,
+      130,
+      132,
+      136
+    ],
+    "authors": "NOAA / NASA / USAF",
+    "published": "1976-10",
+    "report_numbers": [
+      "NOAA-S/T 76-1562",
+      "NASA-TM-X-74335"
+    ],
+    "ntrs_id": "19770009539",
+    "url": "https://ntrs.nasa.gov/citations/19770009539",
+    "pdf": "https://ntrs.nasa.gov/api/citations/19770009539/downloads/19770009539.pdf",
+    "rights": "Work of the U.S. Government. Public use permitted."
+  },
+  "vectors": [
+    {
+      "press_hpa": 1050.4,
+      "press_hpa_ulp": 0.1,
+      "expect_ft": -1000,
+      "page": 120,
+      "uncertainty_ft": 2.65
+    },
+    {
+      "press_hpa": 1031.6,
+      "press_hpa_ulp": 0.1,
+      "expect_ft": -500,
+      "page": 120,
+      "uncertainty_ft": 2.69
+    },
+    {
+      "press_hpa": 1013.25,
+      "press_hpa_ulp": 0.01,
+      "expect_ft": 0,
+      "page": 120,
+      "uncertainty_ft": 0.27
+    },
+    {
+      "press_hpa": 977.16,
+      "press_hpa_ulp": 0.01,
+      "expect_ft": 1000,
+      "page": 120,
+      "uncertainty_ft": 0.28
+    },
+    {
+      "press_hpa": 924.99,
+      "press_hpa_ulp": 0.01,
+      "expect_ft": 2500,
+      "page": 120,
+      "uncertainty_ft": 0.29
+    },
+    {
+      "press_hpa": 843.07,
+      "press_hpa_ulp": 0.01,
+      "expect_ft": 5000,
+      "page": 120,
+      "uncertainty_ft": 0.32
+    },
+    {
+      "press_hpa": 696.81,
+      "press_hpa_ulp": 0.01,
+      "expect_ft": 10000,
+      "page": 122,
+      "uncertainty_ft": 0.37
+    },
+    {
+      "press_hpa": 571.82,
+      "press_hpa_ulp": 0.01,
+      "expect_ft": 15000,
+      "page": 124,
+      "uncertainty_ft": 0.43
+    },
+    {
+      "press_hpa": 187.53,
+      "press_hpa_ulp": 0.01,
+      "expect_ft": 40000,
+      "page": 128,
+      "uncertainty_ft": 1.11
+    },
+    {
+      "press_hpa": 91.198,
+      "press_hpa_ulp": 0.001,
+      "expect_ft": 55000,
+      "page": 130,
+      "uncertainty_ft": 0.23
+    },
+    {
+      "press_hpa": 44.377,
+      "press_hpa_ulp": 0.001,
+      "expect_ft": 70000,
+      "page": 132,
+      "uncertainty_ft": 0.47
+    },
+    {
+      "press_hpa": 10.318,
+      "press_hpa_ulp": 0.001,
+      "expect_ft": 101200,
+      "page": 136,
+      "uncertainty_ft": 2.12
+    }
+  ]
+}
