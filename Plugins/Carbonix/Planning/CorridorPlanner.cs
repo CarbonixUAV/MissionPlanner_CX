@@ -242,6 +242,12 @@ namespace Carbonix.Planning
         // lines at (surface + live MSA/ceiling offset); generation does not use these.
         public double FloorSurfaceAmsl { get; set; } = double.NaN;
         public double CeilingSurfaceAmsl { get; set; } = double.NaN;
+
+        // Approved AGL ceiling of the ceiling zones containing this point (highest wins); NaN
+        // when no zone contains it or none are loaded. With zones loaded the profile draws the
+        // ceiling line at (ceiling surface + this), falling back to the global Ceiling offset
+        // where this is NaN.
+        public double CeilingZoneAglM { get; set; } = double.NaN;
         public bool IsLineWaypoint { get; set; }
         public int WaypointIndex { get; set; }       // corridor vertex index
 

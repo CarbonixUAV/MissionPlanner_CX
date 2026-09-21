@@ -41,6 +41,12 @@ namespace Carbonix.UI
         public double HomeTerrainAlt { get; set; }
         public double MsaM { get; set; } = double.NaN;
         public double CeilingM { get; set; } = double.NaN;
+        // When set, the ceiling line uses each sample's CeilingZoneAglM (the approved ceiling
+        // of the zone it lies in), with CeilingM as the fallback outside every zone.
+        public bool UseCeilingZones { get; set; }
+
+        private double ZoneCeilingOffset(ElevationPoint s) =>
+            double.IsNaN(s.CeilingZoneAglM) ? CeilingM : s.CeilingZoneAglM;
         // Target (scan) AGL over raw SRTM, drawn green: line = terrain + TargetAglM. NaN = hide.
         public double TargetAglM { get; set; } = double.NaN;
 
@@ -678,32 +684,65 @@ namespace Carbonix.UI
         private void DrawFloorCeiling(Graphics g)
         {
             if (Points == null) return;
-            DrawSurfaceLine(g, s => s.FloorSurfaceAmsl,   MsaM,     Color.Red);
-            DrawSurfaceLine(g, s => s.CeilingSurfaceAmsl, CeilingM, Color.DeepSkyBlue);
+            DrawSurfaceLine(g, s => s.FloorSurfaceAmsl, s => MsaM, Color.Red);
+            if (UseCeilingZones)
+            {
+                DrawSurfaceLine(g, s => s.CeilingSurfaceAmsl, ZoneCeilingOffset, Color.DeepSkyBlue);
+                DrawCeilingZoneLabels(g);
+            }
+            else
+            {
+                DrawSurfaceLine(g, s => s.CeilingSurfaceAmsl, s => CeilingM, Color.DeepSkyBlue);
+            }
             DrawTargetLine(g);
         }
 
-        private void DrawSurfaceLine(Graphics g, Func<ElevationPoint, double> surfaceAmsl, double offsetM, Color color)
-        {
-            if (double.IsNaN(offsetM)) return;
+        // Samples on the sampled ground track, in order (loiter/inserted/control anchors are not).
+        private IEnumerable<ElevationPoint> TrackSamples() =>
+            Points.OrderBy(p => p.DistM).Where(s => !s.IsLoiterWaypoint && !s.IsInserted && !s.IsCornerCutControl);
 
+        // The offset is per-sample so a zoned ceiling can step along the track; a NaN surface
+        // or offset breaks the line.
+        private void DrawSurfaceLine(Graphics g, Func<ElevationPoint, double> surfaceAmsl,
+            Func<ElevationPoint, double> offsetM, Color color)
+        {
             var seg = new List<PointF>();
             using (var pen = new Pen(Color.FromArgb(200, color), 1.5f) { DashStyle = DashStyle.Dash })
             {
-                foreach (var s in Points.OrderBy(p => p.DistM))
+                foreach (var s in TrackSamples())
                 {
-                    if (s.IsLoiterWaypoint || s.IsInserted || s.IsCornerCutControl) continue;   // not on the sampled track
                     double amsl = surfaceAmsl(s);
-                    if (double.IsNaN(amsl))
+                    double off = offsetM(s);
+                    if (double.IsNaN(amsl) || double.IsNaN(off))
                     {
                         if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
                         seg.Clear();
                         continue;
                     }
-                    double relM = amsl + offsetM - HomeTerrainAlt;
+                    double relM = amsl + off - HomeTerrainAlt;
                     seg.Add(D2S(s.DistM * DistMultiplier, relM * AltMultiplier));
                 }
                 if (seg.Count >= 2) g.DrawLines(pen, seg.ToArray());
+            }
+        }
+
+        // Label the ceiling line with its value wherever it changes — entering or leaving a
+        // zone, or crossing into one with a different approval — so a step reads at a glance.
+        private void DrawCeilingZoneLabels(Graphics g)
+        {
+            double last = double.NaN;
+            using (var f = new Font("Segoe UI", 7f))
+            using (var b = new SolidBrush(Color.DeepSkyBlue))
+            {
+                foreach (var s in TrackSamples())
+                {
+                    double amsl = s.CeilingSurfaceAmsl, off = ZoneCeilingOffset(s);
+                    if (double.IsNaN(amsl) || double.IsNaN(off)) { last = double.NaN; continue; }
+                    if (off == last) continue;
+                    last = off;
+                    var pt = D2S(s.DistM * DistMultiplier, (amsl + off - HomeTerrainAlt) * AltMultiplier);
+                    g.DrawString($"{off * AltMultiplier:F0} {AltUnit}", f, b, pt.X + 2, pt.Y - 14);
+                }
             }
         }
 
@@ -931,7 +970,9 @@ namespace Carbonix.UI
             };
             if (!double.IsNaN(MsaM))
                 items.Add((Color.Red, true, 1.5f, $"Floor (MSA {MsaM * AltMultiplier:F0} {AltUnit})"));
-            if (!double.IsNaN(CeilingM))
+            if (UseCeilingZones)
+                items.Add((Color.DeepSkyBlue, true, 1.5f, $"Ceiling (zones, else {CeilingM * AltMultiplier:F0} {AltUnit})"));
+            else if (!double.IsNaN(CeilingM))
                 items.Add((Color.DeepSkyBlue, true, 1.5f, $"Ceiling ({CeilingM * AltMultiplier:F0} {AltUnit})"));
             if (!double.IsNaN(TargetAglM))
                 items.Add((Color.LimeGreen, true, 1.5f, $"Target ({TargetAglM * AltMultiplier:F0} {AltUnit})"));

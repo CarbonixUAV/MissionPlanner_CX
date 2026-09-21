@@ -128,6 +128,7 @@ namespace Carbonix
             elev_profile.CornerCutControlChanged += ElevProfile_CornerCutControlChanged;
 
             AddGradientRows();
+            BuildZonesGroup();
             BuildEditTab();
         }
 
@@ -1103,6 +1104,7 @@ namespace Carbonix
                 var capturedCornerCuts = new Dictionary<Carbonix.Planning.VertexId, double>(cornerCutAlts);
                 // Honour the Edit tab's branch-visit order so the export matches the preview.
                 var capturedLegOrder = legOrder.Count > 0 ? legOrder.ToList() : null;
+                var capturedZones = ceilingZones.ToList();
                 (builtPolylines, builtTour, wps, profileSamples, terrAlt) =
                     await System.Threading.Tasks.Task.Run(() =>
                     {
@@ -1130,6 +1132,7 @@ namespace Carbonix
                             ep.FloorSurfaceAmsl = floorSurface.SampleAmsl(ep.Lat, ep.Lng) ?? double.NaN;
                             ep.CeilingSurfaceAmsl = ceilingSurface.SampleAmsl(ep.Lat, ep.Lng) ?? double.NaN;
                         }
+                        SampleCeilingZones(profile, capturedZones);
                         return (pls, tr, generated, profile, homeT);
                     });
             }
@@ -1519,6 +1522,8 @@ namespace Carbonix
             double mult = CurrentState.multiplieralt;
             elev_profile.MsaM       = floorSurface.Loaded   ? (double)NUM_minalgl.Value / mult : double.NaN;
             elev_profile.CeilingM   = ceilingSurface.Loaded ? (double)NUM_maxagl.Value / mult : double.NaN;
+            // Zones ride on the same ceiling surface, so they need it loaded just as the global does.
+            elev_profile.UseCeilingZones = ceilingZones.Count > 0 && ceilingSurface.Loaded;
             elev_profile.TargetAglM = (double)NUM_defagl.Value / mult;
         }
 
