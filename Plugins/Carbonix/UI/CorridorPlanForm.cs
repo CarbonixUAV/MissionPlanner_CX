@@ -129,6 +129,7 @@ namespace Carbonix
 
             AddGradientRows();
             BuildZonesGroup();
+            BuildPlanFileButtons();
             BuildEditTab();
         }
 
