@@ -20,6 +20,7 @@ namespace Carbonix
         public List<string> fdmap_baselayer_allow;
         public string controller;
         public string weather_api_key;
+        public int weather_station_udp_port;
 
         public GeneralSettings()
         {
@@ -92,6 +93,8 @@ namespace Carbonix
             placeholder for the find/replace.
             */
             weather_api_key = "5f88b0183ab94ee68cb15d418c";
+            // WeatherFlow Tempest hubs broadcast on this port
+            weather_station_udp_port = 50222;
         }
     }
 

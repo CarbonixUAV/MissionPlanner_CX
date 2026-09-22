@@ -47,7 +47,7 @@ namespace Carbonix.CAS
 
             // Alert panel overlay on the map
             _alertPanel = new AlertPanelControl(_alertManager);
-            _alertPanel.Location = new Point(0, 65);
+            _alertPanel.Location = new Point(0, WindBarb.BugSize + 5);
             mapControl.Controls.Add(_alertPanel);
 
             // Master light clicks -> open panel
