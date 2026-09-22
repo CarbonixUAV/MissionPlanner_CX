@@ -21,6 +21,7 @@ namespace Carbonix
         public string controller;
         public string weather_api_key;
         public int weather_station_udp_port;
+        public int weather_station_log_minutes;
 
         public GeneralSettings()
         {
@@ -95,6 +96,10 @@ namespace Carbonix
             weather_api_key = "5f88b0183ab94ee68cb15d418c";
             // WeatherFlow Tempest hubs broadcast on this port
             weather_station_udp_port = 50222;
+            // How often the station's report goes into the flight log while
+            // connected, on top of the copy sent when arming; 0 for only
+            // the arming copy
+            weather_station_log_minutes = 10;
         }
     }
 

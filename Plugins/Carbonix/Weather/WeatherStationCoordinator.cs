@@ -3,6 +3,7 @@ using MissionPlanner;
 using MissionPlanner.Plugin;
 using MissionPlanner.Utilities;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
@@ -101,6 +102,15 @@ namespace Carbonix.Weather
                 _groundBug.DirectionDeg = snap.Wind.DirectionDeg;
                 _groundBug.DisplaySpeed = snap.Wind.SpeedMs * CurrentState.multiplierspeed;
             }
+        }
+
+        /// <summary>
+        /// Returns the station's METAR-shaped report as STATUSTEXT lines, or
+        /// an empty list when there is nothing recent to report.
+        /// </summary>
+        public List<string> ReportLines(DateTime nowUtc)
+        {
+            return StationMetar.Lines(StationMetar.Format(_station.Snapshot(nowUtc)));
         }
 
         void ShowWindow()
