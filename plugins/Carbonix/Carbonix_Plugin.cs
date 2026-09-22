@@ -20,6 +20,7 @@ using System.Text.RegularExpressions;
 using Carbonix.CAS;
 using Carbonix.MapTiles;
 using Carbonix.Warnings;
+using Carbonix.Weather;
 using GMap.NET.WindowsForms;
 
 namespace Carbonix
@@ -54,6 +55,9 @@ namespace Carbonix
 
         // Custom map tilesets (MBTiles) drawn over the base map
         MapTilesCoordinator _maptiles;
+
+        // Ground weather station: second wind bug and details window
+        WeatherStationCoordinator _weather;
 
         public override bool Init() { return true; }
 
@@ -105,6 +109,16 @@ namespace Carbonix
                 log.Error("map tileset setup failed", ex);
             }
 
+            // Wind barbs for the aircraft and the ground weather station
+            try
+            {
+                _weather = new WeatherStationCoordinator(Host, settings.weather_station_udp_port);
+            }
+            catch (Exception ex)
+            {
+                log.Error("weather station setup failed", ex);
+            }
+
             // Change HUD bottom color to a lighter brown color than stock
             Host.MainForm.FlightData.Load += new EventHandler(ForceHUD);
 
@@ -135,6 +149,7 @@ namespace Carbonix
             _cas?.Dispose();
             _warningEngine?.Dispose();
             _maptiles?.Dispose();
+            _weather?.Dispose();
 
             return true;
         }
