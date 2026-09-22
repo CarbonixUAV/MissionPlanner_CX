@@ -265,6 +265,10 @@ namespace Carbonix.Planning
         public bool IsLoiterToAlt { get; set; }
         public double LtaStartAltRelM { get; set; }
 
+        // The plain on-line waypoint a loiter-to-alt is entered from (identity = the LTA's Id).
+        // Draggable like any waypoint, but not a corridor vertex: legs are bracketed past it.
+        public bool IsLoiterToAltLeadIn { get; set; }
+
         // Corner-cut control point (the fit point): DistM = cut midpoint, AltRelM = the control
         // altitude that drives the two chord endpoints. Draggable; not a real waypoint.
         public bool IsCornerCutControl { get; set; }

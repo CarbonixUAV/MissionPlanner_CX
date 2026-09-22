@@ -212,11 +212,16 @@ namespace Carbonix
         // Flag the spliced checkpoint samples so the profile draws/handles them as inserted.
         private void MarkInsertedSamples()
         {
-            if (elevationPoints == null || checkpoints.Count == 0) return;
+            if (elevationPoints == null) return;
             var ids = new HashSet<int>(checkpoints.Select(c => c.Id));
+            var leadIns = new HashSet<Carbonix.Planning.VertexId>(
+                loiterToAlts.Select(l => new Carbonix.Planning.VertexId(l.PolylineId, l.Id)));
             foreach (var s in elevationPoints)
-                if (s.IsLineWaypoint && ids.Contains(s.WaypointIndex))
-                    s.IsInserted = true;
+            {
+                if (!s.IsLineWaypoint) continue;
+                if (ids.Contains(s.WaypointIndex)) s.IsInserted = true;
+                if (leadIns.Contains(s.Vertex)) s.IsLoiterToAltLeadIn = true;
+            }
         }
 
         // Right-click "Add checkpoint": map the click distance to a leg (two consecutive
@@ -276,83 +281,133 @@ namespace Carbonix
             return true;
         }
 
+        // Corridor vertex anchors on the profile: line waypoints and loiter turns (a sharp turn
+        // renders as a loiter, not a line WP). Checkpoints and loiter-to-alt lead-ins/spirals are
+        // inserted things, not vertices — legs are bracketed past them so a leg can take several.
+        internal static bool IsVertexAnchor(ElevationPoint s) =>
+            (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted && !s.IsLoiterToAlt && !s.IsLoiterToAltLeadIn;
+
+        // Where the leg out of an anchor begins on the distance axis: a loiter's leg leaves
+        // from its exit (anchor + flown arc), a line waypoint's from the waypoint.
+        internal static double LegStartDistM(ElevationPoint anchor) =>
+            anchor.IsLoiterWaypoint ? anchor.DistM + anchor.LoiterArcLengthM : anchor.DistM;
+
+        // Fraction of the way from anchor a to anchor b along the CORRIDOR at profile distance
+        // distM. A loiter-to-alt spiral between the anchors adds its arc length to the distance
+        // axis without advancing along the line, so that length is discounted. Null when distM
+        // falls inside a loiter (a's arc or a spiral) — there is no point on the line for it.
+        internal static double? LegFraction(List<ElevationPoint> samples, ElevationPoint a, ElevationPoint b, double distM)
+        {
+            double start = LegStartDistM(a);
+            double end = b.DistM;
+            if (distM < start || distM > end) return null;
+
+            double arcBefore = 0, arcTotal = 0;
+            foreach (var s in samples)
+            {
+                if (!s.IsLoiterToAlt || !s.IsLoiterWaypoint) continue;
+                if (s.DistM <= start || s.DistM >= end) continue;
+                double sEnd = s.DistM + s.LoiterArcLengthM;
+                if (distM > s.DistM && distM < sEnd) return null;
+                arcTotal += s.LoiterArcLengthM;
+                if (sEnd <= distM) arcBefore += s.LoiterArcLengthM;
+            }
+
+            double span = end - start - arcTotal;
+            if (span <= 1e-6) return null;
+            return Math.Max(0, Math.Min(1, (distM - start - arcBefore) / span));
+        }
+
+        // Bracket a profile distance between two consecutive vertex anchors and map it to the
+        // corridor segment it lies on: a straight leg between neighbouring vertices of one edge,
+        // or a stub-junction loiter leg (TryJunctionLeg). frac is the along-corridor fraction
+        // from a toward b, for interpolating between the anchors' own samples.
+        internal static bool TryBracketLeg(List<ElevationPoint> samples, List<Carbonix.Planning.Polyline> polylines,
+                                           double distM, out int edge, out int seg, out double t,
+                                           out ElevationPoint a, out ElevationPoint b, out double frac)
+        {
+            edge = seg = -1; t = frac = 0; a = b = null;
+            var verts = samples.Where(IsVertexAnchor).OrderBy(s => s.DistM).ToList();
+            for (int i = 0; i + 1 < verts.Count; i++)
+            {
+                var va = verts[i];
+                var vb = verts[i + 1];
+                if (distM < va.DistM || distM > vb.DistM) continue;
+
+                var f = LegFraction(samples, va, vb, distM);
+                if (f == null) return false;
+
+                int e, sg; double tt;
+                if (va.Vertex.PolylineId == vb.Vertex.PolylineId)
+                {
+                    if (Math.Abs(va.Vertex.Index - vb.Vertex.Index) != 1) return false;   // e.g. a corner-cut chord
+                    e = va.Vertex.PolylineId;
+                    sg = Math.Min(va.Vertex.Index, vb.Vertex.Index);
+                    tt = va.Vertex.Index < vb.Vertex.Index ? f.Value : 1.0 - f.Value;   // from vertex seg
+                }
+                else if (!TryJunctionLeg(polylines, va, vb, f.Value, out e, out sg, out tt))
+                {
+                    return false;   // different polylines and not a junction loiter leg
+                }
+
+                edge = e; seg = sg; t = tt; a = va; b = vb; frac = f.Value;
+                return true;
+            }
+            return false;
+        }
+
         private void ElevProfile_InsertRequested(object sender, WaypointInsertEventArgs e)
         {
             if (elevationPoints == null) return;
 
-            // Bracket the click between two consecutive ORIGINAL vertices on one edge. Both line
-            // waypoints AND loiter turns count as vertex anchors (a sharp turn renders as a
-            // loiter, not a line WP), so legs leading into / out of a loiter are insertable.
-            // Existing checkpoints are skipped so a leg can take several.
-            var verts = elevationPoints
-                .Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
-                .OrderBy(s => s.DistM).ToList();
-            for (int i = 0; i + 1 < verts.Count; i++)
+            // Bracket the click between two consecutive original vertices and map it onto the
+            // corridor segment there (TryBracketLeg: checkpoints and loiter-to-alts are skipped,
+            // a spiral's arc length is discounted from the distance axis).
+            if (!TryBracketLeg(elevationPoints, polylines, e.DistM,
+                               out int edge, out int seg, out double t,
+                               out var a, out var b, out double frac)) return;
+
+            int id = nextCheckpointId++;
+            checkpoints.Add(new Carbonix.Planning.Checkpoint
             {
-                var a = verts[i];
-                var b = verts[i + 1];
-                if (e.DistM < a.DistM || e.DistM > b.DistM) continue;
-                double span = b.DistM - a.DistM;
-                if (span <= 1e-6) continue;
-                double frac = (e.DistM - a.DistM) / span;                          // from a toward b
+                PolylineId = edge, SegmentIndex = seg, T = t, Id = id,
+            });
+            altOverrides[new Carbonix.Planning.VertexId(edge, id)] = e.AltRelM;
 
-                int edge, seg;
-                double t;
-                if (a.Vertex.PolylineId == b.Vertex.PolylineId)
-                {
-                    if (Math.Abs(a.Vertex.Index - b.Vertex.Index) != 1) continue;  // one straight leg
-                    edge = a.Vertex.PolylineId;
-                    seg = Math.Min(a.Vertex.Index, b.Vertex.Index);
-                    t = a.Vertex.Index < b.Vertex.Index ? frac : 1.0 - frac;        // from vertex seg
-                }
-                else if (!TryJunctionLeg(a, b, frac, out edge, out seg, out t))
-                {
-                    continue;   // different polylines and not a junction loiter leg
-                }
-
-                int id = nextCheckpointId++;
-                checkpoints.Add(new Carbonix.Planning.Checkpoint
-                {
-                    PolylineId = edge, SegmentIndex = seg, T = t, Id = id,
-                });
-                altOverrides[new Carbonix.Planning.VertexId(edge, id)] = e.AltRelM;
-
-                // Geo on the TRUE corridor segment (a loiter anchor's lat/lng is the orbit
-                // centre, off the line); fall back to the profile anchors if unavailable.
-                bool edgeIsBranch = edge != Carbonix.Planning.VertexId.MainLine;
-                double lat, lng;
-                if (TrySegmentGeo(edge, seg, out var ga, out var gb))
-                {
-                    lat = ga.Lat + t * (gb.Lat - ga.Lat);
-                    lng = ga.Lng + t * (gb.Lng - ga.Lng);
-                }
-                else
-                {
-                    lat = a.Lat + frac * (b.Lat - a.Lat);
-                    lng = a.Lng + frac * (b.Lng - a.Lng);
-                }
-
-                // Display-only: add the sample directly so the insert is instant and the zoom
-                // is preserved (no regenerate). Accept bakes it into the export from the store.
-                elevationPoints.Add(new ElevationPoint
-                {
-                    DistM          = e.DistM,
-                    AltRelM        = e.AltRelM,
-                    TerrainAlt     = a.TerrainAlt + frac * (b.TerrainAlt - a.TerrainAlt),
-                    HomeTerrainAlt = homeTerrainAlt,
-                    IsLineWaypoint = true,
-                    IsInserted     = true,
-                    WaypointIndex  = id,
-                    IsBranchVertex = edgeIsBranch,
-                    BranchId       = edgeIsBranch ? edge : -1,
-                    Lat            = lat,
-                    Lng            = lng,
-                });
-                InvalidateCornerCutJobs();   // the point set changed
-                RecomputeCornerCuts();       // the new checkpoint may be a cut's neighbour
-                elev_profile.Invalidate();
-                return;
+            // Geo on the TRUE corridor segment (a loiter anchor's lat/lng is the orbit
+            // centre, off the line); fall back to the profile anchors if unavailable.
+            bool edgeIsBranch = edge != Carbonix.Planning.VertexId.MainLine;
+            double lat, lng;
+            if (TrySegmentGeo(edge, seg, out var ga, out var gb))
+            {
+                lat = ga.Lat + t * (gb.Lat - ga.Lat);
+                lng = ga.Lng + t * (gb.Lng - ga.Lng);
             }
+            else
+            {
+                lat = a.Lat + frac * (b.Lat - a.Lat);
+                lng = a.Lng + frac * (b.Lng - a.Lng);
+            }
+
+            // Display-only: add the sample directly so the insert is instant and the zoom
+            // is preserved (no regenerate). Accept bakes it into the export from the store.
+            elevationPoints.Add(new ElevationPoint
+            {
+                DistM          = e.DistM,
+                AltRelM        = e.AltRelM,
+                TerrainAlt     = a.TerrainAlt + frac * (b.TerrainAlt - a.TerrainAlt),
+                HomeTerrainAlt = homeTerrainAlt,
+                IsLineWaypoint = true,
+                IsInserted     = true,
+                WaypointIndex  = id,
+                IsBranchVertex = edgeIsBranch,
+                BranchId       = edgeIsBranch ? edge : -1,
+                Lat            = lat,
+                Lng            = lng,
+            });
+            InvalidateCornerCutJobs();   // the point set changed
+            RecomputeCornerCuts();       // the new checkpoint may be a cut's neighbour
+            elev_profile.Invalidate();
         }
 
         private void ElevProfile_RemoveRequested(object sender, WaypointRemoveEventArgs e)
@@ -391,17 +446,19 @@ namespace Carbonix
             // entry loiter from its re-entry loiter, which share a location.
             if (!TrySegmentGeo(cp.PolylineId, cp.SegmentIndex, out var ga, out var gb)) return;
 
-            var anchors = elevationPoints
-                .Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
-                .OrderBy(s => s.DistM).ToList();
+            var anchors = elevationPoints.Where(IsVertexAnchor).OrderBy(s => s.DistM).ToList();
             var before = anchors.LastOrDefault(s => s.DistM < sample.DistM);
             var after  = anchors.FirstOrDefault(s => s.DistM > sample.DistM);
-            if (before == null || after == null || Math.Abs(after.DistM - before.DistM) < 1e-6) return;
+            if (before == null || after == null) return;
+            double legStart = LegStartDistM(before);
+            if (after.DistM - legStart < 1e-6) return;
 
             // Keep the sample strictly inside the leg so the bracket stays stable across drags.
-            double margin = (after.DistM - before.DistM) * 1e-4;
-            double dist = Math.Max(before.DistM + margin, Math.Min(after.DistM - margin, e.NewDistM));
-            double fracBA = (dist - before.DistM) / (after.DistM - before.DistM);    // before → after
+            double margin = (after.DistM - legStart) * 1e-4;
+            double dist = Math.Max(legStart + margin, Math.Min(after.DistM - margin, e.NewDistM));
+            var f = LegFraction(elevationPoints, before, after, dist);
+            if (f == null) return;      // dragged into a spiral — nowhere on the line for it
+            double fracBA = f.Value;    // before → after, along the corridor
 
             // T runs from the segment's start vertex (ga = Points[seg]); `before` may sit at
             // either end of the segment, so orient by which vertex it is nearer.
@@ -431,33 +488,11 @@ namespace Carbonix
         {
             edge = seg = -1; t = 0; prevAlt = nextAlt = 0;
             if (elevationPoints == null) return false;
-            var verts = elevationPoints
-                .Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
-                .OrderBy(s => s.DistM).ToList();
-            for (int i = 0; i + 1 < verts.Count; i++)
-            {
-                var a = verts[i];
-                var b = verts[i + 1];
-                if (distM < a.DistM || distM > b.DistM) continue;
-                double span = b.DistM - a.DistM;
-                if (span <= 1e-6) continue;
-                double frac = (distM - a.DistM) / span;
-                if (a.Vertex.PolylineId == b.Vertex.PolylineId)
-                {
-                    if (Math.Abs(a.Vertex.Index - b.Vertex.Index) != 1) continue;
-                    edge = a.Vertex.PolylineId;
-                    seg = Math.Min(a.Vertex.Index, b.Vertex.Index);
-                    t = a.Vertex.Index < b.Vertex.Index ? frac : 1.0 - frac;
-                }
-                else if (!TryJunctionLeg(a, b, frac, out edge, out seg, out t))
-                {
-                    continue;
-                }
-                prevAlt = a.AltRelM;   // waypoint the aircraft flies in from (constant-alt entry)
-                nextAlt = b.AltRelM;   // waypoint it flies out to     (constant-alt exit)
-                return true;
-            }
-            return false;
+            if (!TryBracketLeg(elevationPoints, polylines, distM, out edge, out seg, out t,
+                               out var a, out var b, out _)) return false;
+            prevAlt = a.AltRelM;   // waypoint the aircraft flies in from (constant-alt entry)
+            nextAlt = b.AltRelM;   // waypoint it flies out to     (constant-alt exit)
+            return true;
         }
 
         private void ElevProfile_LoiterToAltInsertRequested(object sender, WaypointInsertEventArgs e)

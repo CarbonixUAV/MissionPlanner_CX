@@ -823,11 +823,13 @@ namespace Carbonix.UI
 
         // Classify a planned-path segment by its absolute climb/descent gradient (each leg
         // is flown both ways, so |slope| vs the climb limit is the binding check).
-        private (Color col, float w, bool warn) ClassifySegment(ElevationPoint a, ElevationPoint b)
+        internal (Color col, float w, bool warn) ClassifySegment(ElevationPoint a, ElevationPoint b)
         {
-            // A loiter-to-alt spiral has no horizontal climb gradient — don't flag it; the
-            // DrawLoiterArcs handle already shows it in its own colour.
-            if (a.IsLoiterToAlt || b.IsLoiterToAlt)
+            // Inside a loiter-to-alt spiral (lead-in → anchor, anchor → arc, arc → arc) there is
+            // no horizontal climb gradient — the DrawLoiterArcs handle shows it. The leg OUT of
+            // the spiral (last arc sample → next waypoint) is a normal leg and is checked.
+            bool insideSpiral = (a.IsLoiterToAlt && b.IsLoiterToAlt) || (b.IsLoiterToAlt && b.IsLoiterWaypoint);
+            if (insideSpiral)
                 return (Color.FromArgb(150, Color.MediumTurquoise), 1.5f, false);
             double run = b.DistM - a.DistM;
             double gradPct = run > 1e-6 ? Math.Abs(b.AltRelM - a.AltRelM) / run * 100.0 : 0.0;
