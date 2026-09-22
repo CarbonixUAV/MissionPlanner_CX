@@ -20,6 +20,7 @@ namespace Carbonix.Weather
 
         readonly WeatherStation _station;
         readonly int _port;
+        readonly RawPacketLog _rawLog;
         UdpClient _client;
         Thread _thread;
         volatile bool _running;
@@ -29,10 +30,12 @@ namespace Carbonix.Weather
 
         public int Port => _port;
 
-        public TempestListener(WeatherStation station, int port = DefaultPort)
+        /// <param name="rawLog">Optional debug log that every datagram is written to as it arrives.</param>
+        public TempestListener(WeatherStation station, int port = DefaultPort, RawPacketLog rawLog = null)
         {
             _station = station;
             _port = port;
+            _rawLog = rawLog;
         }
 
         public void Start()
@@ -111,7 +114,10 @@ namespace Carbonix.Weather
 
                 try
                 {
-                    _station.Apply(Encoding.UTF8.GetString(data), DateTime.UtcNow);
+                    var text = Encoding.UTF8.GetString(data);
+                    var now = DateTime.UtcNow;
+                    _rawLog?.Write(now, text);
+                    _station.Apply(text, now);
                 }
                 catch (Exception ex)
                 {

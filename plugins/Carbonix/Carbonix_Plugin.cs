@@ -112,7 +112,7 @@ namespace Carbonix
             // Wind barbs for the aircraft and the ground weather station
             try
             {
-                _weather = new WeatherStationCoordinator(Host, settings.weather_station_udp_port);
+                _weather = new WeatherStationCoordinator(Host, settings.weather_station_udp_port, settings.weather_station_raw_log);
             }
             catch (Exception ex)
             {

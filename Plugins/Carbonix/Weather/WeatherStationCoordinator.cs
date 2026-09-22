@@ -5,6 +5,7 @@ using MissionPlanner.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
 
@@ -24,19 +25,21 @@ namespace Carbonix.Weather
         readonly PluginHost _host;
         readonly WeatherStation _station;
         readonly TempestListener _listener;
+        readonly RawPacketLog _rawLog;
         readonly WindBarb _airBug;
         readonly WindBarb _groundBug;
         readonly Timer _timer;
         readonly ToolTip _tip;
         WeatherStationForm _form;
 
-        public WeatherStation Station => _station;
-
-        public WeatherStationCoordinator(PluginHost host, int port)
+        /// <param name="rawLog">true to write every datagram to a debug log under the tlog folder.</param>
+        public WeatherStationCoordinator(PluginHost host, int port, bool rawLog)
         {
             _host = host;
             _station = new WeatherStation();
-            _listener = new TempestListener(_station, port);
+            if (rawLog)
+                _rawLog = new RawPacketLog(Path.Combine(Settings.Instance.LogDir, "weatherstation"));
+            _listener = new TempestListener(_station, port, _rawLog);
 
             var flightData = host.MainForm.FlightData;
 
@@ -136,6 +139,7 @@ namespace Carbonix.Weather
             _timer.Dispose();
             _tip.Dispose();
             _listener.Dispose();
+            _rawLog?.Dispose();
             if (_form != null && !_form.IsDisposed)
                 _form.Close();
             foreach (var bug in new[] { _airBug, _groundBug })

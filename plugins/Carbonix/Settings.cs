@@ -22,6 +22,7 @@ namespace Carbonix
         public string weather_api_key;
         public int weather_station_udp_port;
         public int weather_station_log_minutes;
+        public bool weather_station_raw_log;
 
         public GeneralSettings()
         {
@@ -100,6 +101,9 @@ namespace Carbonix
             // connected, on top of the copy sent when arming; 0 for only
             // the arming copy
             weather_station_log_minutes = 10;
+            // Debug: write every datagram from the station to a file under
+            // the tlog folder, created on the first packet
+            weather_station_raw_log = false;
         }
     }
 
