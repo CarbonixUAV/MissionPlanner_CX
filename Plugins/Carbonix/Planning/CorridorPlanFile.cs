@@ -55,8 +55,10 @@ namespace Carbonix.Planning
             public double MaxAGL { get; set; }
             public double DefaultAGL { get; set; }
             public double SpeedMs { get; set; }
-            public int NumberOfPasses { get; set; }
             public double PassOffsetM { get; set; }
+            public bool OneWay { get; set; }
+            /// <summary>[lat, lng] of the chosen one-way end; null = automatic.</summary>
+            public double[] OneWayEnd { get; set; }
             public bool Reverse { get; set; }
             public double CornerCutThresholdDeg { get; set; }
             public double FullOrbitThresholdDeg { get; set; }

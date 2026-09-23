@@ -128,6 +128,7 @@ namespace Carbonix
             elev_profile.CornerCutControlChanged += ElevProfile_CornerCutControlChanged;
 
             AddGradientRows();
+            BuildTripControls();
             BuildZonesGroup();
             BuildPlanFileButtons();
             BuildEditTab();
@@ -1061,24 +1062,7 @@ namespace Carbonix
 
         private void RecalcCoverage()
         {
-            int n = (int)NUM_numpasses.Value;
-            double offset = (double)NUM_passoffset.Value;
-            bool hasCentre = (n % 2) == 1;
-            int perSide = n / 2;
-
-            string layout;
-            if (n == 1)
-                layout = "centreline only";
-            else if (hasCentre)
-                layout = perSide == 1
-                    ? $"centreline \u00b1 {offset:F0} m"
-                    : $"centreline \u00b1 {offset:F0} m \u2026 \u00b1 {offset * perSide:F0} m";
-            else
-                layout = perSide == 1
-                    ? $"\u00b1 {offset:F0} m"
-                    : $"\u00b1 {offset:F0} m \u2026 \u00b1 {offset * perSide:F0} m";
-
-            lbl_coverage.Text = $"{n} pass{(n == 1 ? "" : "es")}: {layout}";
+            lbl_coverage.Text = TripSummary();
             lbl_coverage.ForeColor = SystemColors.ControlText;
 
             double lowThresh = (double)NUM_low_thresh.Value;
@@ -1148,8 +1132,8 @@ namespace Carbonix
                         // profile never depend on home — change home later without regenerating.
                         double homeT = 0;
                         var (pls, tr) = CorridorTourBuilder.Build(
-                            capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.NumberOfPasses, reverse,
-                            capturedLegOrder);
+                            capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.OneWay, reverse,
+                            capturedLegOrder, capturedP.OneWayEnd);
                         var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts);
 
                         // The elevation profile is a single representative view of both passes,
@@ -1521,8 +1505,9 @@ namespace Carbonix
                 MaxAGL = maxAGL,
                 DefaultAGL = defAGL,
                 SpeedMs = (double)NUM_speed.Value,
-                NumberOfPasses = (int)NUM_numpasses.Value,
                 PassOffsetM = (double)NUM_passoffset.Value,
+                OneWay = CHK_oneway.Checked,
+                OneWayEnd = oneWayEnd,
                 ReverseDirection = CHK_reverse.Checked,
                 CornerCutThresholdDeg = low,
                 FullOrbitThresholdDeg = high,

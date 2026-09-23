@@ -16,11 +16,17 @@ namespace Carbonix.Planning
         // Flight parameters
         public double SpeedMs { get; set; } = 25;
 
-        // Pass layout
-        // Odd NumberOfPasses → one pass on the centreline; even → no centreline pass.
-        // Adjacent passes are separated by PassOffsetM.
+        // Pass layout. The tour engine flies every edge out and back at ±PassOffsetM/2
+        // (0 = both passes on the centreline). NumberOfPasses only drives the legacy
+        // flight-line generator (GenerateMission).
         public int NumberOfPasses { get; set; } = 3;
         public double PassOffsetM { get; set; } = 100;
+
+        // Trip shape for the tour engine: a round trip returns to the start; one way ends at
+        // OneWayEnd's nearest dead-end (or the farthest dead-end when null), flying the
+        // start→end path once on the centreline. See CorridorTourBuilder.
+        public bool OneWay { get; set; }
+        public PointLatLngAlt OneWayEnd { get; set; }
 
         // Mission options
         public bool ReverseDirection { get; set; } = false;
@@ -104,6 +110,7 @@ namespace Carbonix.Planning
         public int PolylineId { get; set; }
         public TraverseDir Direction { get; set; }
         public double LaneOffsetM { get; set; }   // lateral offset of this lane (0 = centreline)
+        public bool OneWay { get; set; }          // flown once, on the centreline (no back-pass)
     }
 
     /// <summary>
@@ -1100,8 +1107,8 @@ namespace Carbonix.Planning
             var centre = BuildCenterlineTour(byId, tour, allCps);
             if (centre.Count < 2) return empty;
 
-            double off = (p.NumberOfPasses >= 2) ? p.PassOffsetM / 2.0 : 0.0;
-            var (combinedPts, combinedMeta) = OffsetTourPath(centre, off);
+            double off = p.PassOffsetM / 2.0;
+            var (combinedPts, combinedMeta) = OffsetTourPath(centre, tour, off);
             if (combinedPts.Count == 0) return empty;
 
             // 3. Terrain on each waypoint's own polyline centreline.
@@ -1265,9 +1272,10 @@ namespace Carbonix.Planning
         // mitering every corner. The path reverses at each dead-end, so out and back land on
         // opposite sides. A dead-end can't be mitered (180° reversal): it's emitted at the
         // centreline as a single U-turn vertex with a direction override, and the solver
-        // makes the racetrack at the real turn radius.
+        // makes the racetrack at the real turn radius. Points on a one-way step stay on the
+        // centreline (offset 0) — the lateral shift happens over the segment joining them.
         private static (List<PointLatLngAlt> pts, List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> meta)
-            OffsetTourPath(List<(PointLatLngAlt pt, VertexId vid, bool deadEnd, int step)> path, double off)
+            OffsetTourPath(List<(PointLatLngAlt pt, VertexId vid, bool deadEnd, int step)> path, List<TourStep> tour, double off)
         {
             const double MaxMiterScale = 4.0;
             var pts  = new List<PointLatLngAlt>();
@@ -1308,8 +1316,9 @@ namespace Carbonix.Planning
                     scale = cosHalf > 1e-6 ? Math.Min(1.0 / cosHalf, MaxMiterScale) : MaxMiterScale;
                 }
 
-                var op = off > 1e-9 ? node.pt.newpos(offDir, off * scale)
-                                    : new PointLatLngAlt(node.pt.Lat, node.pt.Lng, node.pt.Alt);
+                double o = tour[node.step].OneWay ? 0.0 : off;
+                var op = o > 1e-9 ? node.pt.newpos(offDir, o * scale)
+                                  : new PointLatLngAlt(node.pt.Lat, node.pt.Lng, node.pt.Alt);
                 op.Alt = node.pt.Alt;
                 pts.Add(op);
                 meta.Add((node.step, true, node.vid.Index, isBranch, branchId, null));

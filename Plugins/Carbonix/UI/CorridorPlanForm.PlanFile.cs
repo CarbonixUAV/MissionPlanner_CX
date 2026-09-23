@@ -90,8 +90,9 @@ namespace Carbonix
                     MaxAGL = (double)NUM_maxagl.Value / mult,
                     DefaultAGL = (double)NUM_defagl.Value / mult,
                     SpeedMs = (double)NUM_speed.Value,
-                    NumberOfPasses = (int)NUM_numpasses.Value,
                     PassOffsetM = (double)NUM_passoffset.Value,
+                    OneWay = CHK_oneway.Checked,
+                    OneWayEnd = oneWayEnd != null ? new[] { oneWayEnd.Lat, oneWayEnd.Lng } : null,
                     Reverse = CHK_reverse.Checked,
                     CornerCutThresholdDeg = (double)NUM_low_thresh.Value,
                     FullOrbitThresholdDeg = (double)NUM_high_thresh.Value,
@@ -222,8 +223,10 @@ namespace Carbonix
                 SetNum(NUM_maxagl, p.MaxAGL * mult);
                 SetNum(NUM_defagl, p.DefaultAGL * mult);
                 SetNum(NUM_speed, p.SpeedMs);
-                SetNum(NUM_numpasses, p.NumberOfPasses);
                 SetNum(NUM_passoffset, p.PassOffsetM);
+                CHK_oneway.Checked = p.OneWay;
+                oneWayEnd = p.OneWayEnd != null && p.OneWayEnd.Length >= 2
+                    ? new PointLatLngAlt(p.OneWayEnd[0], p.OneWayEnd[1], 0) : null;
                 CHK_reverse.Checked = p.Reverse;
                 SetNum(NUM_low_thresh, p.CornerCutThresholdDeg);
                 SetNum(NUM_high_thresh, p.FullOrbitThresholdDeg);

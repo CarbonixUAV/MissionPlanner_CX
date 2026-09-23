@@ -50,6 +50,9 @@ namespace Carbonix
         private System.Windows.Forms.ToolStripMenuItem MI_split;
         private System.Windows.Forms.ToolStripMenuItem MI_join;
         private System.Windows.Forms.ToolStripMenuItem MI_delete;
+        private System.Windows.Forms.ToolStripMenuItem MI_oneway_end;
+        private System.Windows.Forms.ToolStripMenuItem MI_oneway_auto;
+        private List<TourStep> editTour;   // the tour behind the current numbering (START/END labels)
         private EditHandle menuTargetHandle;   // vertex the context menu was opened on
         private System.Windows.Forms.CheckBox CHK_show_wp;
         private System.Windows.Forms.CheckBox CHK_show_plus;
@@ -188,13 +191,20 @@ namespace Carbonix
             MI_split = new System.Windows.Forms.ToolStripMenuItem("Split leg here");
             MI_join = new System.Windows.Forms.ToolStripMenuItem("Join legs");
             MI_delete = new System.Windows.Forms.ToolStripMenuItem("Delete point");
+            MI_oneway_end = new System.Windows.Forms.ToolStripMenuItem("End one-way trip here");
+            MI_oneway_auto = new System.Windows.Forms.ToolStripMenuItem("One-way end: automatic");
             MI_split.Click += (s, ev) => DoSplitLeg();
             MI_join.Click += (s, ev) => DoJoinLegs();
             MI_delete.Click += (s, ev) => DoDeletePoint();
+            MI_oneway_end.Click += (s, ev) => SetOneWayEnd(menuTargetHandle);
+            MI_oneway_auto.Click += (s, ev) => { oneWayEnd = null; if (legsNumbered) DrawEditColored(); };
             editMenu.Items.Add(MI_split);
             editMenu.Items.Add(MI_join);
             editMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             editMenu.Items.Add(MI_delete);
+            editMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+            editMenu.Items.Add(MI_oneway_end);
+            editMenu.Items.Add(MI_oneway_auto);
 
             lbl_edit_info = new System.Windows.Forms.Label
             {
@@ -210,6 +220,7 @@ namespace Carbonix
                     "• Click a “+” midpoint to add a vertex; a “+” at a free leg end\n" +
                     "  extends that leg.\n" +
                     "• Right-click a vertex to Split leg here / Join legs.\n" +
+                    "• Right-click a dead-end vertex to end a one-way trip there.\n" +
                     "• Reorder legs with ▲/▼ or drag in the list (valid drops only).\n\n" +
                     "Edits change the geometry used by Generate.",
             };
@@ -341,7 +352,7 @@ namespace Carbonix
 
             // Split the features into legs (edges), steering the branch-visit order by the
             // user's current leg order. The tour's actual order IS the numbering; keep in sync.
-            var actual = ComputeLegOrder(legOrder, out var edges);
+            var actual = ComputeLegOrder(legOrder, out var edges, out editTour);
             legOrder = actual;
 
             var legNo = new Dictionary<int, int>();
@@ -380,6 +391,18 @@ namespace Carbonix
                     var mid = EdgeMidpoint(edge.Points);
                     layer_edit.Markers.Add(MakeLegLabel(new PointLatLng(mid.Lat, mid.Lng), legNo[edge.Id], col));
                 }
+            }
+
+            // Where the tour starts, and (one way) where it ends.
+            if (CHK_show_labels.Checked && editTour != null && editTour.Count > 0)
+            {
+                var byId = edges.ToDictionary(e => e.Id);
+                var start = StepEndpoint(byId, editTour[0], atStart: true);
+                var end = StepEndpoint(byId, editTour[editTour.Count - 1], atStart: false);
+                if (start != null)
+                    layer_edit.Markers.Add(MakeLabel(new PointLatLng(start.Lat, start.Lng), "START", Color.White));
+                if (end != null && CHK_oneway.Checked && start != null && start.GetDistance(end) > 1)
+                    layer_edit.Markers.Add(MakeLabel(new PointLatLng(end.Lat, end.Lng), "END", Color.White));
             }
 
             // Vertex handles + add-vertex "+" markers, from the raw editable features.
@@ -434,12 +457,32 @@ namespace Carbonix
 
         // An always-on tooltip label, matching the GridUI segment-tooltip style, coloured per leg.
         private static GMapMarker MakeLegLabel(PointLatLng at, int legNo, Color col)
+            => MakeLabel(at, "Leg " + legNo, col);
+
+        private static PointLatLngAlt StepEndpoint(Dictionary<int, Planning.Polyline> byId, TourStep s, bool atStart)
+        {
+            if (!byId.TryGetValue(s.PolylineId, out var pl) || pl.Points.Count == 0) return null;
+            bool first = (s.Direction == TraverseDir.Forward) == atStart;
+            return first ? pl.Points[0] : pl.Points[pl.Points.Count - 1];
+        }
+
+        // Right-click "End one-way trip here" on a dead-end vertex.
+        private void SetOneWayEnd(EditHandle h)
+        {
+            if (h == null) return;
+            var pts = FeatureAt(h.Feature);
+            if (h.Index < 0 || h.Index >= pts.Count) return;
+            oneWayEnd = new PointLatLngAlt(pts[h.Index].Lat, pts[h.Index].Lng, 0);
+            if (legsNumbered) DrawEditColored();
+        }
+
+        private static GMapMarker MakeLabel(PointLatLng at, string text, Color col)
         {
             var m = new GMapMarkerRect(at)
             {
                 IsHitTestVisible = false,   // don't steal hover/clicks from vertex + markers
                 ToolTipMode = MarkerTooltipMode.Always,
-                ToolTipText = "Leg " + legNo,
+                ToolTipText = text,
             };
             m.ToolTip = new GMapToolTip(m)
             {
@@ -555,17 +598,22 @@ namespace Carbonix
         // Run the tour builder with the given branch-visit priority and return the resulting
         // leg order (edge ids in flight order). Pure — does not touch UI or the stored order.
         private List<int> ComputeLegOrder(List<int> priority, out List<Planning.Polyline> edges)
+            => ComputeLegOrder(priority, out edges, out _);
+
+        private List<int> ComputeLegOrder(List<int> priority, out List<Planning.Polyline> edges, out List<TourStep> tour)
         {
             edges = new List<Planning.Polyline>();
+            tour = new List<TourStep>();
             var features = AllFeatures();
             if (features.Count == 0) return new List<int>();
 
             var home = plugin.Host.cs.PlannedHomeLocation.Lat != 0
                 ? plugin.Host.cs.PlannedHomeLocation : features[0].First();
             var built = CorridorTourBuilder.Build(
-                features, home, (double)NUM_passoffset.Value, (int)NUM_numpasses.Value, CHK_reverse.Checked,
-                priority != null && priority.Count > 0 ? priority : null);
+                features, home, (double)NUM_passoffset.Value, CHK_oneway.Checked, CHK_reverse.Checked,
+                priority != null && priority.Count > 0 ? priority : null, oneWayEnd);
             edges = built.polylines;
+            tour = built.tour;
 
             var edgeById = built.polylines.ToDictionary(e => e.Id);
             var order = new List<int>();
@@ -762,6 +810,9 @@ namespace Carbonix
                 MI_split.Enabled = rh.Index > 0 && rh.Index < pts.Count - 1 && CountFeaturesAtKey(key) == 1;
                 MI_join.Enabled = CanJoinAt(key, out _, out _);
                 MI_delete.Enabled = pts.Count > 2;   // keep the feature a valid (≥2-point) line
+                bool deadEnd = (rh.Index == 0 || rh.Index == pts.Count - 1) && CountFeaturesAtKey(key) == 1;
+                MI_oneway_end.Enabled = CHK_oneway.Checked && deadEnd;
+                MI_oneway_auto.Enabled = CHK_oneway.Checked && oneWayEnd != null;
                 editMenu.Show(map, me.Location);
                 return;
             }

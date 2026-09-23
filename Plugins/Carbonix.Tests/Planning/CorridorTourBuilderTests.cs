@@ -30,7 +30,7 @@ namespace Carbonix.Tests.Planning
         [TestMethod]
         public void Build_SplitsAtJunctions()
         {
-            var (polys, _) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, 2);
+            var (polys, _) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100);
             // trunk -> 2 edges (split at #2); B -> 2 edges (split at #1); C -> 1 edge.
             Assert.AreEqual(5, polys.Count);
         }
@@ -38,7 +38,7 @@ namespace Carbonix.Tests.Planning
         [TestMethod]
         public void Build_EveryEdgeFlownOutAndBack_OnOppositeOffsets()
         {
-            var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, 2);
+            var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100);
 
             Assert.AreEqual(polys.Count * 2, tour.Count, "each edge appears as out + back");
             foreach (var pl in polys)
@@ -53,7 +53,7 @@ namespace Carbonix.Tests.Planning
         [TestMethod]
         public void Build_StartsAtEndpointNearestHome()
         {
-            var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, 2);
+            var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100);
             var firstEdge = polys.First(pl => pl.Id == tour[0].PolylineId);
             bool touchesWestEnd = new[] { firstEdge.Points.First(), firstEdge.Points.Last() }
                 .Any(pt => Math.Abs(pt.Lng) < 1e-6 && Math.Abs(pt.Lat) < 1e-6);
@@ -63,7 +63,7 @@ namespace Carbonix.Tests.Planning
         [TestMethod]
         public void Build_HomeAtFarEnd_StartsThere()
         {
-            var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, 0.05), 100, 2);
+            var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, 0.05), 100);
             var firstEdge = polys.First(pl => pl.Id == tour[0].PolylineId);
             bool touchesEastEnd = new[] { firstEdge.Points.First(), firstEdge.Points.Last() }
                 .Any(pt => Math.Abs(pt.Lng - 0.04) < 1e-6 && Math.Abs(pt.Lat) < 1e-6);
@@ -73,7 +73,7 @@ namespace Carbonix.Tests.Planning
         [TestMethod]
         public void Build_DetoursSpurBeforeContinuingTrunk()
         {
-            var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, 2);
+            var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100);
 
             int cId = polys.First(pl => pl.Points.Any(p => Math.Abs(p.Lat + 0.01) < 1e-6 && Math.Abs(p.Lng - 0.03) < 1e-6)).Id;
             int trunkEastId = polys.First(pl => pl.Points.Any(p => Math.Abs(p.Lat) < 1e-6 && Math.Abs(p.Lng - 0.04) < 1e-6)).Id;
@@ -87,8 +87,8 @@ namespace Carbonix.Tests.Planning
         [TestMethod]
         public void Build_Reverse_FlipsOrderAndDirections()
         {
-            var fwd = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, 2);
-            var rev = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, 2, reverse: true);
+            var fwd = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100);
+            var rev = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, reverse: true);
 
             Assert.AreEqual(fwd.tour.Count, rev.tour.Count);
             int n = fwd.tour.Count;
@@ -106,7 +106,7 @@ namespace Carbonix.Tests.Planning
             CorridorPlanner.TerrainProvider = (lat, lng) => 0.0;
             try
             {
-                var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100, 2);
+                var (polys, tour) = CorridorTourBuilder.Build(Fixture(), P(0, -0.001), 100);
                 var p = new CorridorParameters { MinAGL = 50, MaxAGL = 120, DefaultAGL = 80, SpeedMs = 25 };
                 var wps = CorridorPlanner.GenerateMissionFromTour(polys, tour, p, P(0, -0.001));
                 Assert.IsTrue(wps.Count > 0, "the auto-built tour generates a waypoint list");
