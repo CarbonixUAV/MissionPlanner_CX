@@ -125,6 +125,25 @@ namespace Carbonix.Tests.Planning
         }
 
         [TestMethod]
+        public void StartAt_Junction_RoundTripStartsAndEndsThere()
+        {
+            var (polys, tour) = CorridorTourBuilder.Build(Tree(), Home, 100, startAt: P(0.0001, 0.0201));
+            Assert.AreEqual(2 * polys.Count, tour.Count);
+            Assert.IsTrue(Near(StepStart(polys, tour[0]), 0, 0.02));
+            Assert.IsTrue(Near(StepEnd(polys, tour[tour.Count - 1]), 0, 0.02));
+        }
+
+        [TestMethod]
+        public void StartAt_Leaf_OneWayEndsAtFarthestFromThere()
+        {
+            // From B's tip the farthest dead-end is the trunk's east end (0.05 vs 0.04 to the west).
+            var (polys, tour) = CorridorTourBuilder.Build(Tree(), Home, 100, oneWay: true, startAt: P(-0.02, 0.02));
+            Assert.IsTrue(Near(StepStart(polys, tour[0]), -0.02, 0.02));
+            Assert.IsTrue(Near(StepEnd(polys, tour[tour.Count - 1]), 0, 0.05));
+            Assert.AreEqual(2 * polys.Count - 3, tour.Count);   // path = B-lower, B-upper, trunk-east
+        }
+
+        [TestMethod]
         public void Loop_OneWay_FallsBackToRoundTrip()
         {
             var square = new List<List<PointLatLngAlt>>

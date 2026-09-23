@@ -848,6 +848,8 @@ namespace Carbonix
             loiterToAlts.Clear();
             cornerCutAlts.Clear();
             altOverrides.Clear();
+            tourStart = null;   // chosen on the old network's vertices
+            oneWayEnd = null;
 
             // The Edit-tab legs/handles reference the old geometry — reset to the raw view.
             ResetEditState();
@@ -1133,7 +1135,7 @@ namespace Carbonix
                         double homeT = 0;
                         var (pls, tr) = CorridorTourBuilder.Build(
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.OneWay, reverse,
-                            capturedLegOrder, capturedP.OneWayEnd);
+                            capturedLegOrder, capturedP.OneWayEnd, capturedP.TourStart);
                         var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts);
 
                         // The elevation profile is a single representative view of both passes,
@@ -1508,6 +1510,7 @@ namespace Carbonix
                 PassOffsetM = (double)NUM_passoffset.Value,
                 OneWay = CHK_oneway.Checked,
                 OneWayEnd = oneWayEnd,
+                TourStart = tourStart,
                 ReverseDirection = CHK_reverse.Checked,
                 CornerCutThresholdDeg = low,
                 FullOrbitThresholdDeg = high,

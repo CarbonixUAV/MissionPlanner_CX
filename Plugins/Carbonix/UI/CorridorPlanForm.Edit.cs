@@ -50,6 +50,8 @@ namespace Carbonix
         private System.Windows.Forms.ToolStripMenuItem MI_split;
         private System.Windows.Forms.ToolStripMenuItem MI_join;
         private System.Windows.Forms.ToolStripMenuItem MI_delete;
+        private System.Windows.Forms.ToolStripMenuItem MI_start_here;
+        private System.Windows.Forms.ToolStripMenuItem MI_start_auto;
         private System.Windows.Forms.ToolStripMenuItem MI_oneway_end;
         private System.Windows.Forms.ToolStripMenuItem MI_oneway_auto;
         private List<TourStep> editTour;   // the tour behind the current numbering (START/END labels)
@@ -191,11 +193,15 @@ namespace Carbonix
             MI_split = new System.Windows.Forms.ToolStripMenuItem("Split leg here");
             MI_join = new System.Windows.Forms.ToolStripMenuItem("Join legs");
             MI_delete = new System.Windows.Forms.ToolStripMenuItem("Delete point");
+            MI_start_here = new System.Windows.Forms.ToolStripMenuItem("Start tour here");
+            MI_start_auto = new System.Windows.Forms.ToolStripMenuItem("Start: nearest home");
             MI_oneway_end = new System.Windows.Forms.ToolStripMenuItem("End one-way trip here");
             MI_oneway_auto = new System.Windows.Forms.ToolStripMenuItem("One-way end: automatic");
             MI_split.Click += (s, ev) => DoSplitLeg();
             MI_join.Click += (s, ev) => DoJoinLegs();
             MI_delete.Click += (s, ev) => DoDeletePoint();
+            MI_start_here.Click += (s, ev) => SetTourStart(menuTargetHandle);
+            MI_start_auto.Click += (s, ev) => { tourStart = null; if (legsNumbered) DrawEditColored(); };
             MI_oneway_end.Click += (s, ev) => SetOneWayEnd(menuTargetHandle);
             MI_oneway_auto.Click += (s, ev) => { oneWayEnd = null; if (legsNumbered) DrawEditColored(); };
             editMenu.Items.Add(MI_split);
@@ -203,6 +209,8 @@ namespace Carbonix
             editMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
             editMenu.Items.Add(MI_delete);
             editMenu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+            editMenu.Items.Add(MI_start_here);
+            editMenu.Items.Add(MI_start_auto);
             editMenu.Items.Add(MI_oneway_end);
             editMenu.Items.Add(MI_oneway_auto);
 
@@ -220,7 +228,8 @@ namespace Carbonix
                     "• Click a “+” midpoint to add a vertex; a “+” at a free leg end\n" +
                     "  extends that leg.\n" +
                     "• Right-click a vertex to Split leg here / Join legs.\n" +
-                    "• Right-click a dead-end vertex to end a one-way trip there.\n" +
+                    "• Right-click an end or junction vertex to start the tour there;\n" +
+                    "  a dead-end vertex to end a one-way trip there.\n" +
                     "• Reorder legs with ▲/▼ or drag in the list (valid drops only).\n\n" +
                     "Edits change the geometry used by Generate.",
             };
@@ -466,14 +475,30 @@ namespace Carbonix
             return first ? pl.Points[0] : pl.Points[pl.Points.Count - 1];
         }
 
+        // Right-click "Start tour here" on an endpoint/junction vertex.
+        private void SetTourStart(EditHandle h)
+        {
+            var at = HandlePoint(h);
+            if (at == null) return;
+            tourStart = at;
+            if (legsNumbered) DrawEditColored();
+        }
+
         // Right-click "End one-way trip here" on a dead-end vertex.
         private void SetOneWayEnd(EditHandle h)
         {
-            if (h == null) return;
-            var pts = FeatureAt(h.Feature);
-            if (h.Index < 0 || h.Index >= pts.Count) return;
-            oneWayEnd = new PointLatLngAlt(pts[h.Index].Lat, pts[h.Index].Lng, 0);
+            var at = HandlePoint(h);
+            if (at == null) return;
+            oneWayEnd = at;
             if (legsNumbered) DrawEditColored();
+        }
+
+        private PointLatLngAlt HandlePoint(EditHandle h)
+        {
+            if (h == null) return null;
+            var pts = FeatureAt(h.Feature);
+            if (h.Index < 0 || h.Index >= pts.Count) return null;
+            return new PointLatLngAlt(pts[h.Index].Lat, pts[h.Index].Lng, 0);
         }
 
         private static GMapMarker MakeLabel(PointLatLng at, string text, Color col)
@@ -611,7 +636,7 @@ namespace Carbonix
                 ? plugin.Host.cs.PlannedHomeLocation : features[0].First();
             var built = CorridorTourBuilder.Build(
                 features, home, (double)NUM_passoffset.Value, CHK_oneway.Checked, CHK_reverse.Checked,
-                priority != null && priority.Count > 0 ? priority : null, oneWayEnd);
+                priority != null && priority.Count > 0 ? priority : null, oneWayEnd, tourStart);
             edges = built.polylines;
             tour = built.tour;
 
@@ -810,7 +835,11 @@ namespace Carbonix
                 MI_split.Enabled = rh.Index > 0 && rh.Index < pts.Count - 1 && CountFeaturesAtKey(key) == 1;
                 MI_join.Enabled = CanJoinAt(key, out _, out _);
                 MI_delete.Enabled = pts.Count > 2;   // keep the feature a valid (≥2-point) line
-                bool deadEnd = (rh.Index == 0 || rh.Index == pts.Count - 1) && CountFeaturesAtKey(key) == 1;
+                bool endpoint = rh.Index == 0 || rh.Index == pts.Count - 1;
+                bool node = endpoint || CountFeaturesAtKey(key) > 1;   // where the walk can start
+                bool deadEnd = endpoint && CountFeaturesAtKey(key) == 1;
+                MI_start_here.Enabled = node;
+                MI_start_auto.Enabled = tourStart != null;
                 MI_oneway_end.Enabled = CHK_oneway.Checked && deadEnd;
                 MI_oneway_auto.Enabled = CHK_oneway.Checked && oneWayEnd != null;
                 editMenu.Show(map, me.Location);

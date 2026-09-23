@@ -43,10 +43,15 @@ namespace Carbonix.Planning
         /// list are taken first; unlisted edges fall back to the default "branches first"
         /// heuristic. The tour stays a valid connected walk regardless.
         /// </param>
+        /// <param name="startAt">
+        /// Start the tour at the network node (feature endpoint or junction) nearest this
+        /// point instead of the feature endpoint nearest <paramref name="home"/>.
+        /// </param>
         public static (List<Polyline> polylines, List<TourStep> tour) Build(
             List<List<PointLatLngAlt>> features, PointLatLngAlt home,
             double passOffsetM, bool oneWay = false, bool reverse = false,
-            IReadOnlyList<int> legPriority = null, PointLatLngAlt oneWayEnd = null)
+            IReadOnlyList<int> legPriority = null, PointLatLngAlt oneWayEnd = null,
+            PointLatLngAlt startAt = null)
         {
             var polylines = new List<Polyline>();
             var tour = new List<TourStep>();
@@ -100,8 +105,10 @@ namespace Carbonix.Planning
                 }
             }
 
-            // 3. Start at the feature endpoint nearest home.
-            var startNode = ChooseStart(feats, home);
+            // 3. Start at the chosen node, else the feature endpoint nearest home.
+            var startNode = startAt != null
+                ? nodePoint.OrderBy(kv => kv.Value.GetDistance(startAt)).First().Key
+                : ChooseStart(feats, home);
 
             // One way: choose the end and the edges on the start→end path. Those edges are
             // taken LAST at each node so their back-passes fall at the very end of the walk,

@@ -16,7 +16,8 @@ namespace Carbonix.Tests.Planning
                 Params = new CorridorPlanFile.Parameters
                 {
                     MinAGL = 50, MaxAGL = 120, DefaultAGL = 80, SpeedMs = 25,
-                    PassOffsetM = 100, OneWay = true, OneWayEnd = new[] { -33.1, 151.2 }, Reverse = true,
+                    PassOffsetM = 100, OneWay = true, OneWayEnd = new[] { -33.1, 151.2 },
+                    TourStart = new[] { -33.0, 151.0 }, Reverse = true,
                     CornerCutThresholdDeg = 15, FullOrbitThresholdDeg = 60,
                     OverflyDistM = 100, TurnRadiusM = 300, CornerCutRadiusM = 150,
                     GradWarnPct = 4, GradMaxPct = 5,
@@ -61,6 +62,7 @@ namespace Carbonix.Tests.Planning
             Assert.AreEqual(a.Params.Reverse, b.Params.Reverse);
             Assert.AreEqual(a.Params.OneWay, b.Params.OneWay);
             CollectionAssert.AreEqual(a.Params.OneWayEnd, b.Params.OneWayEnd);
+            CollectionAssert.AreEqual(a.Params.TourStart, b.Params.TourStart);
             Assert.AreEqual(a.Params.GradMaxPct, b.Params.GradMaxPct);
 
             CollectionAssert.AreEqual(a.LegOrder, b.LegOrder);

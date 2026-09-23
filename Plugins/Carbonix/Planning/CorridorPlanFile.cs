@@ -59,6 +59,8 @@ namespace Carbonix.Planning
             public bool OneWay { get; set; }
             /// <summary>[lat, lng] of the chosen one-way end; null = automatic.</summary>
             public double[] OneWayEnd { get; set; }
+            /// <summary>[lat, lng] of the chosen start node; null = nearest home.</summary>
+            public double[] TourStart { get; set; }
             public bool Reverse { get; set; }
             public double CornerCutThresholdDeg { get; set; }
             public double FullOrbitThresholdDeg { get; set; }

@@ -93,6 +93,7 @@ namespace Carbonix
                     PassOffsetM = (double)NUM_passoffset.Value,
                     OneWay = CHK_oneway.Checked,
                     OneWayEnd = oneWayEnd != null ? new[] { oneWayEnd.Lat, oneWayEnd.Lng } : null,
+                    TourStart = tourStart != null ? new[] { tourStart.Lat, tourStart.Lng } : null,
                     Reverse = CHK_reverse.Checked,
                     CornerCutThresholdDeg = (double)NUM_low_thresh.Value,
                     FullOrbitThresholdDeg = (double)NUM_high_thresh.Value,
@@ -196,9 +197,8 @@ namespace Carbonix
                     ceilingZones.Add(new CeilingZone(z.Name ?? "zone", ring, z.CeilingAglM));
             }
 
-            ApplyPlanParameters(plan.Params);
-
             RebuildModel();
+            ApplyPlanParameters(plan.Params);   // after RebuildModel: it clears the start/end picks
             legOrder = plan.LegOrder.ToList();
             foreach (var kv in CorridorPlanFile.ToVertexAlts(plan.AltOverrides)) altOverrides[kv.Key] = kv.Value;
             foreach (var kv in CorridorPlanFile.ToVertexAlts(plan.CornerCutAlts)) cornerCutAlts[kv.Key] = kv.Value;
@@ -227,6 +227,8 @@ namespace Carbonix
                 CHK_oneway.Checked = p.OneWay;
                 oneWayEnd = p.OneWayEnd != null && p.OneWayEnd.Length >= 2
                     ? new PointLatLngAlt(p.OneWayEnd[0], p.OneWayEnd[1], 0) : null;
+                tourStart = p.TourStart != null && p.TourStart.Length >= 2
+                    ? new PointLatLngAlt(p.TourStart[0], p.TourStart[1], 0) : null;
                 CHK_reverse.Checked = p.Reverse;
                 SetNum(NUM_low_thresh, p.CornerCutThresholdDeg);
                 SetNum(NUM_high_thresh, p.FullOrbitThresholdDeg);
@@ -249,11 +251,12 @@ namespace Carbonix
             n.Value = Math.Max(n.Minimum, Math.Min(n.Maximum, v));
         }
 
-        // The tour roots at the endpoint nearest home, so a plan saved from a different launch
-        // point may fly the legs in a different order than it did when saved.
+        // The tour roots at the endpoint nearest home (unless the plan picked its start), so a
+        // plan saved from a different launch point may fly the legs in a different order.
         private void WarnIfHomeMoved(CorridorPlanFile plan)
         {
             if (plan.Home == null || plan.Home.Length < 2) return;
+            if (plan.Params.TourStart != null) return;
             var now = plugin.Host.cs.PlannedHomeLocation;
             if (now.Lat == 0) return;
 

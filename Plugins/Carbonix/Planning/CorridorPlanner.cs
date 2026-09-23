@@ -28,6 +28,9 @@ namespace Carbonix.Planning
         public bool OneWay { get; set; }
         public PointLatLngAlt OneWayEnd { get; set; }
 
+        // Start the tour at the network node nearest this point (null = endpoint nearest home).
+        public PointLatLngAlt TourStart { get; set; }
+
         // Mission options
         public bool ReverseDirection { get; set; } = false;
 

@@ -19,6 +19,9 @@ namespace Carbonix
         // Dead-end the one-way trip should end at (null = automatic: farthest from the start).
         private PointLatLngAlt oneWayEnd;
 
+        // Node (feature endpoint or junction) the tour starts from (null = nearest home).
+        private PointLatLngAlt tourStart;
+
         // ─── Setup (called from the constructor) ────────────────────────────────────
         private void BuildTripControls()
         {
