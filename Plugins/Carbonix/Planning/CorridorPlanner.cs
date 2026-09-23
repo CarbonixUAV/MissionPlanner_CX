@@ -136,9 +136,10 @@ namespace Carbonix.Planning
     /// A loiter-to-altitude inserted on a leg. It splices a plain lead-in waypoint on the line
     /// (exactly where a <see cref="Checkpoint"/> would land, identity = <see cref="Id"/>) PLUS a
     /// <c>LOITER_TO_ALT</c> one turn-radius to one geographic side (<see cref="Side"/> = +1/-1,
-    /// identity = <see cref="LoiterId"/>). Flown toward the segment's far end the spiral targets
-    /// <see cref="LtaAltRelM"/>; flown the other way it targets the lead-in waypoint's own
-    /// altitude — climb one way, descend the other.
+    /// identity = <see cref="LoiterId"/>). On the edge's FIRST traversal in the tour — the pass
+    /// the profile shows and the one it was planned on — the spiral climbs from
+    /// <see cref="LeadInAltRelM"/> to <see cref="LtaAltRelM"/>; on the return traversal it runs
+    /// the other way — climb one way, descend the other.
     /// </summary>
     public struct LoiterToAlt
     {
@@ -1125,7 +1126,7 @@ namespace Carbonix.Planning
             var wps = SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
 
             if (loiterToAlts != null && loiterToAlts.Count > 0)
-                InsertLoiterToAlts(wps, loiterToAlts, byId, p.TurnRadiusM);
+                InsertLoiterToAlts(wps, loiterToAlts, byId, tour, p.TurnRadiusM);
 
             // AFTER the LTA spirals are in place, so a cut out of an LTA reads the spiral's exit alt.
             ApplyCornerCutSlant(wps, p.DefaultAGL, cornerCutAlts);
@@ -1135,12 +1136,12 @@ namespace Carbonix.Planning
         /// <summary>
         /// Attach each loiter-to-alt's spiral to its (already spliced) lead-in waypoint. For
         /// every traversal of the lead-in: place a LOITER_TO_ALT one radius to the chosen
-        /// geographic side; flown toward the segment's far vertex it climbs to the LTA altitude
-        /// and follows the lead-in (the aircraft climbs, THEN proceeds high); flown back it
-        /// targets the lead-in altitude and precedes it (descend, THEN pass the lead-in low).
+        /// geographic side; flown the way the edge is first traversed in the tour (the pass the
+        /// profile shows) it climbs to the LTA altitude; flown back it descends to the lead-in
+        /// altitude. The lead-in is the spiral's tangent entry and always precedes it.
         /// </summary>
         private static void InsertLoiterToAlts(List<CorridorWaypoint> wps, IReadOnlyList<LoiterToAlt> ltas,
-                                               Dictionary<int, Polyline> byId, double radius)
+                                               Dictionary<int, Polyline> byId, List<TourStep> tour, double radius)
         {
             var inserts = new List<(int at, CorridorWaypoint wp)>();
             foreach (var lta in ltas)
@@ -1152,6 +1153,11 @@ namespace Carbonix.Planning
                 var v1 = pl.Points[lta.SegmentIndex + 1];
                 double segBearing = v0.GetBearing(v1);                              // geographic V0 -> V1
                 double perpBearing = segBearing + (lta.Side >= 0 ? 90.0 : -90.0);   // fixed geographic side
+
+                // Which way along the polyline the planned (first) pass runs. A tour rooted at the
+                // polyline's far end walks it in Reverse first, so "toward V1" is then the return.
+                var firstStep = tour?.FirstOrDefault(st => st.PolylineId == lta.PolylineId);
+                bool firstTowardV1 = firstStep == null || firstStep.Direction == TraverseDir.Forward;
 
                 for (int i = 0; i < wps.Count; i++)
                 {
@@ -1167,10 +1173,11 @@ namespace Carbonix.Planning
                     // The lead-in is the spiral's tangent ENTRY: the aircraft arrives there at the
                     // entry-side altitude, then the spiral changes to the exit-side altitude. So per
                     // pass the lead-in carries the arrival alt and the spiral targets the far side
-                    // (out: low → high; back: high → low). The lead-in ALWAYS precedes the spiral.
-                    lead.AltRelM = towardV1 ? lta.LeadInAltRelM : lta.LtaAltRelM;
+                    // (planned pass: low → high; return: high → low).
+                    bool climb = towardV1 == firstTowardV1;
+                    lead.AltRelM = climb ? lta.LeadInAltRelM : lta.LtaAltRelM;
                     lead.AltAGL  = lead.AltRelM - lead.TerrainAltM;
-                    double target = towardV1 ? lta.LtaAltRelM : lta.LeadInAltRelM;
+                    double target = climb ? lta.LtaAltRelM : lta.LeadInAltRelM;
 
                     var centre = leadPt.newpos(perpBearing, radius);
 
