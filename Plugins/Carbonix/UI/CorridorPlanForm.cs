@@ -191,22 +191,29 @@ namespace Carbonix
         }
 
         // Re-apply stored alt overrides to a freshly generated mission + profile, so edits
-        // persist across a regenerate (both share VertexIds, so one value drives both).
+        // persist across a regenerate (both share VertexIds, so one value drives both). The
+        // engine already applied them before slanting the corner cuts; this pass covers any
+        // sample the engine doesn't own, and leaves the cuts' chord endpoints to the slant.
         private void ApplyAltOverrides()
         {
             if (altOverrides.Count == 0) return;
 
             if (generatedWps != null)
-                foreach (var wp in generatedWps)
-                    if (altOverrides.TryGetValue(wp.Vertex, out var a))
-                    {
-                        wp.AltRelM = a;
-                        wp.AltAGL = a - (wp.TerrainAltM - homeTerrainAlt);
-                    }
+                for (int i = 0; i < generatedWps.Count; i++)
+                {
+                    var wp = generatedWps[i];
+                    if (!altOverrides.TryGetValue(wp.Vertex, out var a)) continue;
+                    bool chord = wp.IsLineWaypoint && !wp.IsTurnHelper &&
+                        ((i + 1 < generatedWps.Count && generatedWps[i + 1].IsLineWaypoint && generatedWps[i + 1].Vertex == wp.Vertex) ||
+                         (i > 0 && generatedWps[i - 1].IsLineWaypoint && generatedWps[i - 1].Vertex == wp.Vertex));
+                    if (chord) continue;
+                    wp.AltRelM = a;
+                    wp.AltAGL = a - (wp.TerrainAltM - homeTerrainAlt);
+                }
 
             if (elevationPoints != null)
                 foreach (var s in elevationPoints)
-                    if (altOverrides.TryGetValue(s.Vertex, out var a))
+                    if (!s.IsCornerCutEndpoint && !s.IsCornerCutControl && altOverrides.TryGetValue(s.Vertex, out var a))
                         s.AltRelM = a;
         }
 
@@ -576,6 +583,12 @@ namespace Carbonix
             if (elevationPoints == null) return;
             var stations = elevationPoints.Where(s => s.IsLineWaypoint || s.IsLoiterWaypoint)
                                           .OrderBy(s => s.DistM).ToList();
+            // A neighbouring cut is seen through its fit point, not its chord (see the engine's
+            // ApplyCornerCutSlant) — so the cuts never depend on each other's output.
+            var controlByVertex = new Dictionary<Carbonix.Planning.VertexId, ElevationPoint>();
+            foreach (var c in elevationPoints.Where(s => s.IsCornerCutControl))
+                if (!controlByVertex.ContainsKey(c.Vertex)) controlByVertex[c.Vertex] = c;
+
             foreach (var control in elevationPoints.Where(s => s.IsCornerCutControl))
             {
                 var ends = elevationPoints.Where(s => s.IsCornerCutEndpoint && s.Vertex == control.Vertex)
@@ -586,13 +599,29 @@ namespace Carbonix
                 if (ei <= 0 || xi < 0 || xi + 1 >= stations.Count) continue;
                 var prev = stations[ei - 1]; var next = stations[xi + 1];
 
-                // A loiter prev's altitude is carried out of its EXIT (anchor + arc), so the
-                // incoming leg starts there — otherwise the spiral length inflates the run and the
-                // leg reads near-flat, kinking the join out of an LTA.
-                double prevDist = prev.IsLoiterWaypoint ? prev.DistM + prev.LoiterArcLengthM : prev.DistM;
+                // Reference nodes. A loiter prev's altitude is carried out of its EXIT (anchor +
+                // arc), so the incoming leg starts there — otherwise the spiral length inflates the
+                // run and the leg reads near-flat, kinking the join out of an LTA.
+                double prevDist, nextDist;
+                if (prev.IsCornerCutEndpoint && controlByVertex.TryGetValue(prev.Vertex, out var pc))
+                {
+                    prev = pc; prevDist = pc.DistM;
+                }
+                else
+                {
+                    prevDist = prev.IsLoiterWaypoint ? prev.DistM + prev.LoiterArcLengthM : prev.DistM;
+                }
+                if (next.IsCornerCutEndpoint && controlByVertex.TryGetValue(next.Vertex, out var nc))
+                {
+                    next = nc; nextDist = nc.DistM;
+                }
+                else
+                {
+                    nextDist = next.DistM;
+                }
                 double xEntry = entry.DistM - prevDist;
                 double xMid   = 0.5 * (entry.DistM + exit.DistM) - prevDist;
-                double xNext  = next.DistM - prevDist;
+                double xNext  = nextDist - prevDist;
                 if (xEntry < 1e-6 || (xNext - xMid) < 1e-6) continue;
 
                 cornerCutJobs.Add(new CornerCutJob
@@ -604,7 +633,7 @@ namespace Carbonix
             }
         }
 
-        // Re-run every corner cut's fit-point spline against its CURRENT neighbour + control
+        // Re-run every corner cut's chamfer against its CURRENT neighbour-node + control
         // altitudes, so the chord tracks adjacent edits live — matching what a regenerate produces.
         // Cheap enough to call on every mouse-move: the geometry is cached (see RebuildCornerCutJobs).
         private void RecomputeCornerCuts()
@@ -615,8 +644,8 @@ namespace Carbonix
                 double yPrev = j.Prev.AltRelM, yNext = j.Next.AltRelM, ySet = j.Control.AltRelM;
                 double gIn  = (ySet - yPrev) / j.XMid;
                 double gOut = (yNext - ySet) / (j.XNext - j.XMid);
-                j.Entry.AltRelM = yPrev + gIn * j.XEntry;        // incoming leg at entry x
-                j.Exit.AltRelM  = ySet + gOut * j.ExitHalfChord; // outgoing leg at exit x
+                j.Entry.AltRelM = yPrev + gIn * j.XEntry;        // incoming line at entry x
+                j.Exit.AltRelM  = ySet + gOut * j.ExitHalfChord; // outgoing line at exit x
             }
         }
 
@@ -1124,6 +1153,7 @@ namespace Carbonix
                 var capturedCheckpoints = checkpoints.ToList();
                 var capturedLtas = loiterToAlts.ToList();
                 var capturedCornerCuts = new Dictionary<Carbonix.Planning.VertexId, double>(cornerCutAlts);
+                var capturedOverrides = new Dictionary<Carbonix.Planning.VertexId, double>(altOverrides);
                 // Honour the Edit tab's branch-visit order so the export matches the preview.
                 var capturedLegOrder = legOrder.Count > 0 ? legOrder.ToList() : null;
                 var capturedZones = ceilingZones.ToList();
@@ -1136,7 +1166,7 @@ namespace Carbonix
                         var (pls, tr) = CorridorTourBuilder.Build(
                             capturedFeatures, capturedHome, capturedP.PassOffsetM, capturedP.OneWay, reverse,
                             capturedLegOrder, capturedP.OneWayEnd, capturedP.TourStart);
-                        var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts);
+                        var generated = CorridorPlanner.GenerateMissionFromTour(pls, tr, capturedP, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts, capturedOverrides);
 
                         // The elevation profile is a single representative view of both passes,
                         // so build it from a centreline (offset 0) mission of the same tour:
@@ -1146,8 +1176,8 @@ namespace Carbonix
                         // stays the flown/exported one (map, stats, accept).
                         var pCenter = capturedP.Clone();
                         pCenter.PassOffsetM = 0;
-                        var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts);
-                        var profile = BuildTourProfile(centreMission, capturedHome, homeT);
+                        var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts, capturedOverrides);
+                        var profile = BuildTourProfile(centreMission, capturedHome, homeT, capturedCornerCuts);
                         EnsureSurfacesLoaded();   // remote header fetch happens here, off the UI thread
                         foreach (var ep in profile)
                         {
@@ -1214,7 +1244,8 @@ namespace Carbonix
         }
 
         internal static List<ElevationPoint> BuildTourProfile(
-            List<CorridorWaypoint> wps, PointLatLngAlt home, double homeTerrainAlt)
+            List<CorridorWaypoint> wps, PointLatLngAlt home, double homeTerrainAlt,
+            IReadOnlyDictionary<Carbonix.Planning.VertexId, double> cornerCutAlts = null)
         {
             const double SampleSpacingM = 25.0;
             var samples = new List<ElevationPoint>();
@@ -1435,28 +1466,39 @@ namespace Carbonix
             }
 
             // Corner-cut control points: a cut is a vertex with TWO line-WP samples (entry/exit).
-            // Add the fit-point handle at the cut midpoint; reconstruct its control altitude from
-            // the incoming leg (inverse of the engine's fit-point spline) so a drag can set it.
+            // Add the fit-point handle at the cut midpoint with its control altitude: the caller's
+            // stored value when it has one, else reconstructed from the incoming leg (inverse of the
+            // engine's chamfer, so the handle sits where the engine's default put it).
             var stations = samples.Where(s => (s.IsLineWaypoint || s.IsLoiterWaypoint) && !s.IsInserted)
                                   .OrderBy(s => s.DistM).ToList();
             var controls = new List<ElevationPoint>();
+            var controlByVertex = new Dictionary<Carbonix.Planning.VertexId, ElevationPoint>();
             foreach (var g in stations.Where(s => s.IsLineWaypoint).GroupBy(s => s.Vertex).Where(gr => gr.Count() == 2))
             {
                 var pair = g.OrderBy(s => s.DistM).ToList();
                 var entry = pair[0]; var exit = pair[1];
                 int ei = stations.IndexOf(entry), xi = stations.IndexOf(exit);
                 if (ei <= 0 || xi + 1 >= stations.Count) continue;
-                var prev = stations[ei - 1]; var next = stations[xi + 1];
-                // A loiter prev's altitude is carried out of its EXIT (anchor + arc), not its entry.
+                var prev = stations[ei - 1];
+                // The incoming leg runs from the previous CONTROL NODE: a neighbouring cut's fit
+                // point, else the station (a loiter's altitude is carried out of its EXIT).
                 double prevDist = prev.IsLoiterWaypoint ? prev.DistM + prev.LoiterArcLengthM : prev.DistM;
+                double prevAlt = prev.AltRelM;
+                if (prev.IsCornerCutEndpoint && controlByVertex.TryGetValue(prev.Vertex, out var pc))
+                {
+                    prevDist = pc.DistM;
+                    prevAlt = pc.AltRelM;
+                }
                 double xEntry = entry.DistM - prevDist;
                 if (xEntry < 1e-6) continue;
                 double midDist = 0.5 * (entry.DistM + exit.DistM);
                 double xMid = midDist - prevDist;
-                double ySet = prev.AltRelM + (entry.AltRelM - prev.AltRelM) * (xMid / xEntry);
+                double ySet = cornerCutAlts != null && cornerCutAlts.TryGetValue(entry.Vertex, out var stored)
+                    ? stored
+                    : prevAlt + (entry.AltRelM - prevAlt) * (xMid / xEntry);
                 entry.IsCornerCutEndpoint = true;   // dots/hit-test move to the fit point below
                 exit.IsCornerCutEndpoint  = true;
-                controls.Add(new ElevationPoint
+                var control = new ElevationPoint
                 {
                     DistM              = midDist,
                     AltRelM            = ySet,
@@ -1468,7 +1510,9 @@ namespace Carbonix
                     BranchId           = entry.BranchId,
                     Lat                = 0.5 * (entry.Lat + exit.Lat),
                     Lng                = 0.5 * (entry.Lng + exit.Lng),
-                });
+                };
+                controls.Add(control);
+                controlByVertex[entry.Vertex] = control;
             }
             samples.AddRange(controls);
 
