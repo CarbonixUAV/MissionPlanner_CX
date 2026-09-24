@@ -20,6 +20,9 @@ namespace Carbonix
         public List<string> fdmap_baselayer_allow;
         public string controller;
         public string weather_api_key;
+        public int weather_station_udp_port;
+        public int weather_station_log_minutes;
+        public bool weather_station_raw_log;
 
         public GeneralSettings()
         {
@@ -92,6 +95,15 @@ namespace Carbonix
             placeholder for the find/replace.
             */
             weather_api_key = "5f88b0183ab94ee68cb15d418c";
+            // WeatherFlow Tempest hubs broadcast on this port
+            weather_station_udp_port = 50222;
+            // How often the station's report goes into the flight log while
+            // connected, on top of the copy sent when arming; 0 for only
+            // the arming copy
+            weather_station_log_minutes = 10;
+            // Debug: write every datagram from the station to a file under
+            // the tlog folder, created on the first packet
+            weather_station_raw_log = false;
         }
     }
 

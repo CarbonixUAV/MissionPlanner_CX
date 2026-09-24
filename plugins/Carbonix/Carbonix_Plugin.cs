@@ -20,6 +20,7 @@ using System.Text.RegularExpressions;
 using Carbonix.CAS;
 using Carbonix.MapTiles;
 using Carbonix.Warnings;
+using Carbonix.Weather;
 using GMap.NET.WindowsForms;
 
 namespace Carbonix
@@ -54,6 +55,9 @@ namespace Carbonix
 
         // Custom map tilesets (MBTiles) drawn over the base map
         MapTilesCoordinator _maptiles;
+
+        // Ground weather station: second wind bug and details window
+        WeatherStationCoordinator _weather;
 
         public override bool Init() { return true; }
 
@@ -105,6 +109,16 @@ namespace Carbonix
                 log.Error("map tileset setup failed", ex);
             }
 
+            // Wind barbs for the aircraft and the ground weather station
+            try
+            {
+                _weather = new WeatherStationCoordinator(Host, settings.weather_station_udp_port, settings.weather_station_raw_log);
+            }
+            catch (Exception ex)
+            {
+                log.Error("weather station setup failed", ex);
+            }
+
             // Change HUD bottom color to a lighter brown color than stock
             Host.MainForm.FlightData.Load += new EventHandler(ForceHUD);
 
@@ -135,11 +149,13 @@ namespace Carbonix
             _cas?.Dispose();
             _warningEngine?.Dispose();
             _maptiles?.Dispose();
+            _weather?.Dispose();
 
             return true;
         }
 
         bool last_arm_state = false; // Used to detect rising edge from disarm to arm
+        DateTime last_weather_report = DateTime.MinValue; // Last time the station report went to the log
         bool last_controller_state = false; // Used to detect change in controller connection
         string last_firmware_version = ""; // Used to prevent unecessary repeated regex parsing (probably unnecessary optimization, but whatever)
         bool has_warned_firmware = false; // We only need to pop up a firmware warning once per session
@@ -219,6 +235,15 @@ namespace Carbonix
                 {
                     Host.comPort.send_text((byte)MAVLink.MAV_SEVERITY.INFO, record);
                 }
+                SendWeatherReport();
+            }
+
+            // Periodic copy of the station report while connected, armed or
+            // not. Zero or less would send every loop tick, so it means off.
+            if (is_connected && settings.weather_station_log_minutes > 0 &&
+                DateTime.UtcNow - last_weather_report >= TimeSpan.FromMinutes(settings.weather_station_log_minutes))
+            {
+                SendWeatherReport();
             }
             
             // Update the Can Records tab completion checkbox on disarm
@@ -294,6 +319,21 @@ namespace Carbonix
             Formatting = Formatting.Indented,
             ObjectCreationHandling = ObjectCreationHandling.Replace,
         };
+
+        /// <summary>
+        /// Sends the ground station's METAR-shaped report as STATUSTEXT, so
+        /// it lands in the dataflash and tlog.
+        /// </summary>
+        void SendWeatherReport()
+        {
+            last_weather_report = DateTime.UtcNow;
+            if (_weather == null)
+                return;
+            foreach (var line in _weather.ReportLines(DateTime.UtcNow))
+            {
+                Host.comPort.send_text((byte)MAVLink.MAV_SEVERITY.INFO, line);
+            }
+        }
 
         private void LoadSettings()
         {
