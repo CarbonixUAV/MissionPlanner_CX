@@ -55,6 +55,9 @@ namespace Carbonix
         // Custom map tilesets (MBTiles) drawn over the base map
         MapTilesCoordinator _maptiles;
 
+        // Click-to-drop pin and mouse ruler on the flight map
+        MapPinTool _mappin;
+
         public override bool Init() { return true; }
 
         public override bool Loaded()
@@ -105,6 +108,18 @@ namespace Carbonix
                 log.Error("map tileset setup failed", ex);
             }
 
+            // Left click on the flight map drops a pin and rulers to the mouse.
+            // Same rule as the tilesets above: a map tool that fails to attach
+            // must not stop the rest of the plugin loading.
+            try
+            {
+                _mappin = new MapPinTool(Host);
+            }
+            catch (Exception ex)
+            {
+                log.Error("map pin setup failed", ex);
+            }
+
             // Change HUD bottom color to a lighter brown color than stock
             Host.MainForm.FlightData.Load += new EventHandler(ForceHUD);
 
@@ -135,6 +150,7 @@ namespace Carbonix
             _cas?.Dispose();
             _warningEngine?.Dispose();
             _maptiles?.Dispose();
+            _mappin?.Dispose();
 
             return true;
         }
