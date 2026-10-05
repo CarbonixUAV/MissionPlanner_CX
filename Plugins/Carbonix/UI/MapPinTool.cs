@@ -72,11 +72,12 @@ namespace Carbonix
         int _terrain_tries;
         DateTime _terrain_next = DateTime.MinValue;
 
-        // Magnetic declination from the vehicle, refreshed lazily: the param
-        // list is a linear scan under a lock, and declination only moves when
-        // the vehicle travels a long way.
-        double? _declination;
-        DateTime _declination_stale = DateTime.MinValue;
+        // Magnetic declination at the pin from the World Magnetic Model,
+        // worked out once when the pin lands. NaN at the poles.
+        double _declination = double.NaN;
+
+        // Logged once per session rather than on every pin.
+        static bool _wmm_expiry_logged;
 
         // Displayed TCPA, and when its gates started failing. A lost answer
         // rides on the last good figure for a while before the line goes.
@@ -298,6 +299,17 @@ namespace Carbonix
             _terrain_tries = 0;
             _terrain_next = DateTime.MinValue;
 
+            // Height moves the declination by hundredths of a degree, so the
+            // terrain answer is not worth waiting for.
+            var now = DateTime.UtcNow;
+            _declination = Wmm.Declination(position.Lat, position.Lng, 0, now);
+
+            if (Wmm.DecimalYear(now) >= Wmm.ValidUntil && !_wmm_expiry_logged)
+            {
+                _wmm_expiry_logged = true;
+                log.Warn("WMM is past its validity; magnetic bearings are extrapolated");
+            }
+
             // The old estimate was for a different point. The speed filter
             // carries over, since it does not depend on the pin.
             ForgetTcpa();
@@ -394,37 +406,15 @@ namespace Carbonix
         }
 
         /// <summary>
-        /// The magnetic bearing, or an empty string when the vehicle has not
-        /// given us a declination to work from.
+        /// Formats the magnetic bearing, or an empty string at the poles where
+        /// declination is undefined.
         /// </summary>
         string Magnetic(double trueBearing)
         {
-            var declination = Declination();
-
-            if (declination == null)
+            if (double.IsNaN(_declination))
                 return "";
 
-            return Angles.Wrap360(Math.Round(trueBearing - declination.Value)).ToString("000") + "°M";
-        }
-
-        /// <summary>
-        /// Declination in degrees, east positive, taken from the vehicle rather
-        /// than a model of our own - Mission Planner does not carry one, and
-        /// the vehicle's figure is the one its own heading is referenced to.
-        /// </summary>
-        double? Declination()
-        {
-            if (DateTime.UtcNow >= _declination_stale)
-            {
-                _declination_stale = DateTime.UtcNow.AddSeconds(10);
-
-                var param = _host.comPort?.MAV?.param?["COMPASS_DEC"];
-                _declination = param == null
-                    ? (double?)null
-                    : (float)param * MathHelper.rad2deg;
-            }
-
-            return _declination;
+            return Angles.Wrap360(Math.Round(trueBearing - _declination)).ToString("000") + "°M";
         }
 
         // --------------------------------------------------
