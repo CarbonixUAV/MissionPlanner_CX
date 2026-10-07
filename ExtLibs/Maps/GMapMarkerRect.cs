@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using GMap.NET;
@@ -30,7 +31,15 @@ namespace GMap.NET.WindowsForms
 
         public GMapMarker InnerMarker;
 
-        public double wprad = 0; 
+        public double wprad = 0;
+
+        /// <summary>
+        /// Direction of travel around the circle: 1 clockwise, -1 counter-clockwise, 0 draws no arrows.
+        /// </summary>
+        public int LoiterDirection = 0;
+
+        /// <summary>Arrow arm length in pixels, matching <see cref="GMapRoute.ArrowLength"/>.</summary>
+        public float ArrowLength = 15;
 
         public void ResetColor()
         {
@@ -94,7 +103,65 @@ namespace GMap.NET.WindowsForms
                 {
                     g.FillPie(new SolidBrush(FillColor.Value), rect, 0, 360);
                 }
+
+                if (LoiterDirection != 0)
+                {
+                    DrawDirectionArrows(g, rect);
+                }
             }
+        }
+
+        void DrawDirectionArrows(IGraphics g, System.Drawing.Rectangle circle)
+        {
+            using (var solid = new Pen(Pen.Color, Pen.Width))
+            {
+                foreach (var arrow in DirectionArrows(circle, LoiterDirection, ArrowLength))
+                {
+                    g.DrawLine(solid, arrow[0].X, arrow[0].Y, arrow[1].X, arrow[1].Y);
+                    g.DrawLine(solid, arrow[0].X, arrow[0].Y, arrow[2].X, arrow[2].Y);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Computes arrowheads tangent to the circle at its top and bottom, pointing in the direction of travel.
+        /// </summary>
+        /// <param name="circle">Bounding box of the circle in pixel coordinates.</param>
+        /// <param name="direction">1 clockwise, -1 counter-clockwise; 0 yields no arrows.</param>
+        /// <param name="arrowLength">Arm length in pixels.</param>
+        /// <returns>One [tip, left arm end, right arm end] triple per arrow; empty when the radius is shorter than an arm.</returns>
+        public static List<PointF[]> DirectionArrows(RectangleF circle, int direction, float arrowLength)
+        {
+            var arrows = new List<PointF[]>();
+            float radius = circle.Width / 2f;
+            if (direction == 0 || radius < arrowLength)
+                return arrows;
+
+            float cx = circle.X + radius;
+            float cy = circle.Y + radius;
+            double deg2rad = Math.PI / 180.0;
+
+            // Screen coordinates: y grows downward, so compass bearing b is at (sin b, -cos b)
+            // and the clockwise tangent there is (cos b, sin b).
+            foreach (var bearing in new[] { 0.0, 180.0 })
+            {
+                double b = bearing * deg2rad;
+                float tipX = cx + radius * (float)Math.Sin(b);
+                float tipY = cy - radius * (float)Math.Cos(b);
+                double travel = Math.Atan2(direction * Math.Sin(b), direction * Math.Cos(b));
+
+                double leftAngle = travel + 210 * deg2rad;
+                double rightAngle = travel - 210 * deg2rad;
+
+                arrows.Add(new[]
+                {
+                    new PointF(tipX, tipY),
+                    new PointF(tipX + arrowLength * (float)Math.Cos(leftAngle), tipY + arrowLength * (float)Math.Sin(leftAngle)),
+                    new PointF(tipX + arrowLength * (float)Math.Cos(rightAngle), tipY + arrowLength * (float)Math.Sin(rightAngle)),
+                });
+            }
+
+            return arrows;
         }
     }
 }
