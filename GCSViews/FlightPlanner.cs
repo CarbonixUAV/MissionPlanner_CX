@@ -1671,10 +1671,47 @@ namespace MissionPlanner.GCSViews
             writeKML();
         }
 
-        internal static void addpolygonmarker(Control src, string tag, double lng, double lat, int alt, Color? color, GMapOverlay overlay)
+        /// <summary>
+        /// Draws the guided-mode target marker and its radius circle.
+        /// </summary>
+        internal static void addGuidedModeMarker(Control src, MAVState MAV, GMapOverlay overlay)
+        {
+            double? radius = null;
+            int direction = 0;
+
+            // Q_GUIDED_MODE 1 makes a quadplane hover at the target instead of loitering around it
+            if (MAV.cs.firmware == Firmwares.ArduPlane &&
+                MAV.param.ContainsKey("WP_LOITER_RAD") &&
+                !(MAV.param.ContainsKey("Q_GUIDED_MODE") && (float) MAV.param["Q_GUIDED_MODE"] == 1))
+            {
+                float loiterrad = (float) MAV.param["WP_LOITER_RAD"];
+                radius = Math.Abs(loiterrad);
+                direction = loiterrad < 0 ? -1 : 1;
+            }
+
+            addpolygonmarker(src, "Guided Mode", MAV.GuidedMode.y / 1e7, MAV.GuidedMode.x / 1e7,
+                (int) MAV.GuidedMode.z, Color.Blue, overlay, radius, direction);
+        }
+
+        /// <summary>
+        /// Adds a pin with a radius circle to the overlay, or moves the pair already carrying the tag.
+        /// </summary>
+        internal static void addpolygonmarker(Control src, string tag, double lng, double lat, int alt, Color? color, GMapOverlay overlay,
+            double? radius = null, int loiterDirection = 0)
         {
             try
             {
+                if (!radius.HasValue)
+                {
+                    try
+                    {
+                        radius = Settings.Instance.GetFloat("TXT_WPRad") / CurrentState.multiplierdist;
+                    }
+                    catch
+                    {
+                    }
+                }
+
                 var existing = overlay.Markers.Where(a => a.Tag == tag);
                 if (existing.Count() > 0)
                 {
@@ -1689,14 +1726,11 @@ namespace MissionPlanner.GCSViews
                     var mBorders = rect.First();
                     mBorders.Position = pos;
 
-                    try
+                    if (radius.HasValue)
                     {
-                        mBorders.wprad =
-                            (Settings.Instance.GetFloat("TXT_WPRad") / CurrentState.multiplierdist);
+                        mBorders.wprad = radius.Value;
                     }
-                    catch
-                    {
-                    }
+                    mBorders.LoiterDirection = loiterDirection;
 
                     if (color.HasValue)
                     {
@@ -1714,14 +1748,11 @@ namespace MissionPlanner.GCSViews
                     GMapMarkerRect mBorders = new GMapMarkerRect(point);
                     {
                         mBorders.InnerMarker = m;
-                        try
+                        if (radius.HasValue)
                         {
-                            mBorders.wprad =
-                                (Settings.Instance.GetFloat("TXT_WPRad") / CurrentState.multiplierdist);
+                            mBorders.wprad = radius.Value;
                         }
-                        catch
-                        {
-                        }
+                        mBorders.LoiterDirection = loiterDirection;
 
                         if (color.HasValue)
                         {
@@ -6754,9 +6785,7 @@ Column 1: Field type (RALLY is the only one at the moment -- may have RALLY_LAND
 
                 if (MainV2.comPort.MAV.cs.mode.ToLower() == "guided" && MainV2.comPort.MAV.GuidedMode.x != 0)
                 {
-                    addpolygonmarker(this, "Guided Mode", MainV2.comPort.MAV.GuidedMode.y / 1e7,
-                        MainV2.comPort.MAV.GuidedMode.x / 1e7,
-                        (int) MainV2.comPort.MAV.GuidedMode.z, Color.Blue, routesoverlay);
+                    addGuidedModeMarker(this, MainV2.comPort.MAV, routesoverlay);
                 }
             }
             catch (Exception ex)
