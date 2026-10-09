@@ -642,8 +642,7 @@ namespace Carbonix
             // ------------------------------------
             // Remove WP progress bar on FlightData
             // ------------------------------------
-            // Hacky, but gets the job done
-            // (the control is private, and seems to resist attempts to set Visible to false)
+            // Hacky, but gets the job done (the control is private)
             foreach (Control c in Host.FDGMapControl.Parent.Controls)
             {
                 if (c.Name == "distanceBar1")
@@ -651,6 +650,13 @@ namespace Carbonix
                     c.Size = new System.Drawing.Size(0, 0);
                     break;
                 }
+            }
+            // FlightData also paints the bar onto the map itself, whatever the control's size or
+            // visibility; at 0x0 that paint throws on every map repaint
+            var paintBar = Host.MainForm.FlightData.GetType().GetMethod("mymap_Paint", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (paintBar != null)
+            {
+                Host.FDGMapControl.Paint -= (PaintEventHandler)Delegate.CreateDelegate(typeof(PaintEventHandler), Host.MainForm.FlightData, paintBar);
             }
 
             // -----------------------------
