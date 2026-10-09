@@ -531,10 +531,39 @@ namespace MissionPlanner
             }
         }
 
+        // Keyed by exception type and call path; some sites throw every few seconds by design
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> firstChanceSeen =
+            new System.Collections.Concurrent.ConcurrentDictionary<string, bool>();
+
+        [ThreadStatic] private static bool inFirstChance;
+
         private static void CurrentDomain_FirstChanceException(object sender,
             System.Runtime.ExceptionServices.FirstChanceExceptionEventArgs e)
         {
-            log.Debug("FirstChanceException in: " + e.Exception.Source, e.Exception);
+            // A throw inside this handler raises the event again
+            if (inFirstChance)
+                return;
+            inFirstChance = true;
+            try
+            {
+                var frames = new StackTrace(1, false).GetFrames() ?? new StackFrame[0];
+                var key = e.Exception.GetType() + " " +
+                          string.Join("<", frames.Select(f => f.GetMethod()).Select(m => m?.DeclaringType + "." + m?.Name));
+                if (!firstChanceSeen.TryAdd(key, true))
+                    return;
+
+                // Until it unwinds, the exception's own trace holds only the throwing frame
+                log.Debug("FirstChanceException in: " + e.Exception.Source +
+                          " (repeats from this call path are not logged)" + Environment.NewLine +
+                          new StackTrace(1, true), e.Exception);
+            }
+            catch
+            {
+            }
+            finally
+            {
+                inFirstChance = false;
+            }
         }
 
         private static Assembly CurrentDomain_TypeResolve(object sender, ResolveEventArgs args)
