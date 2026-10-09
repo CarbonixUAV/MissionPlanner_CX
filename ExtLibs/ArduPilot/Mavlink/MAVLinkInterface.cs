@@ -5116,9 +5116,6 @@ Mission Planner waits for 2 valid heartbeat packets before connecting
                         // Tolerate a small amount of packet order shuffling. This can happen on UDP
                         if (numLost >= 240)
                         {
-                            if (!logreadmode)
-                                log.Info($"mav {sysid}-{compid} seqno {packetSeqNo} exp {expectedPacketSeqNo} shuffle detected");
-
                             // We have found a packet we previously marked missed, adjust accordingly
                             MAVlist[sysid, compid].packetslost--;
                             WhenPacketLost.OnNext(-1);
@@ -5130,9 +5127,6 @@ Mission Planner waits for 2 valid heartbeat packets before connecting
                         {
                             MAVlist[sysid, compid].packetslost += numLost;
                             WhenPacketLost.OnNext(numLost);
-
-                            if (!logreadmode)
-                                log.Info($"mav {sysid}-{compid} seqno {packetSeqNo} exp {expectedPacketSeqNo} pkts lost {numLost}");
                         }
                     }
 
