@@ -52,7 +52,7 @@ namespace RedundantLinkManager
 
             // Track indices and qualities for auto switching
             int firstBest = 0;  // Index of the first link with the best quality
-            int selected = 0;   // Index of the currently selected link
+            int selected = -1;  // Index of the currently selected link, -1 if none
             Link.Quality bestQuality = Link.Quality.Off;  // Quality of the best link
             Link.Quality selectedQuality = Link.Quality.Off;  // Quality of the selected link
 
@@ -68,6 +68,13 @@ namespace RedundantLinkManager
                 // Make it clear which links are disabled, and prevent selecting them manually
                 LinkNames[i].Font = new Font(LinkNames[i].Font, link.Enabled ? FontStyle.Regular : FontStyle.Strikeout);
                 RadioButtons[i].Enabled = link.Enabled;
+
+                // MainV2.SerialReader's fallback can change MainV2.comPort without SwitchLink, so
+                // speech follows the link actually in use rather than the last one switched to
+                if (link.comPort != null)
+                {
+                    link.comPort.speechenabled = link.comPort == Plugin.Host.comPort;
+                }
 
                 if (link.comPort == Plugin.Host.comPort)
                 {
@@ -88,6 +95,15 @@ namespace RedundantLinkManager
                 toolTip1.SetToolTip(LinkNames[i], linkQuality.Reasons);
                 toolTip1.SetToolTip(Bulbs[i], linkQuality.Reasons);
                 toolTip1.SetToolTip(RadioButtons[i], linkQuality.Reasons);
+            }
+
+            // MainV2.comPort is none of the links (MP's own port at startup, or a link just
+            // rebuilt), so show nothing selected rather than a stale link
+            if (selected < 0)
+            {
+                SuppressEvents = true;
+                RadioButtons.ForEach(r => r.Checked = false);
+                SuppressEvents = false;
             }
 
             // Autoswitch
