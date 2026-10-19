@@ -15,6 +15,9 @@ namespace RedundantLinkManager
         // Prevents programatic changes from triggering events
         private bool SuppressEvents = false;
 
+        // Radio unchecked by the selection being handled in Rad_CheckedChanged
+        private RadioButton uncheckedRadio;
+
         private readonly RedundantLinkManager_Plugin Plugin;
 
         private readonly Dictionary<Link.Quality, Color> QualityColors = new Dictionary<Link.Quality, Color>()
@@ -159,15 +162,28 @@ namespace RedundantLinkManager
         private void Rad_CheckedChanged(object sender, EventArgs e)
         {
             if (SuppressEvents) return;
-            
-            // Do nothing when "unchecking"
-            var sender_rad = sender as RadioButton;
-            var index = RadioButtons.IndexOf(sender_rad);
-            if (!sender_rad.Checked) return;
 
-            if(index >= 0)
+            // WinForms unchecks the old radio before raising CheckedChanged on the new one, so
+            // remember it in case the switch is refused
+            var sender_rad = sender as RadioButton;
+            if (!sender_rad.Checked)
             {
-                Plugin.SwitchLink(index);
+                uncheckedRadio = sender_rad;
+                return;
+            }
+            var previous = uncheckedRadio;
+            uncheckedRadio = null;
+
+            var index = RadioButtons.IndexOf(sender_rad);
+            if (index >= 0 && !Plugin.SwitchLink(index))
+            {
+                SuppressEvents = true;
+                sender_rad.Checked = false;
+                if (previous != null)
+                {
+                    previous.Checked = true;
+                }
+                SuppressEvents = false;
             }
         }
 

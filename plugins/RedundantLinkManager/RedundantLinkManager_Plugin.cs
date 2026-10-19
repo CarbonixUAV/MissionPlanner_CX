@@ -237,20 +237,28 @@ namespace RedundantLinkManager
         }
 
         /// <summary>
-        /// Switch active connection to another link
+        /// Switch active connection to another link. Returns whether that link is now the active
+        /// one; a link that has not connected is refused and the active link is left alone.
         /// </summary>
         /// <param name="index">index of the link in the list</param>
-        public void SwitchLink(int index)
+        public bool SwitchLink(int index)
         {
-            if (index < 0 || index >= Links.Count ||
-                Host.comPort == Links[index].comPort)
+            if (index < 0 || index >= Links.Count)
             {
-                return;
+                return false;
+            }
+            if (Host.comPort == Links[index].comPort)
+            {
+                return true;
             }
 
-            if (Links[index].comPort == null)
+            // Only a connected link: RLM hands it to MainV2.Comports once data arrives. A port-less
+            // MAVLinkInterface as MainV2.comPort stops MainV2's reader reading any link, and a
+            // silent retry port blanks the PFD.
+            var target = Links[index].comPort;
+            if (target == null || !MainV2.Comports.Contains(target) || !target.BaseStream.IsOpen)
             {
-                Links[index].comPort = new MAVLinkInterface();
+                return false;
             }
 
             CopyLinkData(Host.comPort, Links[index].comPort);
@@ -259,6 +267,7 @@ namespace RedundantLinkManager
             // Switch the link over
             // Can't use Host.comPort because it has no setter function
             MainV2.comPort = Links[index].comPort;
+            return true;
         }
 
         /// <summary>
