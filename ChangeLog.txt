@@ -1,4 +1,27 @@
-﻿*Mission Planner CX 1.3.83.6 - 2026-06-25
+﻿*Mission Planner CX 1.3.83.7 - 2026-10-29
+  - Map tile overlays
+    - Load transparent overlays from .mbtiles files, drawn over any base map
+    - New "Map Layers" item on the Data and Plan map context menus picks the base map and
+      overlays, and opens the tileset manager
+  - Wind indicators
+    - Replaced the wind arrow with a larger, higher-contrast wind barb that points where the wind
+      is coming from
+    - Added a ground wind barb from the trailer's Tempest weather station
+    - Weather station report is recorded at arm and every 10 minutes, like the METAR report
+  - Map distance tool
+    - Click the Data page map to drop a pin showing its coordinates, terrain height, and the
+      aircraft's distance and bearing from it
+    - Shows time to closest approach when the aircraft is on track to pass near the pin
+    - Hold shift for a ruler from the pin to the mouse
+  - EFB tab: GDL 90 output of the aircraft and ADS-B traffic to AvPlan on an iPad
+  - Added an AMSL option for the PFD altitude tape (right-click the PFD, "Alt strip: AMSL")
+  - Guided circle on the Data page map now uses the plane loiter radius, with direction arrows
+  - Added Mission "Load and Insert" on the plan page context menu
+  - Fixed nuisance airspeed difference CAS alerts, and other PFD values jumping, after clicking
+    on the PFD with non-metric units selected
+  - Reduced log spam. About three quarters of a typical field log was repeated noise
+
+*Mission Planner CX 1.3.83.6 - 2026-06-25
   - Crew Alerting System (CAS)
     - New EICAS-style master warning/caution system replaces the EKF/VIBE indicators on the PFD
     - Alert panel lists all alerts since last acknowledgement
