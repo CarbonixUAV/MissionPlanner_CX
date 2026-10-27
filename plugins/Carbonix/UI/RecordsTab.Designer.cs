@@ -56,6 +56,7 @@ namespace Carbonix
             this.lineSeparator2 = new MissionPlanner.Controls.LineSeparator();
             this.lineSeparator3 = new MissionPlanner.Controls.LineSeparator();
             this.chk_records_done = new System.Windows.Forms.CheckBox();
+            this.chk_dummy = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.num_avbatid)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.num_vtolbatid)).BeginInit();
             this.tableLayoutPanelOuter.SuspendLayout();
@@ -351,6 +352,7 @@ namespace Carbonix
             this.tableLayoutPanelOuter.Controls.Add(this.txt_payload_serial, 1, 8);
             this.tableLayoutPanelOuter.Controls.Add(this.label9, 0, 8);
             this.tableLayoutPanelOuter.Controls.Add(this.chk_records_done, 2, 13);
+            this.tableLayoutPanelOuter.Controls.Add(this.chk_dummy, 2, 8);
             this.tableLayoutPanelOuter.Dock = System.Windows.Forms.DockStyle.Top;
             this.tableLayoutPanelOuter.Location = new System.Drawing.Point(0, 0);
             this.tableLayoutPanelOuter.Margin = new System.Windows.Forms.Padding(2);
@@ -413,12 +415,27 @@ namespace Carbonix
             // chk_records_done
             // 
             this.chk_records_done.AutoSize = true;
-            this.chk_records_done.Location = new System.Drawing.Point(218, 287);
+            this.chk_records_done.Location = new System.Drawing.Point(216, 287);
             this.chk_records_done.Name = "chk_records_done";
             this.chk_records_done.Size = new System.Drawing.Size(52, 17);
             this.chk_records_done.TabIndex = 25;
             this.chk_records_done.Text = "Done";
             this.chk_records_done.UseVisualStyleBackColor = true;
+            // 
+            // chk_dummy
+            // 
+            this.chk_dummy.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.chk_dummy.AutoSize = true;
+            this.chk_dummy.Location = new System.Drawing.Point(216, 197);
+            this.chk_dummy.Margin = new System.Windows.Forms.Padding(3, 0, 3, 0);
+            this.chk_dummy.Name = "chk_dummy";
+            this.chk_dummy.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
+            this.chk_dummy.Size = new System.Drawing.Size(61, 20);
+            this.chk_dummy.TabIndex = 26;
+            this.chk_dummy.Text = "Dummy";
+            this.chk_dummy.UseVisualStyleBackColor = true;
             // 
             // RecordsTab
             // 
@@ -466,5 +483,6 @@ namespace Carbonix
         private System.Windows.Forms.Label label9;
         private System.Windows.Forms.ComboBox cmb_vlos;
         public System.Windows.Forms.CheckBox chk_records_done;
+        private System.Windows.Forms.CheckBox chk_dummy;
     }
 }

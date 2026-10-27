@@ -214,14 +214,12 @@ namespace Carbonix
                 messages.Add($"AVBAT:{num_avbatid.Value}");
             }
 
-            if (txt_payload_serial.Text != "")
+            var payload_serial = txt_payload_serial.Text != "" ? txt_payload_serial.Text : "NoSN";
+            if (chk_dummy.Checked)
             {
-                messages.Add($"PLD:{cmb_payload.Text}:{txt_payload_serial.Text}");
+                payload_serial = $"Dummy_{payload_serial}";
             }
-            else
-            {
-                messages.Add($"PLD:{cmb_payload.Text}");
-            }
+            messages.Add($"PLD:{cmb_payload.Text}_{payload_serial}");
 
             // For the METAR, break into max of 35 character lines, breaking on spaces in the text
             var metar = txt_metar.Text;
