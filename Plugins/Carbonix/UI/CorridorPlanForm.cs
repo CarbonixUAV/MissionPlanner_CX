@@ -128,6 +128,7 @@ namespace Carbonix
             elev_profile.CornerCutControlChanged += ElevProfile_CornerCutControlChanged;
 
             AddGradientRows();
+            AddCornerSplitRow();
             BuildTripControls();
             BuildZonesGroup();
             BuildPlanFileButtons();
@@ -174,6 +175,39 @@ namespace Carbonix
 
             NUM_gradwarn.ValueChanged += GradParams_ValueChanged;
             NUM_gradmax.ValueChanged += GradParams_ValueChanged;
+        }
+
+        // Corner-cut split (see CorridorParameters.CornerCutSplitM). Added in code to avoid
+        // touching the Designer.
+        private System.Windows.Forms.NumericUpDown NUM_cornersplit;
+
+        private void AddCornerSplitRow()
+        {
+            NUM_cornersplit = new System.Windows.Forms.NumericUpDown
+            {
+                Anchor = System.Windows.Forms.AnchorStyles.Left,
+                Increment = 10m,
+                Minimum = 0m,
+                Maximum = 500m,
+                Value = 0m,
+                Width = 59,
+                TextAlign = System.Windows.Forms.HorizontalAlignment.Right,
+            };
+
+            int row = tbl_turns.RowCount;
+            tbl_turns.RowCount = row + 1;
+            tbl_turns.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 24F));
+            tbl_turns.Controls.Add(new System.Windows.Forms.Label
+                { Text = "Corner split:", Anchor = System.Windows.Forms.AnchorStyles.Right, AutoSize = true }, 0, row);
+            tbl_turns.Controls.Add(NUM_cornersplit, 1, row);
+            tbl_turns.Controls.Add(new System.Windows.Forms.Label
+                { Text = "m", Anchor = System.Windows.Forms.AnchorStyles.Left, AutoSize = true }, 2, row);
+
+            tbl_turns.Height += 24;
+            lbl_turninfo.Top += 24;
+            grp_turns.Height += 24;
+
+            NUM_cornersplit.ValueChanged += TurnParams_ValueChanged;
         }
 
         private void GradParams_ValueChanged(object sender, EventArgs e)
@@ -1128,7 +1162,8 @@ namespace Carbonix
 
             lbl_turninfo.Text =
                 $"<{lowThresh}\u00b0: straight | {lowThresh}\u00b0\u2013{highThresh}\u00b0: corner cut | \u2265{highThresh}\u00b0: sharp turn\n" +
-                $"Turn radius: {turnRadius:F0} m  |  Corner radius: {cornerRadius:F0} m";
+                $"Turn radius: {turnRadius:F0} m  |  Corner radius: {cornerRadius:F0} m" +
+                (NUM_cornersplit.Value > 0 ? $"  |  split {NUM_cornersplit.Value:F0} m" : "");
         }
 
         // ─── Generate ─────────────────────────────────────────────────────────────
@@ -1201,6 +1236,7 @@ namespace Carbonix
                         // stays the flown/exported one (map, stats, accept).
                         var pCenter = capturedP.Clone();
                         pCenter.PassOffsetM = 0;
+                        pCenter.CornerCutSplitM = 0;   // the profile shows the nominal (symmetric) cut
                         var centreMission = CorridorPlanner.GenerateMissionFromTour(pls, tr, pCenter, capturedHome, capturedCheckpoints, capturedLtas, capturedCornerCuts, capturedOverrides);
                         var profile = BuildTourProfile(centreMission, capturedHome, homeT, capturedCornerCuts);
                         EnsureSurfacesLoaded();   // remote header fetch happens here, off the UI thread
@@ -1586,6 +1622,7 @@ namespace Carbonix
                 OverflyDistM = (double)NUM_extension.Value,
                 TurnRadiusM = (double)NUM_turnradius.Value,
                 CornerCutRadiusM = (double)NUM_cornerradius.Value,
+                CornerCutSplitM = (double)NUM_cornersplit.Value,
             };
         }
 

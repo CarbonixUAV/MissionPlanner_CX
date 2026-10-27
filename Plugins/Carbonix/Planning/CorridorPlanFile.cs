@@ -67,6 +67,8 @@ namespace Carbonix.Planning
             public double OverflyDistM { get; set; }
             public double TurnRadiusM { get; set; }
             public double CornerCutRadiusM { get; set; }
+            /// <summary>Absent in older files → 0 (symmetric cut).</summary>
+            public double CornerCutSplitM { get; set; }
             public double GradWarnPct { get; set; }
             public double GradMaxPct { get; set; }
         }

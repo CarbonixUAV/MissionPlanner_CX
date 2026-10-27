@@ -51,6 +51,12 @@ namespace Carbonix.Planning
         // Loiter radius for corner-cut inscribed circles (medium turns).
         public double CornerCutRadiusM { get; set; } = 150;
 
+        // Corner-cut split: the inside pass cuts each corner SplitM/2 wider and the outside pass
+        // SplitM/2 tighter, so the out and back chords diverge and bank at stations ~SplitM apart
+        // along each leg (keeps one pass's banked, degraded swath off the other's). The chord
+        // ends stay on the lanes, so the straights keep their offset. 0 = symmetric cut.
+        public double CornerCutSplitM { get; set; } = 0;
+
         // All fields are value types, so a shallow copy is a full copy.
         public CorridorParameters Clone() => (CorridorParameters)MemberwiseClone();
     }
@@ -611,7 +617,8 @@ namespace Carbonix.Planning
             (int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)[] meta,
             CorridorParameters p,
             double turnRadius,
-            double cornerCutRadius)
+            double cornerCutRadius,
+            Func<int, double> cornerCutSplitAt = null)
         {
             var commands = new List<CartCommand>();
             if (poly.Length < 2) return commands;
@@ -692,6 +699,24 @@ namespace Carbonix.Planning
                 {
                     var turn = SolveCornerCut(poly[i], dirIn, dirOut, turnsLeft, cornerCutRadius);
                     if (turn == null) { AddWP(poly[i], i, true); continue; }
+
+                    double split = cornerCutSplitAt?.Invoke(i) ?? 0;
+                    if (split > 0)
+                    {
+                        // Lanes sit right of travel, so a left turn is flown on the outside lane:
+                        // the outside pass cuts tighter, the inside pass wider. Slide both ends
+                        // along their own legs (never off them), at least a quarter of the
+                        // symmetric cut and at most half of each leg.
+                        double pull = turnsLeft ? -split / 2 : split / 2;
+                        double tIn  = Geom.Dot(Geom.Sub(poly[i], turn.EntryPoint), dirIn);
+                        double tOut = Geom.Dot(Geom.Sub(turn.ExitPoint, poly[i]), dirOut);
+                        double maxIn  = 0.5 * Geom.Dot(Geom.Sub(poly[i], poly[i - 1]), dirIn);
+                        double maxOut = 0.5 * Geom.Dot(Geom.Sub(poly[i + 1], poly[i]), dirOut);
+                        tIn  = Math.Min(Math.Max(tIn + pull, 0.25 * tIn), Math.Max(maxIn, tIn));
+                        tOut = Math.Min(Math.Max(tOut + pull, 0.25 * tOut), Math.Max(maxOut, tOut));
+                        turn.EntryPoint = Geom.Sub(poly[i], Geom.Scale(dirIn, tIn));
+                        turn.ExitPoint  = Geom.Add(poly[i], Geom.Scale(dirOut, tOut));
+                    }
 
                     // The two cut points share the corner's VertexId (one linked station) but
                     // sample terrain at their OWN positions (not the corner) so the terrain/target
@@ -882,7 +907,8 @@ namespace Carbonix.Planning
             List<(int lineIdx, bool isLineVertex, int corridorVtxIdx, bool isBranchVertex, int branchId, bool? turnLeftOverride)> combinedMeta,
             Func<CartCommand, PointLatLngAlt, PointLatLngAlt> terrainQueryPoint,
             CorridorParameters p,
-            double homeTerrainAlt)
+            double homeTerrainAlt,
+            Func<int, double> cornerCutSplitAt = null)
         {
             var result = new List<CorridorWaypoint>();
             if (combinedPts.Count == 0) return result;
@@ -903,7 +929,7 @@ namespace Carbonix.Planning
             Vec2[] cartPts = combinedPts.Select(ToCart).ToArray();
             var    meta    = combinedMeta.ToArray();
 
-            var commands = GenerateMissionCartesian(cartPts, meta, p, p.TurnRadiusM, p.CornerCutRadiusM);
+            var commands = GenerateMissionCartesian(cartPts, meta, p, p.TurnRadiusM, p.CornerCutRadiusM, cornerCutSplitAt);
 
             // Terrain (hence altitude) is sampled on the centreline so both lanes share one
             // profile. Turn helpers carry a TerrainAnchor (the orbit exit) so the turn block
@@ -1149,7 +1175,9 @@ namespace Carbonix.Planning
                 return NearestPointOnPolyline(geo, cl).point;
             }
 
-            var wps = SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt);
+            // A one-way step has no partner pass to split away from.
+            var wps = SolveAndBuildWaypoints(combinedPts, combinedMeta, TerrainPoint, p, homeTerrainAlt,
+                i => tour[combinedMeta[i].lineIdx].OneWay ? 0 : p.CornerCutSplitM);
 
             if (loiterToAlts != null && loiterToAlts.Count > 0)
                 InsertLoiterToAlts(wps, loiterToAlts, byId, tour, p.TurnRadiusM);

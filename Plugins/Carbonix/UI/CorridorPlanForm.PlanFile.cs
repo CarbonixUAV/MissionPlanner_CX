@@ -100,6 +100,7 @@ namespace Carbonix
                     OverflyDistM = (double)NUM_extension.Value,
                     TurnRadiusM = (double)NUM_turnradius.Value,
                     CornerCutRadiusM = (double)NUM_cornerradius.Value,
+                    CornerCutSplitM = (double)NUM_cornersplit.Value,
                     GradWarnPct = (double)NUM_gradwarn.Value,
                     GradMaxPct = (double)NUM_gradmax.Value,
                 },
@@ -235,6 +236,7 @@ namespace Carbonix
                 SetNum(NUM_extension, p.OverflyDistM);
                 SetNum(NUM_turnradius, p.TurnRadiusM);
                 SetNum(NUM_cornerradius, p.CornerCutRadiusM);
+                SetNum(NUM_cornersplit, p.CornerCutSplitM);
                 SetNum(NUM_gradwarn, p.GradWarnPct);
                 SetNum(NUM_gradmax, p.GradMaxPct);
             }
