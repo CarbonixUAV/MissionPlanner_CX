@@ -180,8 +180,6 @@ namespace Carbonix
             // 
             this.txt_payload_serial.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.txt_payload_serial.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.Suggest;
-            this.txt_payload_serial.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.HistoryList;
             this.txt_payload_serial.Location = new System.Drawing.Point(84, 200);
             this.txt_payload_serial.Name = "txt_payload_serial";
             this.txt_payload_serial.Size = new System.Drawing.Size(128, 20);
