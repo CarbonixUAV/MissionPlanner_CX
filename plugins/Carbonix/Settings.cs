@@ -263,10 +263,11 @@ namespace Carbonix
                 payloads = new List<string>()
                 {
                     "None",
-                    "Dual GS-120",
-                    "Riegl and GS-120",
-                    "Single GS-120",
-                    "Riegl Vux-120",
+                    "VUX-120,iXM-100",
+                    "VUX-120-23,iXM-GS120",
+                    "2xGS120-FA",
+                    "2xGS120-OBL",
+                    "P3-Gimbal,iXM-GS120"
                 };
 
                 has_avionics_battery = true;
