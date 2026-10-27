@@ -781,10 +781,35 @@ namespace Carbonix
         {
             string ext = Path.GetExtension(path).ToLowerInvariant();
             if (ext == ".kml" || ext == ".kmz")
-                return LoadKml(path);
+                return DropDuplicateFeatures(LoadKml(path));
             if (ext == ".shp")
-                return LoadShp(path);
+                return DropDuplicateFeatures(LoadShp(path));
             return null;
+        }
+
+        // GIS exports sometimes repeat a line as a second placemark (same vertices, either
+        // direction). Every vertex of such a pair is shared by two features, so the tour
+        // builder sees a junction at each one and splits the line into one leg per segment.
+        private static List<List<PointLatLngAlt>> DropDuplicateFeatures(List<List<PointLatLngAlt>> features)
+        {
+            if (features == null) return null;
+            var seen = new HashSet<string>();
+            var result = new List<List<PointLatLngAlt>>();
+            foreach (var f in features)
+            {
+                var keys = f.Select(p => Key(p).ToString()).ToList();
+                string fwd = string.Join(";", keys);
+                keys.Reverse();
+                string rev = string.Join(";", keys);
+                if (seen.Contains(fwd) || seen.Contains(rev))
+                {
+                    log.Warn("Corridor import: dropped duplicate feature (" + f.Count + " pts)");
+                    continue;
+                }
+                seen.Add(fwd);
+                result.Add(f);
+            }
+            return result;
         }
 
         private void BUT_mainline_add_Click(object sender, EventArgs e)
