@@ -15,6 +15,9 @@ namespace RedundantLinkManager
         // Prevents programatic changes from triggering events
         private bool SuppressEvents = false;
 
+        // Radio unchecked by the selection being handled in Rad_CheckedChanged
+        private RadioButton uncheckedRadio;
+
         private readonly RedundantLinkManager_Plugin Plugin;
 
         private readonly Dictionary<Link.Quality, Color> QualityColors = new Dictionary<Link.Quality, Color>()
@@ -49,7 +52,7 @@ namespace RedundantLinkManager
 
             // Track indices and qualities for auto switching
             int firstBest = 0;  // Index of the first link with the best quality
-            int selected = 0;   // Index of the currently selected link
+            int selected = -1;  // Index of the currently selected link, -1 if none
             Link.Quality bestQuality = Link.Quality.Off;  // Quality of the best link
             Link.Quality selectedQuality = Link.Quality.Off;  // Quality of the selected link
 
@@ -65,6 +68,13 @@ namespace RedundantLinkManager
                 // Make it clear which links are disabled, and prevent selecting them manually
                 LinkNames[i].Font = new Font(LinkNames[i].Font, link.Enabled ? FontStyle.Regular : FontStyle.Strikeout);
                 RadioButtons[i].Enabled = link.Enabled;
+
+                // MainV2.SerialReader's fallback can change MainV2.comPort without SwitchLink, so
+                // speech follows the link actually in use rather than the last one switched to
+                if (link.comPort != null)
+                {
+                    link.comPort.speechenabled = link.comPort == Plugin.Host.comPort;
+                }
 
                 if (link.comPort == Plugin.Host.comPort)
                 {
@@ -85,6 +95,15 @@ namespace RedundantLinkManager
                 toolTip1.SetToolTip(LinkNames[i], linkQuality.Reasons);
                 toolTip1.SetToolTip(Bulbs[i], linkQuality.Reasons);
                 toolTip1.SetToolTip(RadioButtons[i], linkQuality.Reasons);
+            }
+
+            // MainV2.comPort is none of the links (MP's own port at startup, or a link just
+            // rebuilt), so show nothing selected rather than a stale link
+            if (selected < 0)
+            {
+                SuppressEvents = true;
+                RadioButtons.ForEach(r => r.Checked = false);
+                SuppressEvents = false;
             }
 
             // Autoswitch
@@ -159,15 +178,28 @@ namespace RedundantLinkManager
         private void Rad_CheckedChanged(object sender, EventArgs e)
         {
             if (SuppressEvents) return;
-            
-            // Do nothing when "unchecking"
-            var sender_rad = sender as RadioButton;
-            var index = RadioButtons.IndexOf(sender_rad);
-            if (!sender_rad.Checked) return;
 
-            if(index >= 0)
+            // WinForms unchecks the old radio before raising CheckedChanged on the new one, so
+            // remember it in case the switch is refused
+            var sender_rad = sender as RadioButton;
+            if (!sender_rad.Checked)
             {
-                Plugin.SwitchLink(index);
+                uncheckedRadio = sender_rad;
+                return;
+            }
+            var previous = uncheckedRadio;
+            uncheckedRadio = null;
+
+            var index = RadioButtons.IndexOf(sender_rad);
+            if (index >= 0 && !Plugin.SwitchLink(index))
+            {
+                SuppressEvents = true;
+                sender_rad.Checked = false;
+                if (previous != null)
+                {
+                    previous.Checked = true;
+                }
+                SuppressEvents = false;
             }
         }
 
