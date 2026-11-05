@@ -39,6 +39,19 @@ namespace Carbonix
         AircraftSettings aircraft_settings;
         Aircraft selected_aircraft;
 
+        // Floor/ceiling surface COGs for the elevation profile's MSA/ceiling lines. The
+        // setting is a URL, or a filename under the user-data "DSM" folder (alongside the
+        // JSON settings / config.xml); an absolute path overrides (Path.Combine drops the base).
+        public string CorridorFloorSurfacePath => ResolveDsmPath(settings?.corridor_floor_surface);
+        public string CorridorCeilingSurfacePath => ResolveDsmPath(settings?.corridor_ceiling_surface);
+
+        private static string ResolveDsmPath(string nameOrPath)
+        {
+            if (string.IsNullOrWhiteSpace(nameOrPath)) return nameOrPath;
+            if (Planning.SurfaceProvider.IsUrl(nameOrPath)) return nameOrPath;   // remote COG
+            return Path.Combine(Settings.GetUserDataDirectory(), "DSM", nameOrPath);
+        }
+
         // Reference to Records tab, and Takeoff tab so its data can be accessed by Loop()
         public RecordsTab tabRecords;
 
