@@ -599,6 +599,24 @@ namespace Carbonix
                     settings.fpmap_menu_maptool_allow
                 );
 
+                // Target-AGL elevation graph alongside the stock one
+                var maptool = ((ToolStripMenuItem)Host.FPMenuMap.Items["mapToolToolStripMenuItem"]).DropDownItems;
+                // Non-modal so the plan map stays navigable; one at a time (it locks the planner)
+                var elevitem = new ToolStripMenuItem("Elevation Graph (Target AGL)");
+                UI.MissionElevationForm elev_form = null;
+                elevitem.Click += (o, e) =>
+                {
+                    if (elev_form != null && !elev_form.IsDisposed)
+                    {
+                        elev_form.Activate();
+                        return;
+                    }
+                    elev_form = new UI.MissionElevationForm(this);
+                    ThemeManager.ApplyThemeTo(elev_form);
+                    elev_form.Show(Host.MainForm);
+                };
+                maptool.Insert(maptool.IndexOfKey("elevationGraphToolStripMenuItem") + 1, elevitem);
+
                 // Replace Clear Mission handler to ask for confirmation
                 Host.FPMenuMap.Items["clearMissionToolStripMenuItem"].Click -= Host.MainForm.FlightPlanner.clearMissionToolStripMenuItem_Click;
                 ((ToolStripMenuItem)Host.FPMenuMap.Items["clearMissionToolStripMenuItem"]).Click += (s, e) =>
