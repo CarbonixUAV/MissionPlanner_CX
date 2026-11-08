@@ -39,6 +39,19 @@ namespace Carbonix
         AircraftSettings aircraft_settings;
         Aircraft selected_aircraft;
 
+        // Floor/ceiling surface COGs for the elevation profile's MSA/ceiling lines. The
+        // setting is a URL, or a filename under the user-data "DSM" folder (alongside the
+        // JSON settings / config.xml); an absolute path overrides (Path.Combine drops the base).
+        public string CorridorFloorSurfacePath => ResolveDsmPath(settings?.corridor_floor_surface);
+        public string CorridorCeilingSurfacePath => ResolveDsmPath(settings?.corridor_ceiling_surface);
+
+        private static string ResolveDsmPath(string nameOrPath)
+        {
+            if (string.IsNullOrWhiteSpace(nameOrPath)) return nameOrPath;
+            if (Planning.SurfaceProvider.IsUrl(nameOrPath)) return nameOrPath;   // remote COG
+            return Path.Combine(Settings.GetUserDataDirectory(), "DSM", nameOrPath);
+        }
+
         // Reference to Records tab, and Takeoff tab so its data can be accessed by Loop()
         public RecordsTab tabRecords;
 
@@ -585,6 +598,24 @@ namespace Carbonix
                     ((ToolStripMenuItem)Host.FPMenuMap.Items["mapToolToolStripMenuItem"]).DropDownItems,
                     settings.fpmap_menu_maptool_allow
                 );
+
+                // Target-AGL elevation graph alongside the stock one
+                var maptool = ((ToolStripMenuItem)Host.FPMenuMap.Items["mapToolToolStripMenuItem"]).DropDownItems;
+                // Non-modal so the plan map stays navigable; one at a time (it locks the planner)
+                var elevitem = new ToolStripMenuItem("Elevation Graph (Target AGL)");
+                UI.MissionElevationForm elev_form = null;
+                elevitem.Click += (o, e) =>
+                {
+                    if (elev_form != null && !elev_form.IsDisposed)
+                    {
+                        elev_form.Activate();
+                        return;
+                    }
+                    elev_form = new UI.MissionElevationForm(this);
+                    ThemeManager.ApplyThemeTo(elev_form);
+                    elev_form.Show(Host.MainForm);
+                };
+                maptool.Insert(maptool.IndexOfKey("elevationGraphToolStripMenuItem") + 1, elevitem);
 
                 // Replace Clear Mission handler to ask for confirmation
                 Host.FPMenuMap.Items["clearMissionToolStripMenuItem"].Click -= Host.MainForm.FlightPlanner.clearMissionToolStripMenuItem_Click;
