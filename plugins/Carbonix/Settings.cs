@@ -171,7 +171,7 @@ namespace Carbonix
                 max_descent_grade = 0.08;
                 cruise_speed = 21.0;
                 landing_hold_minutes = 0;
-                transition_climb = 10;
+                transition_climb = 0;
                 transition_distance = 500;
                 has_engine = false;
 
@@ -229,7 +229,7 @@ namespace Carbonix
                 max_descent_grade = 0.08;
                 cruise_speed = 24.0;
                 landing_hold_minutes = 0;
-                transition_climb = 15;
+                transition_climb = 0;
                 transition_distance = 600;
                 has_engine = true;
 
