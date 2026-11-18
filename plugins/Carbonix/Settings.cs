@@ -28,6 +28,12 @@ namespace Carbonix
         public List<string> gdl90_icaos;
         public List<string> gdl90_callsigns;
 
+        // Floor/ceiling surface COGs (absolute-AMSL max-filtered SRTM) drawn as MSA/ceiling
+        // reference lines on the elevation profile. An https URL, or a filename under the
+        // user-data "DSM" folder (absolute path overrides). Empty = no surface.
+        public string corridor_floor_surface;
+        public string corridor_ceiling_surface;
+
         public GeneralSettings()
         {
             velz_unit = VelZUnits.meters_per_second;
@@ -121,6 +127,9 @@ namespace Carbonix
                 "CXRPAS1",
                 "CXRPAS2",
             };
+
+            corridor_floor_surface = "https://cx-bobs-test-bucket.s3.dualstack.ap-southeast-2.amazonaws.com/floor_surface.tif";
+            corridor_ceiling_surface = "https://cx-bobs-test-bucket.s3.dualstack.ap-southeast-2.amazonaws.com/ceiling_surface.tif";
         }
     }
 
