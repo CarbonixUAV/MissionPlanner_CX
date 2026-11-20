@@ -24,7 +24,7 @@ namespace Carbonix
             messageBoxTimer.Tick += messageBoxTimer_Tick;
         }
 
-        int last_msg_time;
+        (DateTime time, string message) last_msg;
         private void messageBoxTimer_Tick(object sender, EventArgs e)
         {
             if (!this.Visible)
@@ -33,8 +33,8 @@ namespace Carbonix
                 return;
             }
 
-            var messagetime = Host.comPort.MAV.cs.messages.LastOrDefault().time;
-            if (last_msg_time != messagetime.toUnixTime())
+            var latest = Host.comPort.MAV.cs.messages.LastOrDefault();
+            if (!latest.Equals(last_msg))
             {
                 try
                 {
@@ -45,7 +45,7 @@ namespace Carbonix
                     });
                     txt_messagebox.Text = message.ToString();
 
-                    last_msg_time = messagetime.toUnixTime();
+                    last_msg = latest;
                 }
                 catch (Exception ex)
                 {
