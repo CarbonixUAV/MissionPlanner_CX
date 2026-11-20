@@ -133,7 +133,7 @@ namespace MissionPlanner.GCSViews
         double LogPlayBackSpeed = 1.0;
         GMapMarker marker;
 
-        int messagecount;
+        (DateTime time, string message) lastmessage;
 
         //whether or not the output console has already started
         bool outputwindowstarted;
@@ -4323,8 +4323,8 @@ namespace MissionPlanner.GCSViews
 
         private void Messagetabtimer_Tick(object sender, EventArgs e)
         {
-            var messagetime = MainV2.comPort.MAV.cs.messages.LastOrDefault().time;
-            if (messagecount != messagetime.toUnixTime())
+            var latest = MainV2.comPort.MAV.cs.messages.LastOrDefault();
+            if (!latest.Equals(lastmessage))
             {
                 try
                 {
@@ -4335,7 +4335,7 @@ namespace MissionPlanner.GCSViews
                     });
                     txt_messagebox.Text = message.ToString();
 
-                    messagecount = messagetime.toUnixTime();
+                    lastmessage = latest;
                 }
                 catch (Exception ex)
                 {
